@@ -1,0 +1,215 @@
+"""Completion node for Phase 5.
+
+Generates summary and documentation for the completed workflow.
+"""
+
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from ..state import WorkflowState, PhaseStatus, PhaseState
+
+logger = logging.getLogger(__name__)
+
+
+async def completion_node(state: WorkflowState) -> dict[str, Any]:
+    """Generate completion summary and documentation.
+
+    Creates a COMPLETION.md file with:
+    - Summary of what was built
+    - Files created/modified
+    - Test results
+    - Review feedback summary
+    - Any remaining issues
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        State updates with completion status
+    """
+    logger.info(f"Completing workflow for: {state['project_name']}")
+
+    project_dir = Path(state["project_dir"])
+
+    # Update phase status
+    phase_status = state.get("phase_status", {}).copy()
+    phase_5 = phase_status.get("5", PhaseState())
+    phase_5.status = PhaseStatus.IN_PROGRESS
+    phase_5.started_at = datetime.now().isoformat()
+    phase_5.attempts += 1
+    phase_status["5"] = phase_5
+
+    # Gather data for summary
+    plan = state.get("plan", {})
+    impl_result = state.get("implementation_result", {})
+    validation_feedback = state.get("validation_feedback", {})
+    verification_feedback = state.get("verification_feedback", {})
+    errors = state.get("errors", [])
+    git_commits = state.get("git_commits", [])
+
+    # Build summary
+    summary_lines = [
+        f"# Workflow Completion Summary",
+        f"",
+        f"**Project:** {state['project_name']}",
+        f"**Completed:** {datetime.now().isoformat()}",
+        f"",
+        f"## Plan Summary",
+        f"",
+        f"**Name:** {plan.get('plan_name', 'Unknown')}",
+        f"",
+        f"{plan.get('summary', 'No summary available.')}",
+        f"",
+    ]
+
+    # Implementation results
+    if impl_result:
+        summary_lines.extend([
+            f"## Implementation Results",
+            f"",
+            f"- **Files Created:** {impl_result.get('total_files_created', 0)}",
+            f"- **Files Modified:** {impl_result.get('total_files_modified', 0)}",
+            f"- **Tests:** {json.dumps(impl_result.get('test_results', {}))}",
+            f"",
+        ])
+
+    # Validation summary
+    if validation_feedback:
+        summary_lines.extend([
+            f"## Validation Summary",
+            f"",
+        ])
+        for agent, feedback in validation_feedback.items():
+            if hasattr(feedback, "to_dict"):
+                fb_dict = feedback.to_dict()
+            else:
+                fb_dict = feedback if isinstance(feedback, dict) else {"summary": str(feedback)}
+
+            summary_lines.extend([
+                f"### {agent.title()}",
+                f"- **Score:** {fb_dict.get('score', 'N/A')}",
+                f"- **Assessment:** {fb_dict.get('assessment', 'N/A')}",
+                f"- **Summary:** {fb_dict.get('summary', 'N/A')}",
+                f"",
+            ])
+
+    # Verification summary
+    if verification_feedback:
+        summary_lines.extend([
+            f"## Verification Summary",
+            f"",
+        ])
+        for agent, feedback in verification_feedback.items():
+            if hasattr(feedback, "to_dict"):
+                fb_dict = feedback.to_dict()
+            else:
+                fb_dict = feedback if isinstance(feedback, dict) else {"summary": str(feedback)}
+
+            summary_lines.extend([
+                f"### {agent.title()}",
+                f"- **Approved:** {fb_dict.get('approved', 'N/A')}",
+                f"- **Score:** {fb_dict.get('score', 'N/A')}",
+                f"- **Summary:** {fb_dict.get('summary', 'N/A')}",
+                f"",
+            ])
+
+    # Git commits
+    if git_commits:
+        summary_lines.extend([
+            f"## Git Commits",
+            f"",
+        ])
+        for commit in git_commits:
+            summary_lines.append(
+                f"- `{commit.get('hash', 'unknown')[:8]}` - {commit.get('message', 'No message')}"
+            )
+        summary_lines.append("")
+
+    # Errors
+    if errors:
+        summary_lines.extend([
+            f"## Errors Encountered",
+            f"",
+        ])
+        for error in errors:
+            summary_lines.append(
+                f"- **{error.get('type', 'Unknown')}:** {error.get('message', 'No message')}"
+            )
+        summary_lines.append("")
+
+    # Phase status summary
+    summary_lines.extend([
+        f"## Phase Status",
+        f"",
+        f"| Phase | Status | Attempts |",
+        f"|-------|--------|----------|",
+    ])
+
+    phase_names = {
+        "1": "Planning",
+        "2": "Validation",
+        "3": "Implementation",
+        "4": "Verification",
+        "5": "Completion",
+    }
+
+    for phase_num, phase_name in phase_names.items():
+        ps = phase_status.get(phase_num, PhaseState())
+        status_emoji = {
+            PhaseStatus.COMPLETED: "✅",
+            PhaseStatus.FAILED: "❌",
+            PhaseStatus.IN_PROGRESS: "🔄",
+            PhaseStatus.PENDING: "⏳",
+            PhaseStatus.SKIPPED: "⏭️",
+        }.get(ps.status, "❓")
+        summary_lines.append(
+            f"| {phase_name} | {status_emoji} {ps.status.value} | {ps.attempts} |"
+        )
+
+    summary_lines.extend([
+        f"",
+        f"---",
+        f"",
+        f"*Generated by Multi-Agent Orchestration System*",
+    ])
+
+    # Write completion summary
+    completion_dir = project_dir / ".workflow" / "phases" / "completion"
+    completion_dir.mkdir(parents=True, exist_ok=True)
+
+    completion_file = completion_dir / "COMPLETION.md"
+    completion_file.write_text("\n".join(summary_lines))
+
+    # Also write a JSON summary
+    summary_json = {
+        "project": state["project_name"],
+        "completed_at": datetime.now().isoformat(),
+        "plan": plan.get("plan_name"),
+        "implementation": impl_result,
+        "phase_status": {
+            k: v.to_dict() if hasattr(v, "to_dict") else str(v)
+            for k, v in phase_status.items()
+        },
+        "total_errors": len(errors),
+        "total_commits": len(git_commits),
+    }
+
+    (completion_dir / "summary.json").write_text(json.dumps(summary_json, indent=2))
+
+    # Update phase status
+    phase_5.status = PhaseStatus.COMPLETED
+    phase_5.completed_at = datetime.now().isoformat()
+    phase_5.output = {"completion_file": str(completion_file)}
+    phase_status["5"] = phase_5
+
+    logger.info(f"Completion summary written to: {completion_file}")
+
+    return {
+        "phase_status": phase_status,
+        "current_phase": 5,
+        "next_decision": "continue",
+        "updated_at": datetime.now().isoformat(),
+    }

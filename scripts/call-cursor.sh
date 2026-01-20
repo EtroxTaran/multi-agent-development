@@ -15,6 +15,9 @@ PROMPT_FILE="$1"
 OUTPUT_FILE="$2"
 PROJECT_DIR="${3:-.}"
 
+# Resolve to absolute path
+PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
+
 # Model selection (GPT-5.2-Codex is the latest, most capable coding model)
 # Options: gpt-5.2-codex, gpt-5.1-codex, gpt-4.5-turbo, claude-sonnet-4
 CURSOR_MODEL="${CURSOR_MODEL:-gpt-5.2-codex}"
@@ -54,17 +57,19 @@ if [ -f "AGENTS.md" ]; then
 fi
 
 # Call Cursor CLI with JSON output
-# Note: GPT-5.2-Codex is OpenAI's most capable coding model (released Jan 2026)
-# - Extended context window for large codebases
-# - Superior code understanding and generation
-# - Optimized for code review and security analysis
-echo "Calling Cursor CLI with model: $CURSOR_MODEL"
+# Note: cursor-agent CLI usage:
+# - --print: Non-interactive mode (required for automation)
+# - --output-format json: Output as JSON
+# - --force: Force execution without confirmation
+# - Model is configured via environment or config, not CLI flag
+# - Prompt is a positional argument at the end
+echo "Calling Cursor CLI..."
 
-cursor-agent -m "$CURSOR_MODEL" \
-    -p "$PROMPT" \
+cursor-agent --print \
     --output-format json \
     --force \
     $CONTEXT_OPTS \
+    "$PROMPT" \
     > "$OUTPUT_FILE" 2>&1
 
 # Check if output was created

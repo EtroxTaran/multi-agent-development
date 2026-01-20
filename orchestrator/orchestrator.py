@@ -1,6 +1,16 @@
-"""Main orchestrator for the multi-agent workflow."""
+"""Main orchestrator for the multi-agent workflow.
+
+Supports nested architecture where projects live in projects/<name>/ and
+the orchestrator coordinates without directly writing application code.
+
+Supports two execution modes:
+- Legacy mode: Sequential phase execution via subprocess calls
+- LangGraph mode: Graph-based workflow with native parallelism
+"""
 
 import argparse
+import asyncio
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +19,7 @@ from typing import Optional
 from .utils.state import StateManager, PhaseStatus
 from .utils.logging import OrchestrationLogger, LogLevel
 from .utils.git_operations import GitOperationsManager
+from .project_manager import ProjectManager
 from .phases import (
     PlanningPhase,
     ValidationPhase,
@@ -16,6 +27,15 @@ from .phases import (
     VerificationPhase,
     CompletionPhase,
 )
+
+
+def is_langgraph_enabled() -> bool:
+    """Check if LangGraph mode is enabled via environment variable.
+
+    Returns:
+        True if ORCHESTRATOR_USE_LANGGRAPH is set to 'true' or '1'
+    """
+    return os.environ.get("ORCHESTRATOR_USE_LANGGRAPH", "").lower() in ("true", "1")
 
 
 class Orchestrator:
@@ -409,6 +429,19 @@ class Orchestrator:
             "gemini": gemini.check_available(),
         }
 
+        # Check SDK availability
+        sdk_status = {}
+        try:
+            from .sdk import AgentFactory
+            factory = AgentFactory(self.project_dir)
+            sdk_report = factory.get_availability_report()
+            sdk_status = {
+                "claude_sdk": sdk_report.get("claude_sdk", False),
+                "gemini_sdk": sdk_report.get("gemini_sdk", False),
+            }
+        except ImportError:
+            sdk_status = {"claude_sdk": False, "gemini_sdk": False}
+
         # Determine overall health
         all_agents_available = all(agents_status.values())
         current_phase_status = None
@@ -430,8 +463,156 @@ class Orchestrator:
             "iteration_count": state.iteration_count,
             "last_updated": state.updated_at,
             "agents": agents_status,
+            "sdk": sdk_status,
+            "langgraph_enabled": is_langgraph_enabled(),
             "has_context": state.context is not None,
             "total_commits": len(state.git_commits),
+        }
+
+    async def run_langgraph(self) -> dict:
+        """Run the workflow using LangGraph.
+
+        Uses the LangGraph workflow graph for graph-based execution
+        with native parallelism and checkpointing.
+
+        Returns:
+            Dictionary with workflow results
+        """
+        from .langgraph import WorkflowRunner, create_initial_state
+
+        self.logger.banner("Multi-Agent Orchestration System (LangGraph Mode)")
+
+        # Check prerequisites
+        prereq_ok, prereq_errors = self.check_prerequisites()
+        if not prereq_ok:
+            for error in prereq_errors:
+                self.logger.error(error)
+            return {
+                "success": False,
+                "error": "Prerequisites not met",
+                "details": prereq_errors,
+            }
+
+        # Create LangGraph runner
+        runner = WorkflowRunner(self.project_dir)
+
+        self.logger.info(f"Project: {self.project_dir.name}")
+        self.logger.info(f"Checkpoint directory: {runner.checkpoint_dir}")
+        self.logger.separator()
+
+        try:
+            # Run the workflow
+            result = await runner.run()
+
+            # Check result
+            if result.get("phase_status", {}).get("5", {}).status == "completed":
+                self.logger.banner("Workflow Complete!")
+                return {
+                    "success": True,
+                    "mode": "langgraph",
+                    "results": result,
+                }
+            else:
+                # Check if escalated
+                if result.get("next_decision") == "escalate":
+                    self.logger.warning("Workflow paused for human intervention")
+                    return {
+                        "success": False,
+                        "mode": "langgraph",
+                        "paused": True,
+                        "message": "Workflow requires human intervention",
+                        "results": result,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "mode": "langgraph",
+                        "results": result,
+                    }
+
+        except Exception as e:
+            self.logger.error(f"LangGraph workflow failed: {e}")
+            return {
+                "success": False,
+                "mode": "langgraph",
+                "error": str(e),
+            }
+
+    async def resume_langgraph(self, human_response: Optional[dict] = None) -> dict:
+        """Resume the LangGraph workflow from checkpoint.
+
+        Args:
+            human_response: Optional response for human escalation
+
+        Returns:
+            Dictionary with workflow results
+        """
+        from .langgraph import WorkflowRunner
+
+        self.logger.banner("Resuming LangGraph Workflow")
+
+        runner = WorkflowRunner(self.project_dir)
+
+        # Check for pending interrupt
+        pending = runner.get_pending_interrupt()
+        if pending:
+            self.logger.info(f"Workflow paused at: {pending['paused_at']}")
+
+        try:
+            result = await runner.resume(human_response)
+
+            if result.get("phase_status", {}).get("5", {}).status == "completed":
+                self.logger.banner("Workflow Complete!")
+                return {
+                    "success": True,
+                    "mode": "langgraph",
+                    "results": result,
+                }
+            else:
+                return {
+                    "success": False,
+                    "mode": "langgraph",
+                    "results": result,
+                }
+
+        except Exception as e:
+            self.logger.error(f"LangGraph resume failed: {e}")
+            return {
+                "success": False,
+                "mode": "langgraph",
+                "error": str(e),
+            }
+
+    async def status_langgraph(self) -> dict:
+        """Get LangGraph workflow status.
+
+        Returns:
+            Dictionary with status information
+        """
+        from .langgraph import WorkflowRunner
+
+        runner = WorkflowRunner(self.project_dir)
+
+        state = await runner.get_state()
+        if not state:
+            return {
+                "mode": "langgraph",
+                "status": "not_started",
+                "message": "No checkpoint found",
+            }
+
+        pending = runner.get_pending_interrupt()
+
+        return {
+            "mode": "langgraph",
+            "status": "paused" if pending else "in_progress",
+            "project": state.get("project_name"),
+            "current_phase": state.get("current_phase"),
+            "phase_status": {
+                k: v.status.value if hasattr(v, "status") else str(v)
+                for k, v in state.get("phase_status", {}).items()
+            },
+            "pending_interrupt": pending,
         }
 
     def _print_progress(self, phase_num: int, phase_name: str, status: str) -> None:
@@ -472,16 +653,57 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m orchestrator --start           Start workflow from phase 1
-  python -m orchestrator --resume          Resume from last incomplete phase
-  python -m orchestrator --status          Show current workflow status
-  python -m orchestrator --health          Show health check status
-  python -m orchestrator --reset           Reset all phases
-  python -m orchestrator --rollback 3      Rollback to before phase 3
-  python -m orchestrator --phase 3         Start from specific phase
+  # Nested architecture (recommended)
+  python -m orchestrator --project my-app --start
+  python -m orchestrator --project my-app --resume
+  python -m orchestrator --project my-app --status
+
+  # Project management
+  python -m orchestrator --list-projects
+  python -m orchestrator --create-project my-new-app
+  python -m orchestrator --sync-projects
+
+  # Legacy mode (works in current directory)
+  python -m orchestrator --start
+  python -m orchestrator --resume
+  python -m orchestrator --status
+  python -m orchestrator --health
+  python -m orchestrator --reset
+  python -m orchestrator --rollback 3
+  python -m orchestrator --phase 3
         """,
     )
 
+    # Project management (nested architecture)
+    parser.add_argument(
+        "--project", "-p",
+        type=str,
+        help="Project name (in projects/ directory)",
+    )
+    parser.add_argument(
+        "--list-projects",
+        action="store_true",
+        help="List all projects",
+    )
+    parser.add_argument(
+        "--create-project",
+        type=str,
+        metavar="NAME",
+        help="Create a new project from template",
+    )
+    parser.add_argument(
+        "--sync-projects",
+        action="store_true",
+        help="Sync templates to all projects",
+    )
+    parser.add_argument(
+        "--template",
+        type=str,
+        default="base",
+        help="Template for new project (default: base)",
+    )
+
+    # Workflow commands
     parser.add_argument(
         "--start",
         action="store_true",
@@ -546,7 +768,7 @@ Examples:
         "--project-dir",
         type=str,
         default=".",
-        help="Project directory (default: current)",
+        help="Project directory (default: current) - legacy mode",
     )
     parser.add_argument(
         "--quiet",
@@ -559,7 +781,25 @@ Examples:
         help="Enable debug output",
     )
 
+    # LangGraph mode options
+    parser.add_argument(
+        "--use-langgraph",
+        action="store_true",
+        help="Use LangGraph workflow (graph-based with parallelism)",
+    )
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Force legacy mode (sequential subprocess calls)",
+    )
+
     args = parser.parse_args()
+
+    # Set LangGraph mode from flag
+    if args.use_langgraph:
+        os.environ["ORCHESTRATOR_USE_LANGGRAPH"] = "true"
+    elif args.legacy:
+        os.environ["ORCHESTRATOR_USE_LANGGRAPH"] = "false"
 
     # Determine log level
     log_level = LogLevel.INFO
@@ -568,25 +808,102 @@ Examples:
     elif args.debug:
         log_level = LogLevel.DEBUG
 
+    # Handle project management commands first
+    root_dir = Path(args.project_dir).resolve()
+    if args.project_dir == ".":
+        # Try to find meta-architect root
+        candidate = Path.cwd()
+        while candidate != candidate.parent:
+            if (candidate / "projects").exists() and (candidate / "orchestrator").exists():
+                root_dir = candidate
+                break
+            candidate = candidate.parent
+
+    project_manager = ProjectManager(root_dir)
+
+    # Project management commands
+    if args.list_projects:
+        projects = project_manager.list_projects()
+        if not projects:
+            print("No projects found. Create one with: --create-project <name>")
+            return
+
+        print("\nProjects:")
+        print("-" * 60)
+        for p in projects:
+            phase_str = f"Phase {p['current_phase']}" if p['current_phase'] else "Not started"
+            spec_str = "Has spec" if p['has_product_spec'] else "No spec"
+            print(f"  {p['name']}")
+            print(f"    Template: {p['template']}, Status: {phase_str}, {spec_str}")
+        return
+
+    if args.create_project:
+        result = project_manager.create_project(args.create_project, args.template)
+        if result['success']:
+            print(result['output'])
+        else:
+            print(f"Error: {result['error']}")
+            if result.get('output'):
+                print(result['output'])
+            sys.exit(1)
+        return
+
+    if args.sync_projects:
+        result = project_manager.sync_all_projects()
+        print(result['output'])
+        if not result['success']:
+            sys.exit(1)
+        return
+
+    # Determine project directory
+    if args.project:
+        project_dir = project_manager.get_project(args.project)
+        if not project_dir:
+            print(f"Error: Project '{args.project}' not found")
+            print("Available projects:")
+            for p in project_manager.list_projects():
+                print(f"  - {p['name']}")
+            sys.exit(1)
+    else:
+        # Legacy mode: use current directory or --project-dir
+        project_dir = Path(args.project_dir).resolve()
+
     # Create orchestrator
     orchestrator = Orchestrator(
-        project_dir=args.project_dir,
+        project_dir=project_dir,
         max_retries=args.max_retries,
         auto_commit=not args.no_commit,
         log_level=log_level,
     )
 
+    # Check if using LangGraph mode
+    use_langgraph = is_langgraph_enabled()
+
     # Execute command
     if args.status:
-        status = orchestrator.status()
-        print("\nWorkflow Status:")
-        print(f"  Project: {status['project']}")
-        print(f"  Current Phase: {status['current_phase']}")
-        print(f"  Total Commits: {status['total_commits']}")
-        print("\nPhase Statuses:")
-        for phase, state in status['phase_statuses'].items():
-            emoji = "✅" if state == "completed" else "❌" if state == "failed" else "⏳"
-            print(f"  {emoji} {phase}: {state}")
+        if use_langgraph:
+            status = asyncio.run(orchestrator.status_langgraph())
+            print(f"\nWorkflow Status (LangGraph Mode):")
+            print(f"  Status: {status.get('status', 'unknown')}")
+            print(f"  Project: {status.get('project', 'N/A')}")
+            print(f"  Current Phase: {status.get('current_phase', 'N/A')}")
+            if status.get('pending_interrupt'):
+                print(f"  ⚠️ Paused for human intervention at: {status['pending_interrupt']['paused_at']}")
+            if 'phase_status' in status:
+                print("\nPhase Statuses:")
+                for phase, state in status['phase_status'].items():
+                    emoji = "✅" if state == "completed" else "❌" if state == "failed" else "⏳"
+                    print(f"  {emoji} Phase {phase}: {state}")
+        else:
+            status = orchestrator.status()
+            print("\nWorkflow Status:")
+            print(f"  Project: {status['project']}")
+            print(f"  Current Phase: {status['current_phase']}")
+            print(f"  Total Commits: {status['total_commits']}")
+            print("\nPhase Statuses:")
+            for phase, state in status['phase_statuses'].items():
+                emoji = "✅" if state == "completed" else "❌" if state == "failed" else "⏳"
+                print(f"  {emoji} {phase}: {state}")
         return
 
     if args.health:
@@ -598,10 +915,16 @@ Examples:
         print(f"  Phase Status: {health['phase_status'] or 'N/A'}")
         print(f"  Iteration Count: {health['iteration_count']}")
         print(f"  Last Updated: {health['last_updated']}")
-        print("\nAgent Availability:")
+        print("\nAgent Availability (CLI):")
         for agent, available in health['agents'].items():
             emoji = "✅" if available else "❌"
             print(f"  {emoji} {agent}: {'Available' if available else 'Unavailable'}")
+        if 'sdk' in health:
+            print("\nSDK Availability:")
+            for sdk, available in health['sdk'].items():
+                emoji = "✅" if available else "❌"
+                print(f"  {emoji} {sdk}: {'Available' if available else 'Unavailable'}")
+        print(f"\nLangGraph Mode: {'Enabled' if health.get('langgraph_enabled') else 'Disabled'}")
         return
 
     if args.rollback:
@@ -620,18 +943,31 @@ Examples:
         print("Workflow reset.")
         return
 
+    # Check if using LangGraph mode
+    use_langgraph = is_langgraph_enabled()
+
     if args.resume:
-        result = orchestrator.resume()
+        if use_langgraph:
+            result = asyncio.run(orchestrator.resume_langgraph())
+        else:
+            result = orchestrator.resume()
     elif args.start or args.phase:
-        start = args.phase or 1
-        result = orchestrator.run(
-            start_phase=start,
-            end_phase=args.end_phase,
-            skip_validation=args.skip_validation,
-        )
+        if use_langgraph:
+            result = asyncio.run(orchestrator.run_langgraph())
+        else:
+            start = args.phase or 1
+            result = orchestrator.run(
+                start_phase=start,
+                end_phase=args.end_phase,
+                skip_validation=args.skip_validation,
+            )
     else:
         parser.print_help()
         return
+
+    # Print mode information
+    if result.get("mode") == "langgraph":
+        print(f"\n[LangGraph Mode]")
 
     # Exit with appropriate code
     sys.exit(0 if result.get("success", False) else 1)

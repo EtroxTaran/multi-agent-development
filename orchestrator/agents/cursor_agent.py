@@ -58,17 +58,26 @@ class CursorAgent(BaseAgent):
 
         Returns:
             Command as list of strings
+
+        Note:
+            cursor-agent CLI usage:
+            - --print or -p: Non-interactive mode (print output, don't open UI)
+            - --output-format json: Output as JSON
+            - --force: Force execution without confirmation
+            - Prompt is a positional argument at the end
         """
         command = [
             "cursor-agent",
-            "-p",
-            prompt,
+            "--print",  # Non-interactive mode
             "--output-format",
             output_format,
         ]
 
         if force:
             command.append("--force")
+
+        # Prompt must be positional argument at the end
+        command.append(prompt)
 
         return command
 

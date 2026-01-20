@@ -8,6 +8,7 @@ A **production-ready multi-agent orchestration system** that coordinates Claude 
 ## Table of Contents
 
 - [How It Works](#how-it-works)
+- [LangGraph Architecture](#langgraph-architecture)
 - [The 5-Phase Workflow](#the-5-phase-workflow)
 - [Agent Specializations](#agent-specializations)
 - [Installation](#installation)
@@ -76,6 +77,100 @@ Meta-Architect solves the coordination problem for AI-assisted development by or
 | **TDD Enforcement** | Tests written before implementation in Phase 3 |
 | **Git Integration** | Auto-commits after each phase with rollback capability |
 | **State Persistence** | Resume interrupted workflows from any phase |
+
+---
+
+## LangGraph Architecture
+
+The orchestration system uses **LangGraph** for graph-based workflow management with native parallelism, checkpointing, and human-in-the-loop capabilities.
+
+### Workflow Graph
+
+```
+┌──────────────────┐
+│  prerequisites   │ ← Validate project setup
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│    planning      │ ← Claude creates plan (Phase 1)
+└────────┬─────────┘
+         │
+    ┌────┴────┐ (PARALLEL fan-out)
+    ▼         ▼
+┌────────┐ ┌────────┐
+│ Cursor │ │ Gemini │ ← Validate plan (Phase 2)
+│validate│ │validate│   READ-ONLY reviewers
+└───┬────┘ └───┬────┘
+    └────┬────┘ (fan-in)
+         ▼
+┌──────────────────┐
+│validation_fan_in │ ← Merge feedback, route decision
+└────────┬─────────┘
+         │ conditional: continue → implementation
+         │             retry → planning
+         │             escalate → human_escalation
+         ▼
+┌──────────────────┐
+│ implementation   │ ← Worker Claude writes code (Phase 3)
+└────────┬─────────┘   SEQUENTIAL - single writer
+         │
+    ┌────┴────┐ (PARALLEL fan-out)
+    ▼         ▼
+┌────────┐ ┌────────┐
+│ Cursor │ │ Gemini │ ← Review code (Phase 4)
+│ review │ │ review │   READ-ONLY reviewers
+└───┬────┘ └───┬────┘
+    └────┬────┘ (fan-in)
+         ▼
+┌──────────────────┐
+│verification_fan_in│ ← Merge reviews, route decision
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│   completion     │ ← Generate summary (Phase 5)
+└──────────────────┘
+```
+
+### Key Safety Guarantees
+
+| Guarantee | Implementation |
+|-----------|----------------|
+| **No file conflicts** | Only `implementation` node writes files; Cursor/Gemini are read-only |
+| **Human escalation** | `interrupt()` pauses workflow for human input when needed |
+| **Checkpoint/resume** | SqliteSaver persists state for recovery from any point |
+| **Transient error handling** | Exponential backoff with jitter for recoverable errors |
+| **Worker clarification** | Workers can request human answers for ambiguous requirements |
+
+### Running with LangGraph
+
+```bash
+# Start new workflow with LangGraph
+python -m orchestrator --project my-feature --use-langgraph
+
+# Resume from checkpoint
+python -m orchestrator --project my-feature --resume --use-langgraph
+
+# Run tests
+python -m pytest tests/test_langgraph.py -v
+```
+
+### State Schema
+
+The workflow uses typed state with reducers for parallel merge:
+
+```python
+class WorkflowState(TypedDict):
+    project_dir: str
+    project_name: str
+    current_phase: int
+    phase_status: dict[str, PhaseState]
+    plan: Optional[dict]
+    validation_feedback: Annotated[dict, _merge_feedback]  # Parallel merge
+    verification_feedback: Annotated[dict, _merge_feedback]
+    implementation_result: Optional[dict]
+    next_decision: Optional[WorkflowDecision]  # continue|retry|escalate|abort
+    errors: Annotated[list[dict], operator.add]  # Append-only
+```
 
 ---
 
@@ -390,13 +485,31 @@ meta-architect/
 │   │   ├── claude.py       # ClaudeAgent
 │   │   ├── cursor.py       # CursorAgent
 │   │   └── gemini.py       # GeminiAgent
-│   ├── phases/             # Phase implementations
+│   ├── phases/             # Phase implementations (legacy)
 │   │   ├── base.py         # BasePhase class
 │   │   ├── phase1_planning.py
 │   │   ├── phase2_validation.py
 │   │   ├── phase3_implementation.py
 │   │   ├── phase4_verification.py
 │   │   └── phase5_completion.py
+│   ├── langgraph/          # LangGraph workflow (recommended)
+│   │   ├── workflow.py     # Graph assembly, entry point
+│   │   ├── state.py        # TypedDict state schema, reducers
+│   │   ├── nodes/          # Node implementations
+│   │   │   ├── prerequisites.py
+│   │   │   ├── planning.py
+│   │   │   ├── validation.py
+│   │   │   ├── implementation.py
+│   │   │   ├── verification.py
+│   │   │   ├── escalation.py
+│   │   │   └── completion.py
+│   │   ├── routers/        # Conditional edge logic
+│   │   │   ├── validation.py
+│   │   │   └── verification.py
+│   │   └── integrations/   # Adapters for existing utils
+│   │       ├── approval.py
+│   │       ├── conflict.py
+│   │       └── state.py
 │   └── utils/              # Utilities
 │       ├── state.py        # StateManager
 │       ├── logging.py      # OrchestrationLogger
@@ -404,14 +517,28 @@ meta-architect/
 │       ├── conflict_resolution.py
 │       ├── context.py      # ContextManager (drift detection)
 │       ├── git_operations.py  # GitOperationsManager
+│       ├── resilience.py   # AsyncCircuitBreaker, RetryPolicy
 │       └── validation.py   # Feedback validation
 ├── scripts/
 │   ├── init-multi-agent.sh # Project initialization
 │   ├── call-cursor.sh      # Cursor CLI wrapper
-│   └── call-gemini.sh      # Gemini CLI wrapper
-├── templates/              # Project templates
+│   ├── call-gemini.sh      # Gemini CLI wrapper
+│   ├── create-project.py   # Create new projects
+│   ├── sync-rules.py       # Sync shared rules to agents
+│   └── sync-project-templates.py  # Sync templates to projects
+├── shared-rules/           # Shared rules for all agents
+│   ├── core-rules.md
+│   ├── coding-standards.md
+│   ├── guardrails.md
+│   ├── cli-reference.md
+│   ├── lessons-learned.md
+│   └── agent-overrides/    # Agent-specific extensions
+├── project-templates/      # Project templates
+├── projects/               # Project containers
 ├── schemas/                # JSON validation schemas
 ├── tests/                  # Test suite
+│   ├── test_langgraph.py   # LangGraph tests (57 tests)
+│   └── ...
 └── examples/               # Example projects
 ```
 

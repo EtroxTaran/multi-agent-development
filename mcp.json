@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "mcpServers": {
+    "mcp-codebase": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.codebase"],
+      "env": {
+        "PROJECTS_ROOT": "projects/"
+      },
+      "description": "Semantic code search and symbol lookup for project codebases"
+    },
+    "mcp-workflow": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.workflow"],
+      "env": {
+        "PROJECTS_ROOT": "projects/"
+      },
+      "description": "Workflow state, plan access, and phase management"
+    },
+    "mcp-docs": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.docs"],
+      "env": {
+        "PROJECTS_ROOT": "projects/",
+        "META_ROOT": "."
+      },
+      "description": "Documentation, specifications, and shared rules access"
+    },
+    "mcp-git": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.git"],
+      "env": {
+        "PROJECTS_ROOT": "projects/"
+      },
+      "description": "Git operations, diff, history, and change tracking"
+    }
+  },
+  "toolDescriptions": {
+    "mcp-codebase": {
+      "search_code": "Search for code patterns using ripgrep with regex support",
+      "get_symbols": "Extract functions, classes, and methods from source files",
+      "find_references": "Find all references to a symbol in the codebase",
+      "get_file_structure": "Get directory tree structure with metadata",
+      "get_file_summary": "Get file summary with imports, exports, and components"
+    },
+    "mcp-workflow": {
+      "get_state": "Get current workflow state for a project",
+      "update_phase": "Update phase status (pending/in_progress/completed/failed)",
+      "get_plan": "Get the implementation plan from Phase 1",
+      "save_plan": "Save implementation plan",
+      "create_checkpoint": "Create a checkpoint for rollback",
+      "get_phase_feedback": "Get validation/verification feedback",
+      "save_phase_feedback": "Save agent feedback for a phase",
+      "add_blocker": "Add a blocker to a phase",
+      "resolve_blocker": "Mark a blocker as resolved"
+    },
+    "mcp-docs": {
+      "get_spec": "Get PRODUCT.md specification for a project",
+      "get_context": "Get agent-specific context file (CLAUDE.md, etc.)",
+      "get_rules": "Get shared rules (core, coding, guardrails, cli, lessons)",
+      "search_docs": "Search documentation for keywords",
+      "get_readme": "Get README.md for a project",
+      "list_docs": "List all documentation files in a project"
+    },
+    "mcp-git": {
+      "get_diff": "Get git diff between commits or working directory",
+      "get_history": "Get commit history with messages and stats",
+      "list_changes": "List modified, added, deleted, and untracked files",
+      "get_file_at_commit": "Get file contents at a specific commit",
+      "get_blame": "Get git blame showing who modified each line",
+      "get_branch_info": "Get current branch and branch list",
+      "compare_commits": "Compare two commits with file change summary"
+    }
+  }
+}

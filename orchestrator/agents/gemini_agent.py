@@ -39,25 +39,28 @@ class GeminiAgent(BaseAgent):
     def build_command(
         self,
         prompt: str,
-        output_format: str = "json",
         **kwargs,
     ) -> list[str]:
         """Build the Gemini CLI command.
 
         Args:
             prompt: The prompt to send
-            output_format: Output format
             **kwargs: Additional arguments (ignored)
 
         Returns:
             Command as list of strings
+
+        Note:
+            gemini CLI usage:
+            - --yolo: Auto-approve tool calls (non-interactive)
+            - Prompt is a positional argument
+            - Gemini CLI does NOT support --output-format flag
+            - Output must be parsed/wrapped to JSON externally
         """
         command = [
             "gemini",
-            "-p",
-            prompt,
-            "--output-format",
-            output_format,
+            "--yolo",  # Auto-approve tool calls for non-interactive use
+            prompt,    # Prompt as positional argument
         ]
 
         return command

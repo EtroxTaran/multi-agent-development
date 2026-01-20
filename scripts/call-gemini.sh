@@ -15,6 +15,9 @@ PROMPT_FILE="$1"
 OUTPUT_FILE="$2"
 PROJECT_DIR="${3:-.}"
 
+# Resolve to absolute path
+PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
+
 # Model selection (Gemini 3 Pro is the latest, most capable model)
 # Options: gemini-3-pro, gemini-3-flash, gemini-2.5-pro, gemini-2.5-flash
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3-pro}"
@@ -53,29 +56,31 @@ if [ -f "AGENTS.md" ]; then
     CONTEXT_OPTS="--read AGENTS.md"
 fi
 
-# Call Gemini CLI with JSON output
-# Note: Gemini 3 Pro is the most capable model (released Dec 2025)
-# - 1M+ token context window
-# - Best reasoning and coding performance
-# - Native tool use support
+# Call Gemini CLI
+# Note: gemini CLI usage:
+# - --yolo: Auto-approve tool calls (required for non-interactive mode)
+# - Prompt is a positional argument
+# - Gemini CLI does NOT support --output-format flag
+# - Model can be set via GEMINI_MODEL env var or --model flag
 echo "Calling Gemini CLI with model: $GEMINI_MODEL"
 
-gemini -m "$GEMINI_MODEL" \
-    -p "$PROMPT" \
-    --output-format json \
-    $CONTEXT_OPTS \
-    > "$OUTPUT_FILE" 2>&1
+# Create temp file for raw output
+TEMP_OUTPUT=$(mktemp)
+trap "rm -f $TEMP_OUTPUT" EXIT
 
-# Check if output was created
-if [ ! -f "$OUTPUT_FILE" ]; then
-    echo '{"status": "error", "agent": "gemini", "message": "Failed to create output file"}' > "$OUTPUT_FILE"
-    exit 1
-fi
+# Run Gemini CLI (note: no --output-format flag available)
+gemini --model "$GEMINI_MODEL" \
+    --yolo \
+    "$PROMPT" \
+    > "$TEMP_OUTPUT" 2>&1
 
-# Validate JSON output
-if ! python3 -c "import json; json.load(open('$OUTPUT_FILE'))" 2>/dev/null; then
-    # If not valid JSON, wrap the output
-    CONTENT=$(cat "$OUTPUT_FILE")
+# Check if output is valid JSON, if not wrap it
+if python3 -c "import json; json.load(open('$TEMP_OUTPUT'))" 2>/dev/null; then
+    # Already valid JSON, copy as-is
+    cp "$TEMP_OUTPUT" "$OUTPUT_FILE"
+else
+    # Wrap raw output in JSON structure
+    CONTENT=$(cat "$TEMP_OUTPUT")
     echo "{\"status\": \"completed\", \"agent\": \"gemini\", \"raw_output\": $(echo "$CONTENT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" > "$OUTPUT_FILE"
 fi
 
