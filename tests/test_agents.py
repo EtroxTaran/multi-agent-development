@@ -142,7 +142,7 @@ class TestCursorAgent:
         cmd = agent.build_command("test prompt")
 
         assert cmd[0] == "cursor-agent"
-        assert "-p" in cmd
+        assert "--print" in cmd  # Non-interactive mode flag
         assert "test prompt" in cmd
         assert "--force" in cmd
 
@@ -172,6 +172,6 @@ class TestGeminiAgent:
         cmd = agent.build_command("test prompt")
 
         assert cmd[0] == "gemini"
-        assert "-p" in cmd
+        assert "--yolo" in cmd  # Auto-approve for non-interactive mode
         assert "test prompt" in cmd
-        assert "--output-format" in cmd
+        # Note: gemini CLI doesn't support --output-format

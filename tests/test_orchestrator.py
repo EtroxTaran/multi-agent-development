@@ -162,20 +162,19 @@ class TestOrchestrator:
     @patch("subprocess.run")
     def test_auto_commit(self, mock_run, temp_project_dir):
         """Test auto-commit functionality."""
-        # Mock git commands
+        # Mock git commands - optimized to use batched operations:
+        # 1. is_git_repo() -> git rev-parse --is-inside-work-tree
+        # 2. auto_commit() -> batched bash script (status + add + commit + hash)
         mock_run.side_effect = [
-            MagicMock(returncode=0),  # git rev-parse
-            MagicMock(returncode=0, stdout="M file.txt\n"),  # git status
-            MagicMock(returncode=0),  # git add
-            MagicMock(returncode=0, stdout=""),  # git commit
-            MagicMock(returncode=0, stdout="abc123def456\n"),  # git rev-parse HEAD
+            MagicMock(returncode=0),  # git rev-parse (is_git_repo check)
+            MagicMock(returncode=0, stdout="abc123def456\n"),  # batched auto_commit script
         ]
 
         orch = Orchestrator(temp_project_dir, auto_commit=True)
         orch._auto_commit(1, "planning")
 
-        # Verify git add and commit were called
-        assert mock_run.call_count >= 3
+        # Verify batched git operations were called (2 subprocess calls total)
+        assert mock_run.call_count == 2
 
     def test_resume(self, temp_project_dir):
         """Test resume finds correct starting phase."""

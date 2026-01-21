@@ -222,3 +222,188 @@ def human_escalation_router(
 
     # Default: abort
     return "__end__"
+
+
+# New routers for risk mitigation nodes
+
+def product_validation_router(
+    state: WorkflowState,
+) -> Literal["planning", "human_escalation", "__end__"]:
+    """Route after product validation.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "planning": Validation passed, proceed to planning
+        - "human_escalation": Validation failed, need human help
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "planning"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to planning if no issues
+    return "planning"
+
+
+def pre_implementation_router(
+    state: WorkflowState,
+) -> Literal["implementation", "human_escalation", "__end__"]:
+    """Route after pre-implementation checks.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "implementation": Checks passed, proceed to implementation
+        - "human_escalation": Checks failed, need human help
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "implementation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to implementation
+    return "implementation"
+
+
+def build_verification_router(
+    state: WorkflowState,
+) -> Literal["cursor_review", "implementation", "human_escalation", "__end__"]:
+    """Route after build verification.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "cursor_review": Build passed, proceed to verification
+        - "implementation": Build failed, retry implementation
+        - "human_escalation": Max retries exceeded
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "cursor_review"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "implementation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to verification
+    return "cursor_review"
+
+
+def coverage_check_router(
+    state: WorkflowState,
+) -> Literal["security_scan", "implementation", "human_escalation", "__end__"]:
+    """Route after coverage check.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "security_scan": Coverage passed/non-blocking, proceed
+        - "implementation": Coverage failed (blocking), retry
+        - "human_escalation": Max retries exceeded
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "security_scan"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "implementation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to security scan
+    return "security_scan"
+
+
+def security_scan_router(
+    state: WorkflowState,
+) -> Literal["completion", "implementation", "human_escalation", "__end__"]:
+    """Route after security scan.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "completion": Scan passed, proceed to completion
+        - "implementation": Blocking issues, retry implementation
+        - "human_escalation": Max retries exceeded
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "completion"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "implementation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to completion
+    return "completion"
+
+
+def approval_gate_router(
+    state: WorkflowState,
+) -> Literal["pre_implementation", "planning", "human_escalation", "__end__"]:
+    """Route after approval gate (post-validation).
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name based on approval decision
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "pre_implementation"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "planning"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to pre-implementation
+    return "pre_implementation"

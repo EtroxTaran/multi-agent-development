@@ -26,6 +26,13 @@ from .nodes import (
     verification_fan_in_node,
     human_escalation_node,
     completion_node,
+    # New risk mitigation nodes
+    product_validation_node,
+    pre_implementation_node,
+    build_verification_node,
+    coverage_check_node,
+    security_scan_node,
+    approval_gate_node,
 )
 from .routers import (
     prerequisites_router,
@@ -35,6 +42,13 @@ from .routers import (
     implementation_router,
     completion_router,
     human_escalation_router,
+    # New risk mitigation routers
+    product_validation_router,
+    pre_implementation_router,
+    build_verification_router,
+    coverage_check_router,
+    security_scan_router,
+    approval_gate_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,26 +61,33 @@ def create_workflow_graph(
     """Create the LangGraph workflow graph.
 
     This creates a graph with:
-    - Sequential phases: prerequisites → planning → validation → implementation → verification → completion
-    - Parallel fan-out: planning fans out to cursor_validate AND gemini_validate
-    - Parallel fan-out: implementation fans out to cursor_review AND gemini_review
-    - Parallel fan-in: validation_fan_in merges validation results
-    - Parallel fan-in: verification_fan_in merges review results
-    - Human escalation node for blocked workflows
-    - Conditional routing based on phase results
+    - Sequential phases with risk mitigation checks
+    - Parallel fan-out/fan-in for validation and verification
+    - Human escalation and approval gates
+    - Configurable feature flags for optional nodes
+
+    Enhanced workflow path:
+    ```
+    prerequisites → product_validation → planning →
+    [cursor_validate || gemini_validate] → validation_fan_in →
+    approval_gate → pre_implementation → implementation → build_verification →
+    [cursor_review || gemini_review] → verification_fan_in →
+    coverage_check → security_scan → completion
+    ```
 
     Retry Policy (when enabled):
     - Agent nodes (cursor_*, gemini_*) have RetryPolicy for transient failures
     - Uses exponential backoff: initial_interval=1s, backoff_multiplier=2
     - Max retries: 3 attempts before failing
-    - Retries on: ConnectionError, TimeoutError, rate limits
-
-    To enable retry policy, set enable_retry_policy=True or LANGGRAPH_RETRY_ENABLED=true
 
     Graph structure:
     ```
                      ┌─────────────────┐
-                     │ prerequisites   │
+                     │  prerequisites  │
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │product_validation│  ← NEW: Validates PRODUCT.md
                      └────────┬────────┘
                               │
                      ┌────────▼────────┐
@@ -74,31 +95,51 @@ def create_workflow_graph(
                      └────────┬────────┘
                               │
               ┌───────────────┼───────────────┐
-              │               │               │
+              │                               │
      ┌────────▼────────┐             ┌────────▼────────┐
      │ cursor_validate │             │ gemini_validate │
      └────────┬────────┘             └────────┬────────┘
-              │               │               │
-              └───────────────┼───────────────┘
+              │                               │
+              └───────────────┬───────────────┘
                               │
                      ┌────────▼────────┐
-                     │ validation_fan_in│
+                     │validation_fan_in│
                      └────────┬────────┘
                               │
                      ┌────────▼────────┐
-                     │ implementation  │
+                     │  approval_gate  │  ← NEW: Human approval (optional)
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │pre_implementation│  ← NEW: Environment checks
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │  implementation │
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │build_verification│  ← NEW: Build check
                      └────────┬────────┘
                               │
               ┌───────────────┼───────────────┐
-              │               │               │
+              │                               │
      ┌────────▼────────┐             ┌────────▼────────┐
      │  cursor_review  │             │  gemini_review  │
      └────────┬────────┘             └────────┬────────┘
-              │               │               │
-              └───────────────┼───────────────┘
+              │                               │
+              └───────────────┬───────────────┘
                               │
                      ┌────────▼────────┐
                      │verification_fan_in│
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │  coverage_check │  ← NEW: Coverage enforcement
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │  security_scan  │  ← NEW: Security scanning
                      └────────┬────────┘
                               │
                      ┌────────▼────────┐
@@ -106,15 +147,13 @@ def create_workflow_graph(
                      └────────┬────────┘
                               │
                             [END]
-
-    Human escalation can be reached from:
-    - prerequisites (missing requirements)
-    - validation_fan_in (validation failed max times)
-    - verification_fan_in (verification failed max times)
     ```
+
+    Human escalation can be reached from multiple nodes when issues occur.
 
     Args:
         checkpointer: Optional checkpointer for persistence
+        enable_retry_policy: Enable retry policies for agent nodes
 
     Returns:
         Compiled StateGraph workflow
@@ -126,32 +165,37 @@ def create_workflow_graph(
     retry_enabled = enable_retry_policy or os.environ.get("LANGGRAPH_RETRY_ENABLED", "").lower() == "true"
 
     # Create retry policies for different node types
-    # Agent nodes: retry on transient failures with exponential backoff
     agent_retry_policy = RetryPolicy(
         max_attempts=3,
-        initial_interval=1.0,  # Start with 1 second wait
-        backoff_factor=2.0,    # Double each retry: 1s, 2s, 4s
-        jitter=True,           # Add randomness to prevent thundering herd
+        initial_interval=1.0,
+        backoff_factor=2.0,
+        jitter=True,
     ) if retry_enabled else None
 
-    # Implementation node: longer timeout, more retries
     implementation_retry_policy = RetryPolicy(
         max_attempts=2,
-        initial_interval=5.0,  # Start with 5 second wait
+        initial_interval=5.0,
         backoff_factor=2.0,
         jitter=True,
     ) if retry_enabled else None
 
     # Add all nodes with appropriate retry policies
+    # Core workflow nodes
     graph.add_node("prerequisites", prerequisites_node)
+    graph.add_node("product_validation", product_validation_node)  # NEW
     graph.add_node("planning", planning_node, retry=agent_retry_policy)
     graph.add_node("cursor_validate", cursor_validate_node, retry=agent_retry_policy)
     graph.add_node("gemini_validate", gemini_validate_node, retry=agent_retry_policy)
     graph.add_node("validation_fan_in", validation_fan_in_node)
+    graph.add_node("approval_gate", approval_gate_node)  # NEW
+    graph.add_node("pre_implementation", pre_implementation_node)  # NEW
     graph.add_node("implementation", implementation_node, retry=implementation_retry_policy)
+    graph.add_node("build_verification", build_verification_node)  # NEW
     graph.add_node("cursor_review", cursor_review_node, retry=agent_retry_policy)
     graph.add_node("gemini_review", gemini_review_node, retry=agent_retry_policy)
     graph.add_node("verification_fan_in", verification_fan_in_node)
+    graph.add_node("coverage_check", coverage_check_node)  # NEW
+    graph.add_node("security_scan", security_scan_node)  # NEW
     graph.add_node("human_escalation", human_escalation_node)
     graph.add_node("completion", completion_node)
 
@@ -163,10 +207,21 @@ def create_workflow_graph(
     # Start → prerequisites
     graph.add_edge(START, "prerequisites")
 
-    # Prerequisites → planning (with conditional for escalation)
+    # Prerequisites → product_validation (with conditional for escalation)
     graph.add_conditional_edges(
         "prerequisites",
         prerequisites_router,
+        {
+            "planning": "product_validation",  # Changed: go to product_validation first
+            "human_escalation": "human_escalation",
+            "__end__": END,
+        },
+    )
+
+    # Product validation → planning (with conditional for escalation)
+    graph.add_conditional_edges(
+        "product_validation",
+        product_validation_router,
         {
             "planning": "planning",
             "human_escalation": "human_escalation",
@@ -175,7 +230,6 @@ def create_workflow_graph(
     )
 
     # Planning → parallel validation fan-out
-    # Both cursor_validate and gemini_validate run in parallel
     graph.add_edge("planning", "cursor_validate")
     graph.add_edge("planning", "gemini_validate")
 
@@ -183,33 +237,86 @@ def create_workflow_graph(
     graph.add_edge("cursor_validate", "validation_fan_in")
     graph.add_edge("gemini_validate", "validation_fan_in")
 
-    # Validation fan-in → conditional routing
+    # Validation fan-in → approval_gate (with conditional routing)
     graph.add_conditional_edges(
         "validation_fan_in",
         validation_router,
         {
-            "implementation": "implementation",
-            "planning": "planning",  # Retry planning if validation fails
+            "implementation": "approval_gate",  # Changed: go to approval_gate first
+            "planning": "planning",
             "human_escalation": "human_escalation",
             "__end__": END,
         },
     )
 
-    # Implementation → parallel verification fan-out
-    graph.add_edge("implementation", "cursor_review")
-    graph.add_edge("implementation", "gemini_review")
+    # Approval gate → pre_implementation (with conditional routing)
+    graph.add_conditional_edges(
+        "approval_gate",
+        approval_gate_router,
+        {
+            "pre_implementation": "pre_implementation",
+            "planning": "planning",
+            "human_escalation": "human_escalation",
+            "__end__": END,
+        },
+    )
+
+    # Pre-implementation → implementation (with conditional routing)
+    graph.add_conditional_edges(
+        "pre_implementation",
+        pre_implementation_router,
+        {
+            "implementation": "implementation",
+            "human_escalation": "human_escalation",
+            "__end__": END,
+        },
+    )
+
+    # Implementation → build_verification
+    graph.add_edge("implementation", "build_verification")
+
+    # Build verification → parallel verification fan-out
+    # Both review nodes run in parallel after build passes
+    # Build failures are handled by having build_verification_node set errors in state
+    # and verification_fan_in will check for build errors
+    graph.add_edge("build_verification", "cursor_review")
+    graph.add_edge("build_verification", "gemini_review")
 
     # Verification fan-in: both reviewers merge here
     graph.add_edge("cursor_review", "verification_fan_in")
     graph.add_edge("gemini_review", "verification_fan_in")
 
-    # Verification fan-in → conditional routing
+    # Verification fan-in → coverage_check (with conditional routing)
     graph.add_conditional_edges(
         "verification_fan_in",
         verification_router,
         {
+            "completion": "coverage_check",  # Changed: go to coverage_check first
+            "implementation": "implementation",
+            "human_escalation": "human_escalation",
+            "__end__": END,
+        },
+    )
+
+    # Coverage check → security_scan (with conditional routing)
+    graph.add_conditional_edges(
+        "coverage_check",
+        coverage_check_router,
+        {
+            "security_scan": "security_scan",
+            "implementation": "implementation",
+            "human_escalation": "human_escalation",
+            "__end__": END,
+        },
+    )
+
+    # Security scan → completion (with conditional routing)
+    graph.add_conditional_edges(
+        "security_scan",
+        security_scan_router,
+        {
             "completion": "completion",
-            "implementation": "implementation",  # Retry implementation if verification fails
+            "implementation": "implementation",
             "human_escalation": "human_escalation",
             "__end__": END,
         },

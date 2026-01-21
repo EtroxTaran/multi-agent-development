@@ -1,0 +1,29 @@
+{
+  "project_type": "java-spring",
+  "validation": {
+    "validation_threshold": 7.0,
+    "verification_threshold": 8.0,
+    "max_phase_retries": 3
+  },
+  "quality": {
+    "coverage_threshold": 80,
+    "coverage_blocking": true,
+    "build_required": true,
+    "lint_required": false
+  },
+  "security": {
+    "enabled": true,
+    "blocking_severities": ["critical", "high"]
+  },
+  "workflow": {
+    "features": {
+      "product_validation": true,
+      "environment_check": true,
+      "build_verification": true,
+      "coverage_check": true,
+      "security_scan": true,
+      "approval_gates": false
+    },
+    "approval_phases": []
+  }
+}

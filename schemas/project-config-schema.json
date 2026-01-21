@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://meta-architect.dev/schemas/project-config.json",
+  "title": "Project Configuration",
+  "description": "Configuration schema for meta-architect project settings",
+  "type": "object",
+  "properties": {
+    "project_type": {
+      "type": "string",
+      "description": "Type of project (e.g., base, react-tanstack, node-api, java-spring)",
+      "enum": ["base", "react-tanstack", "node-api", "java-spring", "nx-fullstack", "python"],
+      "default": "base"
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation threshold settings",
+      "properties": {
+        "validation_threshold": {
+          "type": "number",
+          "description": "Minimum score for Phase 2 validation (0-10)",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 6.0
+        },
+        "verification_threshold": {
+          "type": "number",
+          "description": "Minimum score for Phase 4 verification (0-10)",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 7.0
+        },
+        "max_phase_retries": {
+          "type": "integer",
+          "description": "Maximum retries per phase before escalation",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "quality": {
+      "type": "object",
+      "description": "Code quality settings",
+      "properties": {
+        "coverage_threshold": {
+          "type": "number",
+          "description": "Minimum test coverage percentage (0-100)",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 70
+        },
+        "coverage_blocking": {
+          "type": "boolean",
+          "description": "Whether failing coverage threshold blocks the workflow",
+          "default": false
+        },
+        "build_required": {
+          "type": "boolean",
+          "description": "Whether build must succeed before verification",
+          "default": true
+        },
+        "lint_required": {
+          "type": "boolean",
+          "description": "Whether linting must pass before verification",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "description": "Security scanning settings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether security scanning is enabled",
+          "default": true
+        },
+        "blocking_severities": {
+          "type": "array",
+          "description": "Severities that block workflow completion",
+          "items": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low", "info"]
+          },
+          "default": ["critical", "high"],
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "workflow": {
+      "type": "object",
+      "description": "Workflow behavior settings",
+      "properties": {
+        "features": {
+          "type": "object",
+          "description": "Feature flags for optional workflow nodes",
+          "properties": {
+            "product_validation": {
+              "type": "boolean",
+              "description": "Enable PRODUCT.md validation",
+              "default": true
+            },
+            "environment_check": {
+              "type": "boolean",
+              "description": "Enable pre-implementation environment checks",
+              "default": true
+            },
+            "build_verification": {
+              "type": "boolean",
+              "description": "Enable post-implementation build verification",
+              "default": true
+            },
+            "coverage_check": {
+              "type": "boolean",
+              "description": "Enable test coverage checking",
+              "default": true
+            },
+            "security_scan": {
+              "type": "boolean",
+              "description": "Enable security vulnerability scanning",
+              "default": true
+            },
+            "approval_gates": {
+              "type": "boolean",
+              "description": "Enable human approval gates at specified phases",
+              "default": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "approval_phases": {
+          "type": "array",
+          "description": "Phase numbers requiring human approval (when approval_gates is true)",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "default": [],
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "project_type": "node-api",
+      "validation": {
+        "validation_threshold": 7.0,
+        "verification_threshold": 8.0
+      },
+      "quality": {
+        "coverage_threshold": 85,
+        "coverage_blocking": true
+      },
+      "security": {
+        "enabled": true,
+        "blocking_severities": ["critical", "high"]
+      },
+      "workflow": {
+        "features": {
+          "product_validation": true,
+          "environment_check": true,
+          "build_verification": true,
+          "coverage_check": true,
+          "security_scan": true,
+          "approval_gates": false
+        }
+      }
+    },
+    {
+      "project_type": "react-tanstack",
+      "validation": {
+        "validation_threshold": 6.5,
+        "verification_threshold": 7.5
+      },
+      "quality": {
+        "coverage_threshold": 80,
+        "coverage_blocking": false
+      },
+      "workflow": {
+        "features": {
+          "approval_gates": true
+        },
+        "approval_phases": [2, 4]
+      }
+    }
+  ]
+}

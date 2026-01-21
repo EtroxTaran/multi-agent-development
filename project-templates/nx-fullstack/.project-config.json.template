@@ -1,0 +1,29 @@
+{
+  "project_type": "nx-fullstack",
+  "validation": {
+    "validation_threshold": 6.5,
+    "verification_threshold": 7.5,
+    "max_phase_retries": 3
+  },
+  "quality": {
+    "coverage_threshold": 75,
+    "coverage_blocking": false,
+    "build_required": true,
+    "lint_required": true
+  },
+  "security": {
+    "enabled": true,
+    "blocking_severities": ["critical", "high"]
+  },
+  "workflow": {
+    "features": {
+      "product_validation": true,
+      "environment_check": true,
+      "build_verification": true,
+      "coverage_check": true,
+      "security_scan": true,
+      "approval_gates": false
+    },
+    "approval_phases": []
+  }
+}

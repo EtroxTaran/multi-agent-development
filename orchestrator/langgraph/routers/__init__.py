@@ -12,6 +12,13 @@ from .general import (
     implementation_router,
     completion_router,
     human_escalation_router,
+    # New risk mitigation routers
+    product_validation_router,
+    pre_implementation_router,
+    build_verification_router,
+    coverage_check_router,
+    security_scan_router,
+    approval_gate_router,
 )
 
 __all__ = [
@@ -22,4 +29,11 @@ __all__ = [
     "implementation_router",
     "completion_router",
     "human_escalation_router",
+    # New risk mitigation routers
+    "product_validation_router",
+    "pre_implementation_router",
+    "build_verification_router",
+    "coverage_check_router",
+    "security_scan_router",
+    "approval_gate_router",
 ]

@@ -13,6 +13,9 @@ def verification_router(
 ) -> Literal["completion", "implementation", "human_escalation", "__end__"]:
     """Route after verification based on results.
 
+    Also checks for build verification failures that occurred before
+    the parallel review fan-out.
+
     Args:
         state: Current workflow state
 
@@ -23,6 +26,18 @@ def verification_router(
         - "human_escalation": Max retries exceeded, escalate
         - "__end__": Abort workflow
     """
+    # First, check for build verification errors
+    # Build verification runs before parallel reviews, and build failures
+    # are stored in errors. We need to check for them here.
+    errors = state.get("errors", [])
+    build_errors = [e for e in errors if e.get("type") == "build_verification_failed"]
+    if build_errors:
+        # Check iteration count to decide retry vs escalate
+        iteration_count = state.get("iteration_count", 0)
+        if iteration_count >= 3:
+            return "human_escalation"
+        return "implementation"
+
     decision = state.get("next_decision")
 
     if decision == WorkflowDecision.CONTINUE or decision == "continue":
