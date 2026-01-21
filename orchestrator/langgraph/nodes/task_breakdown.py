@@ -20,6 +20,11 @@ from ..state import (
     PhaseState,
     create_task,
 )
+from ..integrations import (
+    create_linear_adapter,
+    save_issue_mapping,
+    create_markdown_tracker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +117,19 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
     tasks_dir = project_dir / ".workflow" / "phases" / "task_breakdown"
     tasks_dir.mkdir(parents=True, exist_ok=True)
     (tasks_dir / "tasks.json").write_text(json.dumps(tasks_output, indent=2))
+
+    # Create Linear issues (if configured)
+    linear_adapter = create_linear_adapter(project_dir)
+    linear_mapping = linear_adapter.create_issues_from_tasks(tasks, state["project_name"])
+    if linear_mapping:
+        save_issue_mapping(project_dir, linear_mapping)
+        logger.info(f"Created {len(linear_mapping)} Linear issues")
+
+    # Create markdown task files (always, if tracking enabled)
+    markdown_tracker = create_markdown_tracker(project_dir)
+    task_files = markdown_tracker.create_task_files(tasks, linear_mapping)
+    if task_files:
+        logger.info(f"Created {len(task_files)} markdown task files")
 
     logger.info(f"Created {len(tasks)} tasks in {len(milestones)} milestones")
 

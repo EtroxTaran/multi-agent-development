@@ -17,6 +17,11 @@ from ..state import (
     TaskStatus,
     get_task_by_id,
 )
+from ..integrations import (
+    create_linear_adapter,
+    load_issue_mapping,
+    create_markdown_tracker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +83,7 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
             return _handle_verification_failure(
                 updated_task,
                 f"Missing files: {files_check.get('missing', [])}",
+                project_dir,
             )
 
         if not test_result["success"]:
@@ -87,6 +93,7 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
                 return _handle_verification_failure(
                     updated_task,
                     f"Tests failed: {test_result.get('error', 'Unknown')}",
+                    project_dir,
                 )
 
         # Task verified successfully
@@ -98,6 +105,12 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
             "test_result": test_result,
             "verified_at": datetime.now().isoformat(),
         })
+
+        # Update task status in trackers
+        completion_notes = "Task verified successfully - all tests passed"
+        _update_task_trackers_on_completion(
+            project_dir, task_id, TaskStatus.COMPLETED, completion_notes
+        )
 
         logger.info(f"Task {task_id} verified successfully")
 
@@ -111,7 +124,7 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Verification error for task {task_id}: {e}")
-        return _handle_verification_failure(updated_task, str(e))
+        return _handle_verification_failure(updated_task, str(e), project_dir)
 
 
 def _verify_files_created(project_dir: Path, task: Task) -> dict:
@@ -332,12 +345,17 @@ def _save_verification_result(project_dir: Path, task_id: str, result: dict) -> 
     result_file.write_text(json.dumps(result, indent=2))
 
 
-def _handle_verification_failure(task: Task, error_message: str) -> dict[str, Any]:
+def _handle_verification_failure(
+    task: Task,
+    error_message: str,
+    project_dir: Optional[Path] = None,
+) -> dict[str, Any]:
     """Handle task verification failure.
 
     Args:
         task: Task that failed verification
         error_message: Error message
+        project_dir: Optional project directory for tracker updates
 
     Returns:
         State update with error and retry/escalate decision
@@ -352,6 +370,12 @@ def _handle_verification_failure(task: Task, error_message: str) -> dict[str, An
         # Max retries exceeded
         task["status"] = TaskStatus.FAILED
         logger.error(f"Task {task_id} failed verification after {attempts} attempts")
+
+        # Update trackers with failure status
+        if project_dir:
+            _update_task_trackers_on_completion(
+                project_dir, task_id, TaskStatus.FAILED, error_message
+            )
 
         return {
             "tasks": [task],
@@ -383,3 +407,45 @@ def _handle_verification_failure(task: Task, error_message: str) -> dict[str, An
             "next_decision": "retry",  # Retry the same task
             "updated_at": datetime.now().isoformat(),
         }
+
+
+def _update_task_trackers_on_completion(
+    project_dir: Path,
+    task_id: str,
+    status: TaskStatus,
+    notes: Optional[str] = None,
+) -> None:
+    """Update task status in markdown tracker and Linear on completion.
+
+    Args:
+        project_dir: Project directory
+        task_id: Task ID
+        status: Final status (COMPLETED or FAILED)
+        notes: Completion/failure notes
+    """
+    try:
+        # Update markdown tracker
+        markdown_tracker = create_markdown_tracker(project_dir)
+        markdown_tracker.update_task_status(task_id, status, notes)
+    except Exception as e:
+        logger.warning(f"Failed to update markdown tracker for task {task_id}: {e}")
+
+    try:
+        # Update Linear (if configured and issue exists)
+        linear_adapter = create_linear_adapter(project_dir)
+        if linear_adapter.enabled:
+            # Load issue mapping to populate cache
+            issue_mapping = load_issue_mapping(project_dir)
+            linear_adapter._issue_cache.update(issue_mapping)
+
+            # Update status
+            linear_adapter.update_issue_status(task_id, status)
+
+            # Add completion comment
+            if status == TaskStatus.COMPLETED and notes:
+                linear_adapter.add_completion_comment(task_id, notes)
+            elif status == TaskStatus.FAILED and notes:
+                linear_adapter.add_blocker_comment(task_id, notes)
+
+    except Exception as e:
+        logger.warning(f"Failed to update Linear for task {task_id}: {e}")

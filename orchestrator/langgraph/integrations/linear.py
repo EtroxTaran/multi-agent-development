@@ -6,10 +6,14 @@ Provides optional integration with Linear issue tracking:
 - Add blocker comments
 
 Uses the official Linear MCP (https://mcp.linear.app/mcp) with graceful degradation.
+MCP calls are made via subprocess to the Claude CLI.
 """
 
+import asyncio
 import json
 import logging
+import os
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -235,29 +239,38 @@ class LinearAdapter:
     def _check_mcp_available(self) -> bool:
         """Check if Linear MCP is available.
 
+        Tests MCP availability by attempting to list teams.
+
         Returns:
             True if MCP is available
         """
         if self._mcp_available is not None:
             return self._mcp_available
 
-        # For now, assume not available since MCP integration
-        # requires runtime context we don't have in this adapter
-        # The actual MCP calls would be made through the MCP server
-        # when running in a Claude Code context
-        self._mcp_available = False
-        logger.info(
-            "Linear MCP integration requires MCP runtime. "
-            "Add mcp-linear to your mcp.json for full integration."
-        )
+        try:
+            # Test MCP by running a simple query
+            prompt = "List Linear teams using the mcp__linear__listTeams tool. Return only the JSON response."
+            result = self._run_mcp_command(prompt)
+
+            if result and "teams" in result.lower():
+                self._mcp_available = True
+                logger.info("Linear MCP is available")
+            else:
+                self._mcp_available = False
+                logger.info(
+                    "Linear MCP not available. "
+                    "Ensure mcp-linear is configured in your mcp.json."
+                )
+        except Exception as e:
+            self._mcp_available = False
+            logger.info(f"Linear MCP check failed: {e}")
+
         return self._mcp_available
 
     def _create_issue(self, task: Task, project_name: str) -> Optional[str]:
         """Create a Linear issue for a task.
 
-        Note: This is a placeholder for the actual MCP call.
-        In practice, the workflow nodes would call the Linear MCP
-        tools directly when available.
+        Uses the Linear MCP createIssue tool.
 
         Args:
             task: Task to create issue for
@@ -266,37 +279,189 @@ class LinearAdapter:
         Returns:
             Issue ID if created, None otherwise
         """
-        # Placeholder - actual implementation would call Linear MCP
-        logger.debug(f"Would create Linear issue for task {task.get('id')}")
+        task_id = task.get("id", "")
+        title = task.get("title", "")
+        user_story = task.get("user_story", "")
+        acceptance_criteria = task.get("acceptance_criteria", [])
+        priority_map = {
+            "critical": 1,
+            "high": 2,
+            "medium": 3,
+            "low": 4,
+        }
+        priority = priority_map.get(task.get("priority", "medium"), 3)
+
+        # Build description
+        description_parts = [
+            f"**Project:** {project_name}",
+            f"**Task ID:** {task_id}",
+            "",
+            "## User Story",
+            user_story or "_No user story defined_",
+            "",
+            "## Acceptance Criteria",
+        ]
+        for criterion in acceptance_criteria:
+            description_parts.append(f"- [ ] {criterion}")
+
+        description = "\n".join(description_parts)
+
+        prompt = f"""Create a Linear issue using mcp__linear__createIssue with:
+- teamId: "{self.config.team_id}"
+- title: "[{task_id}] {title}"
+- description: {json.dumps(description)}
+- priority: {priority}
+
+Return ONLY the issue ID from the response in format: ISSUE_ID: <id>"""
+
+        try:
+            result = self._run_mcp_command(prompt)
+            if result:
+                # Parse issue ID from response
+                if "ISSUE_ID:" in result:
+                    issue_id = result.split("ISSUE_ID:")[1].strip().split()[0]
+                    logger.info(f"Created Linear issue {issue_id} for task {task_id}")
+                    return issue_id
+
+                # Try to parse from JSON response
+                try:
+                    data = json.loads(result)
+                    if isinstance(data, dict):
+                        issue_id = data.get("id") or data.get("issueId")
+                        if issue_id:
+                            logger.info(f"Created Linear issue {issue_id} for task {task_id}")
+                            return issue_id
+                except json.JSONDecodeError:
+                    pass
+
+                logger.warning(f"Could not parse issue ID from response: {result[:200]}")
+
+        except Exception as e:
+            logger.warning(f"Failed to create Linear issue for task {task_id}: {e}")
+
         return None
 
     def _update_issue(self, issue_id: str, updates: dict) -> bool:
         """Update a Linear issue.
 
+        Uses the Linear MCP updateIssue tool.
+
         Args:
             issue_id: Issue ID
-            updates: Fields to update
+            updates: Fields to update (e.g., {"status": "In Progress"})
 
         Returns:
             True if updated
         """
-        # Placeholder
-        logger.debug(f"Would update Linear issue {issue_id}: {updates}")
-        return True
+        # Build the update prompt
+        update_fields = []
+        for key, value in updates.items():
+            if key == "status":
+                # Status needs to be mapped to state ID
+                update_fields.append(f'- stateId for status "{value}"')
+            else:
+                update_fields.append(f"- {key}: {json.dumps(value)}")
+
+        prompt = f"""Update Linear issue {issue_id} using mcp__linear__updateIssue with:
+{chr(10).join(update_fields)}
+
+First get the workflow states for the team to find the correct stateId, then update the issue.
+Return SUCCESS if updated, or ERROR with reason."""
+
+        try:
+            result = self._run_mcp_command(prompt)
+            if result and "SUCCESS" in result.upper():
+                logger.debug(f"Updated Linear issue {issue_id}")
+                return True
+            elif result and "ERROR" not in result.upper():
+                # Assume success if no explicit error
+                logger.debug(f"Updated Linear issue {issue_id}")
+                return True
+            else:
+                logger.warning(f"Failed to update Linear issue {issue_id}: {result}")
+                return False
+
+        except Exception as e:
+            logger.warning(f"Failed to update Linear issue {issue_id}: {e}")
+            return False
 
     def _add_comment(self, issue_id: str, body: str) -> bool:
         """Add a comment to a Linear issue.
 
+        Uses the Linear MCP createComment tool.
+
         Args:
             issue_id: Issue ID
-            body: Comment body
+            body: Comment body (markdown supported)
 
         Returns:
             True if added
         """
-        # Placeholder
-        logger.debug(f"Would add comment to Linear issue {issue_id}")
-        return True
+        prompt = f"""Add a comment to Linear issue {issue_id} using mcp__linear__createComment with:
+- issueId: "{issue_id}"
+- body: {json.dumps(body)}
+
+Return SUCCESS if added, or ERROR with reason."""
+
+        try:
+            result = self._run_mcp_command(prompt)
+            if result and "SUCCESS" in result.upper():
+                logger.debug(f"Added comment to Linear issue {issue_id}")
+                return True
+            elif result and "ERROR" not in result.upper():
+                # Assume success if no explicit error
+                logger.debug(f"Added comment to Linear issue {issue_id}")
+                return True
+            else:
+                logger.warning(f"Failed to add comment to Linear issue {issue_id}: {result}")
+                return False
+
+        except Exception as e:
+            logger.warning(f"Failed to add comment to Linear issue {issue_id}: {e}")
+            return False
+
+    def _run_mcp_command(self, prompt: str, timeout: int = 30) -> Optional[str]:
+        """Run a Claude CLI command with MCP tools.
+
+        Args:
+            prompt: Prompt for Claude
+            timeout: Command timeout in seconds
+
+        Returns:
+            Command output or None on failure
+        """
+        cmd = [
+            "claude",
+            "-p", prompt,
+            "--output-format", "text",
+            "--allowedTools", "mcp__linear__*",
+            "--max-turns", "3",
+        ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env={**os.environ, "TERM": "dumb"},
+            )
+
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                logger.debug(f"MCP command failed: {result.stderr}")
+                return None
+
+        except subprocess.TimeoutExpired:
+            logger.warning(f"MCP command timed out after {timeout}s")
+            return None
+        except FileNotFoundError:
+            logger.warning("Claude CLI not found")
+            return None
+        except Exception as e:
+            logger.warning(f"MCP command error: {e}")
+            return None
 
 
 def create_linear_adapter(project_dir: Path) -> LinearAdapter:

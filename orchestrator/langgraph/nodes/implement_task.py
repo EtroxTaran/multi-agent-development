@@ -29,6 +29,11 @@ from ..integrations.ralph_loop import (
     run_ralph_loop,
     detect_test_framework,
 )
+from ..integrations import (
+    create_linear_adapter,
+    load_issue_mapping,
+    create_markdown_tracker,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +148,9 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
     updated_task = dict(task)
     updated_task["attempts"] = updated_task.get("attempts", 0) + 1
     updated_task["status"] = TaskStatus.IN_PROGRESS
+
+    # Update task status in trackers
+    _update_task_trackers(project_dir, task_id, TaskStatus.IN_PROGRESS)
 
     # Decide which execution mode to use
     use_ralph = _should_use_ralph_loop(task, project_dir)
@@ -631,3 +639,36 @@ def _parse_task_output(stdout: str, task_id: str) -> dict:
             pass
 
     return {"task_id": task_id, "status": "unknown", "raw_output": stdout}
+
+
+def _update_task_trackers(
+    project_dir: Path,
+    task_id: str,
+    status: TaskStatus,
+    notes: Optional[str] = None,
+) -> None:
+    """Update task status in markdown tracker and Linear.
+
+    Args:
+        project_dir: Project directory
+        task_id: Task ID
+        status: New status
+        notes: Optional status notes
+    """
+    try:
+        # Update markdown tracker
+        markdown_tracker = create_markdown_tracker(project_dir)
+        markdown_tracker.update_task_status(task_id, status, notes)
+    except Exception as e:
+        logger.warning(f"Failed to update markdown tracker for task {task_id}: {e}")
+
+    try:
+        # Update Linear (if configured and issue exists)
+        linear_adapter = create_linear_adapter(project_dir)
+        if linear_adapter.enabled:
+            # Load issue mapping to populate cache
+            issue_mapping = load_issue_mapping(project_dir)
+            linear_adapter._issue_cache.update(issue_mapping)
+            linear_adapter.update_issue_status(task_id, status)
+    except Exception as e:
+        logger.warning(f"Failed to update Linear for task {task_id}: {e}")

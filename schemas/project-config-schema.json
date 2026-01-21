@@ -167,6 +167,92 @@
         }
       },
       "additionalProperties": false
+    },
+    "integrations": {
+      "type": "object",
+      "description": "External integration settings",
+      "properties": {
+        "linear": {
+          "type": "object",
+          "description": "Linear issue tracking integration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Linear integration",
+              "default": false
+            },
+            "team_id": {
+              "type": "string",
+              "description": "Linear team ID for issue creation"
+            },
+            "create_project": {
+              "type": "boolean",
+              "description": "Create a Linear project for the feature",
+              "default": true
+            },
+            "project_id": {
+              "type": "string",
+              "description": "Existing Linear project ID to use"
+            },
+            "status_mapping": {
+              "type": "object",
+              "description": "Map task status to Linear workflow states",
+              "properties": {
+                "pending": {
+                  "type": "string",
+                  "default": "Backlog"
+                },
+                "in_progress": {
+                  "type": "string",
+                  "default": "In Progress"
+                },
+                "completed": {
+                  "type": "string",
+                  "default": "Done"
+                },
+                "blocked": {
+                  "type": "string",
+                  "default": "Blocked"
+                },
+                "failed": {
+                  "type": "string",
+                  "default": "Cancelled"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "task_tracking": {
+          "type": "object",
+          "description": "Local markdown task tracking",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable local markdown task files",
+              "default": true
+            },
+            "tasks_dir": {
+              "type": "string",
+              "description": "Directory for task files (relative to .workflow/)",
+              "default": "tasks"
+            },
+            "make_readonly": {
+              "type": "boolean",
+              "description": "Make task files read-only (chmod 444)",
+              "default": true
+            },
+            "validate_checksums": {
+              "type": "boolean",
+              "description": "Validate task file checksums on read",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

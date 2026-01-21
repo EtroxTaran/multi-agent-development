@@ -16,6 +16,12 @@ from .linear import (
     save_issue_mapping,
     load_issue_mapping,
 )
+from .markdown_tracker import (
+    MarkdownTracker,
+    MarkdownTrackerConfig,
+    create_markdown_tracker,
+    load_tracker_config,
+)
 from .ralph_loop import (
     RalphLoopConfig,
     RalphLoopResult,
@@ -41,6 +47,11 @@ __all__ = [
     "load_linear_config",
     "save_issue_mapping",
     "load_issue_mapping",
+    # Markdown task tracker
+    "MarkdownTracker",
+    "MarkdownTrackerConfig",
+    "create_markdown_tracker",
+    "load_tracker_config",
     # Ralph Wiggum loop integration
     "RalphLoopConfig",
     "RalphLoopResult",
