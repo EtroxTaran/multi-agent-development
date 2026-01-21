@@ -68,11 +68,8 @@ dev = [
 [project.scripts]
 orchestrator = "orchestrator.orchestrator:main"
 
-[project.urls]
-Homepage = "https://github.com/example/multi-agent-orchestrator"
-Documentation = "https://github.com/example/multi-agent-orchestrator#readme"
-Repository = "https://github.com/example/multi-agent-orchestrator.git"
-Issues = "https://github.com/example/multi-agent-orchestrator/issues"
+# [project.urls]
+# URLs removed - update with actual repository when published
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}

@@ -345,7 +345,7 @@ source .venv/bin/activate  # Linux/Mac
 # or: .venv\Scripts\activate  # Windows
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -e .
 
 # Verify installation
 python -c "from orchestrator import Orchestrator; print('OK')"
@@ -355,13 +355,16 @@ python -c "from orchestrator import Orchestrator; print('OK')"
 
 ## Quick Start
 
-### 1. Initialize Your Project
+### 1. Create Your Project
 
 ```bash
-bash scripts/init-multi-agent.sh /path/to/your/project
+# From meta-architect root directory
+./scripts/init.sh create my-app --type node-api
+
+# Available types: node-api, react-tanstack, java-spring, nx-fullstack
 ```
 
-This creates the workflow structure in your project.
+This creates `projects/my-app/` with all necessary configuration files.
 
 ### 2. Define Your Feature
 
@@ -433,8 +436,7 @@ After initialization, your project will have:
 ```
 your-project/
 ├── PRODUCT.md              # Your feature specification (edit this!)
-├── AGENTS.md               # Workflow rules (source of truth)
-├── CLAUDE.md               # Claude-specific instructions
+├── CLAUDE.md               # Claude-specific instructions (workflow rules)
 ├── GEMINI.md               # Gemini-specific instructions
 │
 ├── .claude/
@@ -486,14 +488,7 @@ meta-architect/
 │   │   ├── claude.py       # ClaudeAgent
 │   │   ├── cursor.py       # CursorAgent
 │   │   └── gemini.py       # GeminiAgent
-│   ├── phases/             # Phase implementations (legacy)
-│   │   ├── base.py         # BasePhase class
-│   │   ├── phase1_planning.py
-│   │   ├── phase2_validation.py
-│   │   ├── phase3_implementation.py
-│   │   ├── phase4_verification.py
-│   │   └── phase5_completion.py
-│   ├── langgraph/          # LangGraph workflow (recommended)
+│   ├── langgraph/          # LangGraph workflow
 │   │   ├── workflow.py     # Graph assembly, entry point
 │   │   ├── state.py        # TypedDict state schema, reducers
 │   │   ├── nodes/          # Node implementations
@@ -502,14 +497,19 @@ meta-architect/
 │   │   │   ├── validation.py
 │   │   │   ├── implementation.py
 │   │   │   ├── verification.py
+│   │   │   ├── task_breakdown.py
+│   │   │   ├── implement_task.py
+│   │   │   ├── verify_task.py
 │   │   │   ├── escalation.py
 │   │   │   └── completion.py
 │   │   ├── routers/        # Conditional edge logic
 │   │   │   ├── validation.py
-│   │   │   └── verification.py
+│   │   │   ├── verification.py
+│   │   │   └── task.py
 │   │   └── integrations/   # Adapters for existing utils
 │   │       ├── approval.py
 │   │       ├── conflict.py
+│   │       ├── linear.py
 │   │       └── state.py
 │   └── utils/              # Utilities
 │       ├── state.py        # StateManager
@@ -521,7 +521,7 @@ meta-architect/
 │       ├── resilience.py   # AsyncCircuitBreaker, RetryPolicy
 │       └── validation.py   # Feedback validation
 ├── scripts/
-│   ├── init-multi-agent.sh # Project initialization
+│   ├── init.sh             # Project initialization
 │   ├── call-cursor.sh      # Cursor CLI wrapper
 │   ├── call-gemini.sh      # Gemini CLI wrapper
 │   ├── create-project.py   # Create new projects
@@ -946,7 +946,7 @@ python -m pytest tests/ -v
 
 # Run specific test modules
 python -m pytest tests/test_orchestrator.py -v
-python -m pytest tests/test_phases.py -v
+python -m pytest tests/test_langgraph.py -v
 python -m pytest tests/test_approval.py -v
 
 # Run with coverage

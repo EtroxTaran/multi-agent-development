@@ -23,13 +23,6 @@ from .utils.git_operations import GitOperationsManager
 from .utils.log_manager import LogManager, load_config as load_log_config, should_auto_cleanup
 from .utils.handoff import HandoffGenerator, generate_handoff
 from .project_manager import ProjectManager
-from .phases import (
-    PlanningPhase,
-    ValidationPhase,
-    ImplementationPhase,
-    VerificationPhase,
-    CompletionPhase,
-)
 from .ui import create_display, UICallbackHandler
 
 
@@ -59,12 +52,13 @@ class Orchestrator:
     - Structured logging
     """
 
-    PHASES = [
-        (1, "planning", PlanningPhase),
-        (2, "validation", ValidationPhase),
-        (3, "implementation", ImplementationPhase),
-        (4, "verification", VerificationPhase),
-        (5, "completion", CompletionPhase),
+    # Legacy PHASES removed - now using LangGraph workflow exclusively
+    PHASE_NAMES = [
+        (1, "planning"),
+        (2, "validation"),
+        (3, "implementation"),
+        (4, "verification"),
+        (5, "completion"),
     ]
 
     def __init__(
@@ -141,132 +135,21 @@ class Orchestrator:
         end_phase: int = 5,
         skip_validation: bool = False,
     ) -> dict:
-        """Run the orchestration workflow.
+        """Run the orchestration workflow using LangGraph.
+
+        Note: Legacy phase execution has been removed. This method now
+        delegates to run_langgraph() for all workflow execution.
 
         Args:
-            start_phase: Phase to start from (1-5)
-            end_phase: Phase to end at (1-5)
-            skip_validation: Skip the validation phase (phase 2)
+            start_phase: Phase to start from (1-5) - currently ignored, LangGraph starts fresh
+            end_phase: Phase to end at (1-5) - currently ignored, LangGraph runs to completion
+            skip_validation: Skip the validation phase (phase 2) - currently ignored
 
         Returns:
             Dictionary with workflow results
         """
-        self.logger.banner("Multi-Agent Orchestration System")
-
-        # Check prerequisites
-        prereq_ok, prereq_errors = self.check_prerequisites()
-        if not prereq_ok:
-            for error in prereq_errors:
-                self.logger.error(error)
-            return {
-                "success": False,
-                "error": "Prerequisites not met",
-                "details": prereq_errors,
-            }
-
-        # Load state
-        self.state.load()
-        self.logger.info(f"Project: {self.state.state.project_name}")
-        self.logger.info(f"Workflow directory: {self.state.workflow_dir}")
-        self.logger.separator()
-
-        # Run phases
-        results = {}
-        for phase_num, phase_name, phase_class in self.PHASES:
-            if phase_num < start_phase:
-                continue
-            if phase_num > end_phase:
-                break
-            if skip_validation and phase_num == 2:
-                self.logger.info("Skipping validation phase", phase=2)
-                continue
-
-            # Check if phase is already completed
-            phase_state = self.state.get_phase(phase_num)
-            if phase_state.status == PhaseStatus.COMPLETED:
-                self.logger.info(f"Phase {phase_num} already completed, skipping", phase=phase_num)
-                continue
-
-            # Run phase with retry logic
-            result = self._run_phase_with_retry(phase_num, phase_name, phase_class)
-            results[phase_name] = result
-
-            if not result.get("success", False):
-                self.logger.error(f"Workflow stopped at phase {phase_num}")
-                return {
-                    "success": False,
-                    "stopped_at_phase": phase_num,
-                    "error": result.get("error", "Phase failed"),
-                    "results": results,
-                }
-
-            # Auto-commit after successful phase
-            if self.auto_commit and phase_num < 5:  # Don't commit after completion
-                self._auto_commit(phase_num, phase_name)
-
-        self.logger.banner("Workflow Complete!")
-        self.logger.info(f"Summary: {self.state.workflow_dir / 'phases' / 'completion' / 'COMPLETION.md'}")
-
-        return {
-            "success": True,
-            "results": results,
-            "summary": self.state.get_summary(),
-        }
-
-    def _run_phase_with_retry(
-        self,
-        phase_num: int,
-        phase_name: str,
-        phase_class: type,
-    ) -> dict:
-        """Run a phase with retry logic.
-
-        Args:
-            phase_num: Phase number (1-5)
-            phase_name: Phase name
-            phase_class: Phase class to instantiate
-
-        Returns:
-            Dictionary with phase results
-        """
-        phase_state = self.state.get_phase(phase_num)
-
-        while self.state.can_retry(phase_num):
-            # Print progress indicator
-            self._print_progress(phase_num, phase_name.title(), "Starting...")
-
-            # Create phase instance
-            phase = phase_class(
-                project_dir=self.project_dir,
-                state_manager=self.state,
-                logger=self.logger,
-            )
-
-            # Update max attempts from orchestrator config
-            phase_state.max_attempts = self.max_retries
-
-            # Log retry if not first attempt
-            if phase_state.attempts > 0:
-                self.logger.retry(phase_num, phase_state.attempts + 1, self.max_retries)
-
-            # Run phase
-            result = phase.run()
-
-            if result.get("success", False):
-                return result
-
-            # Check if we should retry
-            if not self.state.can_retry(phase_num):
-                break
-
-            # Reset phase for retry
-            self.state.reset_phase(phase_num)
-
-        return {
-            "success": False,
-            "error": f"Phase {phase_num} failed after {phase_state.attempts} attempts",
-            "last_error": phase_state.error,
-        }
+        # Delegate to LangGraph workflow
+        return asyncio.run(self.run_langgraph())
 
     def _auto_commit(self, phase_num: int, phase_name: str) -> None:
         """Auto-commit changes after a phase.
@@ -298,27 +181,16 @@ class Orchestrator:
             self.logger.warning(f"Auto-commit failed: {e}", phase=phase_num)
 
     def resume(self) -> dict:
-        """Resume workflow from last incomplete phase.
+        """Resume workflow from last checkpoint using LangGraph.
+
+        Note: Legacy phase-based resume has been removed. This method now
+        delegates to resume_langgraph() for checkpoint-based resume.
 
         Returns:
             Dictionary with workflow results
         """
-        self.state.load()
-
-        # Find first incomplete phase
-        start_phase = 1
-        for phase_num, phase_name, _ in self.PHASES:
-            phase_state = self.state.get_phase(phase_num)
-            if phase_state.status != PhaseStatus.COMPLETED:
-                start_phase = phase_num
-                break
-
-        if start_phase > 5:
-            self.logger.info("All phases already completed")
-            return {"success": True, "message": "Workflow already complete"}
-
-        self.logger.info(f"Resuming from phase {start_phase}")
-        return self.run(start_phase=start_phase)
+        # Delegate to LangGraph resume
+        return asyncio.run(self.resume_langgraph())
 
     def status(self) -> dict:
         """Get current workflow status.
@@ -342,7 +214,7 @@ class Orchestrator:
             self.logger.info(f"Reset phase {phase}")
         else:
             # Reset all phases
-            for phase_num, _, _ in self.PHASES:
+            for phase_num, _ in self.PHASE_NAMES:
                 phase_state = self.state.get_phase(phase_num)
                 phase_state.status = PhaseStatus.PENDING
                 phase_state.attempts = 0
