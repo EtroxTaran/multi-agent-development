@@ -49,40 +49,34 @@ async def prerequisites_node(state: WorkflowState) -> dict[str, Any]:
         workflow_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Created workflow directory: {workflow_dir}")
 
-    # Check agent availability
-    from ...sdk import ClaudeSDKAgent, GeminiSDKAgent
-
-    agents_available = {
-        "claude_sdk": ClaudeSDKAgent.is_available(),
-        "gemini_sdk": GeminiSDKAgent.is_available(),
-    }
-
-    # Check CLI fallbacks
+    # Check CLI agent availability
     from ...agents import ClaudeAgent, CursorAgent, GeminiAgent
 
     claude_cli = ClaudeAgent(project_dir)
     cursor_cli = CursorAgent(project_dir)
     gemini_cli = GeminiAgent(project_dir)
 
-    agents_available["claude_cli"] = claude_cli.check_available()
-    agents_available["cursor_cli"] = cursor_cli.check_available()
-    agents_available["gemini_cli"] = gemini_cli.check_available()
+    agents_available = {
+        "claude_cli": claude_cli.check_available(),
+        "cursor_cli": cursor_cli.check_available(),
+        "gemini_cli": gemini_cli.check_available(),
+    }
 
     # Determine if we can proceed
     can_proceed = True
     missing_agents = []
 
-    # Need at least one way to call Claude
-    if not (agents_available["claude_sdk"] or agents_available["claude_cli"]):
-        missing_agents.append("Claude (set ANTHROPIC_API_KEY or install claude CLI)")
+    # Need Claude CLI
+    if not agents_available["claude_cli"]:
+        missing_agents.append("Claude (install claude CLI)")
         can_proceed = False
 
-    # Need at least one way to call Gemini
-    if not (agents_available["gemini_sdk"] or agents_available["gemini_cli"]):
-        missing_agents.append("Gemini (set GOOGLE_API_KEY or install gemini CLI)")
+    # Need Gemini CLI
+    if not agents_available["gemini_cli"]:
+        missing_agents.append("Gemini (install gemini CLI)")
         can_proceed = False
 
-    # Cursor is CLI only
+    # Need Cursor CLI
     if not agents_available["cursor_cli"]:
         missing_agents.append("Cursor (install cursor-agent CLI)")
         can_proceed = False

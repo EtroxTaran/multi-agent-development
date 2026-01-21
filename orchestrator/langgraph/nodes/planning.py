@@ -1,11 +1,13 @@
 """Planning node for Phase 1.
 
 Generates implementation plan from PRODUCT.md specification
-using Claude.
+using Claude CLI.
 """
 
+import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -107,29 +109,37 @@ async def planning_node(state: WorkflowState) -> dict[str, Any]:
     # Build prompt
     prompt = PLANNING_PROMPT.format(product_spec=product_spec)
 
-    # Try SDK first, fall back to CLI
-    from ...sdk import ClaudeSDKAgent, AgentFactory, AgentType
-
     action_logger.log_agent_invoke("claude", "Generating implementation plan", phase=1)
 
     try:
-        factory = AgentFactory(project_dir=project_dir)
-        result = await factory.generate(
-            agent_type=AgentType.CLAUDE,
-            prompt=prompt,
-            system_prompt="You are a senior software architect creating implementation plans. Always respond with valid JSON.",
-            max_tokens=4096,
+        # Use Claude CLI to generate plan
+        cmd = ["claude", "-p", prompt, "--output-format", "json"]
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(project_dir),
         )
 
-        if not result.success:
-            raise Exception(result.error)
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=300,  # 5 minute timeout
+        )
 
-        # Parse the plan
-        plan = result.parsed_output
-        if not plan:
+        if process.returncode != 0:
+            error_msg = stderr.decode() if stderr else "Unknown error"
+            raise Exception(f"Claude CLI failed: {error_msg}")
+
+        output = stdout.decode()
+
+        # Parse the plan from output
+        plan = None
+        try:
+            plan = json.loads(output)
+        except json.JSONDecodeError:
             # Try to extract JSON from text
-            import re
-            json_match = re.search(r"\{[\s\S]*\}", result.output or "")
+            json_match = re.search(r"\{[\s\S]*\}", output)
             if json_match:
                 plan = json.loads(json_match.group(0))
             else:

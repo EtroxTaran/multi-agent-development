@@ -4,8 +4,10 @@ Cursor and Gemini validate the plan in parallel, then
 results are merged in the fan-in node.
 """
 
+import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -286,25 +288,33 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
     prompt = GEMINI_VALIDATION_PROMPT.format(plan=json.dumps(plan, indent=2))
 
     try:
-        # Try SDK first, fall back to CLI
-        from ...sdk import AgentFactory, AgentType
+        # Use Gemini CLI to validate plan
+        cmd = ["gemini", "--yolo", prompt]
 
-        factory = AgentFactory(project_dir=project_dir)
-        result = await factory.generate(
-            agent_type=AgentType.GEMINI,
-            prompt=prompt,
-            system_prompt="You are a senior software architect. Always respond with valid JSON.",
-            max_tokens=4096,
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(project_dir),
         )
 
-        if not result.success:
-            raise Exception(result.error or "Gemini validation failed")
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=300,  # 5 minute timeout
+        )
+
+        if process.returncode != 0:
+            error_msg = stderr.decode() if stderr else "Unknown error"
+            raise Exception(f"Gemini CLI failed: {error_msg}")
+
+        output = stdout.decode()
 
         # Parse feedback
-        feedback_data = result.parsed_output or {}
-        if not feedback_data and result.output:
-            import re
-            json_match = re.search(r"\{[\s\S]*\}", result.output)
+        feedback_data = {}
+        try:
+            feedback_data = json.loads(output)
+        except json.JSONDecodeError:
+            json_match = re.search(r"\{[\s\S]*\}", output)
             if json_match:
                 feedback_data = json.loads(json_match.group(0))
 
