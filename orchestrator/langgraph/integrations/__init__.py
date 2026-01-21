@@ -16,6 +16,13 @@ from .linear import (
     save_issue_mapping,
     load_issue_mapping,
 )
+from .ralph_loop import (
+    RalphLoopConfig,
+    RalphLoopResult,
+    run_ralph_loop,
+    detect_test_framework,
+    COMPLETION_PROMISE,
+)
 
 __all__ = [
     "LangGraphApprovalAdapter",
@@ -30,4 +37,10 @@ __all__ = [
     "load_linear_config",
     "save_issue_mapping",
     "load_issue_mapping",
+    # Ralph Wiggum loop integration
+    "RalphLoopConfig",
+    "RalphLoopResult",
+    "run_ralph_loop",
+    "detect_test_framework",
+    "COMPLETION_PROMISE",
 ]

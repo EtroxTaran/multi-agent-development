@@ -1,8 +1,8 @@
 # Claude-Specific Rules
 
 <!-- AGENT-SPECIFIC: Only applies to Claude -->
-<!-- Version: 2.1 -->
-<!-- Updated: 2026-01-21 - Added Quick Start section -->
+<!-- Version: 2.2 -->
+<!-- Updated: 2026-01-21 - Added Task-Based Execution, Ralph Wiggum Loop, Linear Integration -->
 
 ---
 
@@ -293,3 +293,192 @@ python -m pytest tests/test_langgraph.py -v
 | `orchestrator/langgraph/nodes/*.py` | Node implementations |
 | `orchestrator/langgraph/routers/*.py` | Conditional edge logic |
 | `orchestrator/langgraph/integrations/*.py` | Adapters for existing utils |
+
+---
+
+## Task-Based Incremental Execution
+
+Instead of implementing the entire feature in one shot, the workflow breaks PRODUCT.md into individual tasks and implements them one-by-one with verification after each.
+
+### Task Loop Structure
+
+```
+planning → task_breakdown →
+    ┌─────────────────────────────────────────┐
+    │            TASK LOOP                    │
+    │  select_task → implement_task →         │
+    │       ↑         verify_task ────────────┼──┐
+    │       └─────────────────────────────────┘  │
+    │              (loop back)                   │
+    └────────────────────────────────────────────┘
+                        │ (all tasks complete)
+                        ↓
+                build_verification → ...
+```
+
+### Task Data Model
+
+```python
+class Task(TypedDict):
+    id: str                          # "T1", "T2"
+    title: str                       # Short title
+    user_story: str                  # "As a... I want... So that..."
+    acceptance_criteria: list[str]   # Checklist items
+    dependencies: list[str]          # Task IDs this depends on
+    status: TaskStatus               # pending|in_progress|completed|failed|blocked
+    priority: str                    # critical|high|medium|low
+    files_to_create: list[str]
+    files_to_modify: list[str]
+    test_files: list[str]
+    attempts: int
+    max_attempts: int                # Default 3
+```
+
+### Task Selection Algorithm
+
+1. Filter tasks with `status == "pending"`
+2. Filter tasks with all dependencies in `completed_task_ids`
+3. Sort by: priority (high first) → milestone order → task ID
+4. Select first available task
+
+### Benefits
+
+- **Incremental verification**: Catch issues early, not after hours of work
+- **Progress visibility**: Track completion percentage
+- **Safer rollback**: Revert individual tasks, not entire feature
+- **Linear integration**: Optionally sync tasks to Linear issues
+
+---
+
+## Ralph Wiggum Loop (TDD Mode)
+
+The Ralph Wiggum loop is an iterative execution pattern for TDD-based implementation. When tests already exist, it runs Claude in a loop until all tests pass.
+
+### How It Works
+
+```
+┌─────────────────┐
+│  Task Selected  │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │ Tests   │
+    │ exist?  │
+    └────┬────┘
+   YES   │   NO
+    ┌────┴────────────┐
+    │ Ralph Loop      │ Standard Mode
+    └────┬────────────┘
+         │
+    ┌────┴────┐
+    │ Fresh   │
+    │ Claude  │ (iteration 1)
+    └────┬────┘
+         │
+    ┌────┴────┐
+    │ Tests   │
+    │ Pass?   │
+    └────┬────┘
+   YES   │   NO (spawn new Claude, loop)
+         │
+    ┌────┴────┐
+    │ Done!   │
+    └─────────┘
+```
+
+### Key Principles
+
+1. **Fresh context each iteration**: Avoids context degradation on complex tasks
+2. **Tests as backpressure**: Natural completion signal (all tests green)
+3. **Completion promise**: `<promise>DONE</promise>` signals task complete
+4. **Automatic retry**: Keeps iterating until tests pass (up to 10 iterations)
+
+### Configuration
+
+```bash
+# Enable Ralph loop for all tasks
+USE_RALPH_LOOP=true python -m orchestrator --project my-project
+
+# Disable Ralph loop (use standard single-invocation mode)
+USE_RALPH_LOOP=false python -m orchestrator --project my-project
+
+# Auto-detect (default): use Ralph if task has test_files defined
+USE_RALPH_LOOP=auto python -m orchestrator --project my-project
+```
+
+### When to Use Ralph Loop
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Tests already exist (TDD) | ✅ Use Ralph loop |
+| Complex multi-step task | ✅ Use Ralph loop |
+| Simple single-file change | ❌ Use standard mode |
+| No tests defined | ❌ Use standard mode |
+
+### Iteration Logs
+
+Ralph loop saves logs to `.workflow/ralph_logs/{task_id}/`:
+- `iteration_001.json` - First iteration metadata
+- `iteration_002.json` - Second iteration metadata
+- etc.
+
+---
+
+## Linear Integration (Optional)
+
+Optionally sync tasks to Linear for project management tracking.
+
+### Configuration
+
+Add to `projects/<name>/.project-config.json`:
+
+```json
+{
+  "integrations": {
+    "linear": {
+      "enabled": true,
+      "team_id": "TEAM123",
+      "create_project": true,
+      "status_mapping": {
+        "pending": "Backlog",
+        "in_progress": "In Progress",
+        "completed": "Done",
+        "blocked": "Blocked",
+        "failed": "Cancelled"
+      }
+    }
+  }
+}
+```
+
+### MCP Setup
+
+Linear integration uses the official Linear MCP. Add to `mcp.json`:
+
+```json
+{
+  "mcp-linear": {
+    "command": "npx",
+    "args": ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
+    "description": "Official Linear MCP for issue tracking",
+    "optional": true
+  }
+}
+```
+
+### What Gets Synced
+
+| Workflow Event | Linear Action |
+|----------------|---------------|
+| Task breakdown | Create issues from tasks |
+| Task started | Update status to "In Progress" |
+| Task completed | Update status to "Done" |
+| Task blocked | Add blocker comment |
+| Task failed | Update status to "Cancelled" |
+
+### Graceful Degradation
+
+If Linear MCP is unavailable or not configured:
+- Workflow continues normally
+- No errors thrown
+- Tasks tracked in `.workflow/` only

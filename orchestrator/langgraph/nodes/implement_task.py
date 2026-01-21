@@ -2,6 +2,12 @@
 
 Implements a single task using worker Claude with focused scope.
 Only implements the current task's acceptance criteria.
+
+Supports two execution modes:
+1. Standard: Single worker invocation with TDD prompt
+2. Ralph Wiggum: Iterative loop until tests pass (fresh context each iteration)
+
+Ralph Wiggum mode is recommended when tests already exist (TDD workflow).
 """
 
 import asyncio
@@ -18,12 +24,21 @@ from ..state import (
     TaskStatus,
     get_task_by_id,
 )
+from ..integrations.ralph_loop import (
+    RalphLoopConfig,
+    run_ralph_loop,
+    detect_test_framework,
+)
 
 logger = logging.getLogger(__name__)
 
 # Configuration
-TASK_TIMEOUT = 600  # 10 minutes per task
+TASK_TIMEOUT = 600  # 10 minutes per task (standard mode)
+RALPH_TIMEOUT = 1800  # 30 minutes total for Ralph loop
 MAX_CONCURRENT_OPERATIONS = 1  # Single writer
+
+# Environment variable to enable Ralph Wiggum mode
+USE_RALPH_LOOP = os.environ.get("USE_RALPH_LOOP", "auto")  # "auto", "true", "false"
 
 TASK_IMPLEMENTATION_PROMPT = """You are implementing a SINGLE task as part of a larger feature.
 
@@ -86,6 +101,12 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
     Spawns a worker Claude to implement the single selected task
     with focused scope and TDD practices.
 
+    Supports two modes:
+    - Standard: Single worker invocation (default for simple tasks)
+    - Ralph Wiggum: Iterative loop until tests pass (for TDD tasks)
+
+    Set USE_RALPH_LOOP env var to control: "auto", "true", "false"
+
     Args:
         state: Current workflow state
 
@@ -122,6 +143,170 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
     updated_task = dict(task)
     updated_task["attempts"] = updated_task.get("attempts", 0) + 1
     updated_task["status"] = TaskStatus.IN_PROGRESS
+
+    # Decide which execution mode to use
+    use_ralph = _should_use_ralph_loop(task, project_dir)
+
+    if use_ralph:
+        logger.info(f"Using Ralph Wiggum loop for task {task_id}")
+        return await _implement_with_ralph_loop(
+            state=state,
+            task=task,
+            updated_task=updated_task,
+            project_dir=project_dir,
+        )
+    else:
+        logger.info(f"Using standard implementation for task {task_id}")
+        return await _implement_standard(
+            state=state,
+            task=task,
+            updated_task=updated_task,
+            project_dir=project_dir,
+        )
+
+
+def _should_use_ralph_loop(task: Task, project_dir: Path) -> bool:
+    """Determine whether to use Ralph Wiggum loop for this task.
+
+    Uses Ralph loop when:
+    - USE_RALPH_LOOP=true (always use)
+    - USE_RALPH_LOOP=auto AND task has test_files defined
+
+    Args:
+        task: Task to implement
+        project_dir: Project directory
+
+    Returns:
+        True if Ralph loop should be used
+    """
+    ralph_setting = USE_RALPH_LOOP.lower()
+
+    if ralph_setting == "false":
+        return False
+
+    if ralph_setting == "true":
+        return True
+
+    # Auto mode: use Ralph if tests are specified
+    if ralph_setting == "auto":
+        test_files = task.get("test_files", [])
+        return len(test_files) > 0
+
+    return False
+
+
+async def _implement_with_ralph_loop(
+    state: WorkflowState,
+    task: Task,
+    updated_task: dict,
+    project_dir: Path,
+) -> dict[str, Any]:
+    """Implement task using Ralph Wiggum iterative loop.
+
+    Runs Claude in a loop until all tests pass, with fresh context
+    each iteration to avoid degradation.
+
+    Args:
+        state: Workflow state
+        task: Task definition
+        updated_task: Task with updated attempt count
+        project_dir: Project directory
+
+    Returns:
+        State updates
+    """
+    task_id = task["id"]
+
+    # Configure Ralph loop
+    test_command = detect_test_framework(project_dir)
+    config = RalphLoopConfig(
+        max_iterations=10,
+        iteration_timeout=300,  # 5 min per iteration
+        test_command=test_command,
+        save_iteration_logs=True,
+    )
+
+    try:
+        result = await asyncio.wait_for(
+            run_ralph_loop(
+                project_dir=project_dir,
+                task_id=task_id,
+                title=task.get("title", ""),
+                user_story=task.get("user_story", ""),
+                acceptance_criteria=task.get("acceptance_criteria", []),
+                files_to_create=task.get("files_to_create", []),
+                files_to_modify=task.get("files_to_modify", []),
+                test_files=task.get("test_files", []),
+                config=config,
+            ),
+            timeout=RALPH_TIMEOUT,
+        )
+
+        if result.success:
+            # Task completed successfully
+            _save_task_result(project_dir, task_id, {
+                "status": "completed",
+                "implementation_mode": "ralph_wiggum",
+                "iterations": result.iterations,
+                "total_time_seconds": result.total_time_seconds,
+                "completion_reason": result.completion_reason,
+                **(result.final_output or {}),
+            })
+
+            updated_task["implementation_notes"] = (
+                f"Completed via Ralph loop in {result.iterations} iteration(s). "
+                f"Reason: {result.completion_reason}"
+            )
+
+            logger.info(
+                f"Task {task_id} completed via Ralph loop "
+                f"in {result.iterations} iterations"
+            )
+
+            return {
+                "tasks": [updated_task],
+                "next_decision": "continue",  # Go to verify_task
+                "updated_at": datetime.now().isoformat(),
+            }
+        else:
+            # Ralph loop failed
+            logger.warning(
+                f"Ralph loop failed for task {task_id}: {result.error}"
+            )
+            return _handle_task_error(
+                updated_task,
+                f"Ralph loop failed after {result.iterations} iterations: {result.error}",
+            )
+
+    except asyncio.TimeoutError:
+        logger.error(f"Ralph loop for task {task_id} timed out")
+        return _handle_task_error(
+            updated_task,
+            f"Ralph loop timed out after {RALPH_TIMEOUT // 60} minutes",
+        )
+    except Exception as e:
+        logger.error(f"Ralph loop for task {task_id} failed: {e}")
+        return _handle_task_error(updated_task, str(e))
+
+
+async def _implement_standard(
+    state: WorkflowState,
+    task: Task,
+    updated_task: dict,
+    project_dir: Path,
+) -> dict[str, Any]:
+    """Implement task using standard single-invocation approach.
+
+    Args:
+        state: Workflow state
+        task: Task definition
+        updated_task: Task with updated attempt count
+        project_dir: Project directory
+
+    Returns:
+        State updates
+    """
+    task_id = task["id"]
 
     # Build completed tasks context
     completed_context = _build_completed_context(state)

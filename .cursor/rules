@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-21 02:01:54 -->
+<!-- Last synced: 2026-01-21 03:24:27 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Cursor as code quality reviewer.
@@ -515,8 +515,8 @@ export GEMINI_MODEL=gemini-2.0-flash  # Override Gemini model
 
 <!-- SHARED: This file applies to ALL agents -->
 <!-- Add new lessons at the TOP of this file -->
-<!-- Version: 1.0 -->
-<!-- Last Updated: 2026-01-20 -->
+<!-- Version: 1.1 -->
+<!-- Last Updated: 2026-01-21 -->
 
 ## How to Add a Lesson
 
@@ -529,6 +529,50 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons
+
+### 2026-01-21 - Ralph Wiggum Loop for TDD Implementation
+
+- **Issue**: Single-shot implementation sometimes fails on complex tasks, requiring full restart
+- **Root Cause**: Context degradation during long implementations; no iterative retry mechanism
+- **Fix**: Implemented Ralph Wiggum loop pattern:
+  - Iterative execution until tests pass (fresh context each iteration)
+  - Completion signal: `<promise>DONE</promise>`
+  - Auto-detection: uses Ralph loop when `test_files` are defined
+  - Configurable via `USE_RALPH_LOOP` environment variable
+- **Prevention**:
+  - Use Ralph loop for TDD tasks where tests already exist
+  - Fresh context per iteration avoids token limit issues
+  - Tests provide natural backpressure and completion signal
+- **Applies To**: claude
+- **Files Changed**:
+  - `orchestrator/langgraph/integrations/ralph_loop.py` (new)
+  - `orchestrator/langgraph/nodes/implement_task.py` (modified)
+  - `tests/test_ralph_loop.py` (new)
+
+### 2026-01-21 - Task-Based Incremental Execution
+
+- **Issue**: One-shot implementation risky for larger features; failures mean redo everything
+- **Root Cause**: No incremental verification; no progress visibility for stakeholders
+- **Fix**: Implemented task-based execution:
+  - Break PRODUCT.md into user stories/tasks via `task_breakdown` node
+  - Implement task-by-task in a loop with verification after each
+  - Task selection respects dependencies and priorities
+  - Optional Linear integration for project tracking
+- **Prevention**:
+  - Always break features into discrete tasks with clear acceptance criteria
+  - Verify each task before moving to next
+  - Use dependency tracking to ensure correct execution order
+- **Applies To**: all
+- **Files Changed**:
+  - `orchestrator/langgraph/state.py` (Task, Milestone types)
+  - `orchestrator/langgraph/nodes/task_breakdown.py` (new)
+  - `orchestrator/langgraph/nodes/select_task.py` (new)
+  - `orchestrator/langgraph/nodes/implement_task.py` (new)
+  - `orchestrator/langgraph/nodes/verify_task.py` (new)
+  - `orchestrator/langgraph/routers/task.py` (new)
+  - `orchestrator/langgraph/integrations/linear.py` (new)
+  - `tests/test_task_nodes.py` (new)
+  - `tests/test_linear_integration.py` (new)
 
 ### 2026-01-21 - LangGraph Workflow Architecture
 
