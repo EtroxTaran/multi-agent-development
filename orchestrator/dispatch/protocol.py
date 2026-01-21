@@ -426,6 +426,7 @@ class AgentDispatcher:
                 )
             except asyncio.TimeoutError:
                 process.kill()
+                await process.wait()  # Ensure process is properly reaped
                 raise AgentExecutionTimeout(
                     f"Agent {agent.id} execution timed out after {timeout}s"
                 )

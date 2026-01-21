@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ..state import WorkflowState, PhaseStatus, PhaseState
+from ...cleanup import CleanupManager
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,18 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
     phase_status["5"] = phase_5
 
     logger.info(f"Completion summary written to: {completion_file}")
+
+    # Run scheduled cleanup to remove old persistent artifacts
+    try:
+        cleanup_manager = CleanupManager(project_dir)
+        cleanup_result = cleanup_manager.scheduled_cleanup()
+        if cleanup_result.total_deleted > 0:
+            logger.info(
+                f"Scheduled cleanup: {cleanup_result.total_deleted} items, "
+                f"{cleanup_result.bytes_freed} bytes freed"
+            )
+    except Exception as e:
+        logger.warning(f"Scheduled cleanup failed: {e}")
 
     return {
         "phase_status": phase_status,

@@ -34,6 +34,9 @@ from ..integrations import (
     load_issue_mapping,
     create_markdown_tracker,
 )
+from ..integrations.board_sync import sync_board
+from ...specialists.runner import SpecialistRunner
+from ...cleanup import CleanupManager
 
 logger = logging.getLogger(__name__)
 
@@ -44,60 +47,6 @@ MAX_CONCURRENT_OPERATIONS = 1  # Single writer
 
 # Environment variable to enable Ralph Wiggum mode
 USE_RALPH_LOOP = os.environ.get("USE_RALPH_LOOP", "auto")  # "auto", "true", "false"
-
-TASK_IMPLEMENTATION_PROMPT = """You are implementing a SINGLE task as part of a larger feature.
-
-TASK: {task_id} - {title}
-
-USER STORY:
-{user_story}
-
-ACCEPTANCE CRITERIA FOR THIS TASK:
-{acceptance_criteria}
-
-FILES TO CREATE:
-{files_to_create}
-
-FILES TO MODIFY:
-{files_to_modify}
-
-TEST FILES:
-{test_files}
-
-{completed_context}
-
-INSTRUCTIONS:
-1. Focus ONLY on this specific task - do not implement other features
-2. Write tests FIRST (TDD approach)
-3. Implement the minimal code to make tests pass
-4. Follow existing code patterns in the project
-
-OUTPUT FORMAT:
-Return a JSON object with your implementation result:
-{{
-    "task_id": "{task_id}",
-    "status": "completed",
-    "files_created": ["list of new files"],
-    "files_modified": ["list of modified files"],
-    "tests_written": ["list of test files"],
-    "tests_passed": true,
-    "implementation_notes": "Brief notes on what was implemented"
-}}
-
-IF YOU NEED CLARIFICATION:
-If you encounter something unclear, output:
-{{
-    "task_id": "{task_id}",
-    "status": "needs_clarification",
-    "question": "Specific question",
-    "context": "What you've tried",
-    "options": ["Option A", "Option B"],
-    "recommendation": "Your recommended approach"
-}}
-Then STOP and wait for human input.
-
-DO NOT implement anything beyond this task's scope.
-"""
 
 # Scoped prompt for minimal context workers - focuses only on task-relevant files
 SCOPED_TASK_PROMPT = """## Task
@@ -307,6 +256,17 @@ async def _implement_with_ralph_loop(
                 f"in {result.iterations} iterations"
             )
 
+            # Cleanup transient/session artifacts for this task
+            try:
+                cleanup_manager = CleanupManager(project_dir)
+                cleanup_result = cleanup_manager.on_task_done(task_id)
+                logger.debug(
+                    f"Cleanup for task {task_id}: {cleanup_result.total_deleted} items, "
+                    f"{cleanup_result.bytes_freed} bytes freed"
+                )
+            except Exception as e:
+                logger.warning(f"Cleanup failed for task {task_id}: {e}")
+
             return {
                 "tasks": [updated_task],
                 "next_decision": "continue",  # Go to verify_task
@@ -339,7 +299,7 @@ async def _implement_standard(
     updated_task: dict,
     project_dir: Path,
 ) -> dict[str, Any]:
-    """Implement task using standard single-invocation approach.
+    """Implement task using standard single-invocation approach via Specialist Runner.
 
     Args:
         state: Workflow state
@@ -352,20 +312,8 @@ async def _implement_standard(
     """
     task_id = task["id"]
 
-    # Build completed tasks context
-    completed_context = _build_completed_context(state)
-
-    # Build the prompt
-    prompt = TASK_IMPLEMENTATION_PROMPT.format(
-        task_id=task_id,
-        title=task.get("title", ""),
-        user_story=task.get("user_story", ""),
-        acceptance_criteria=_format_criteria(task.get("acceptance_criteria", [])),
-        files_to_create=_format_files(task.get("files_to_create", [])),
-        files_to_modify=_format_files(task.get("files_to_modify", [])),
-        test_files=_format_files(task.get("test_files", [])),
-        completed_context=completed_context,
-    )
+    # Build prompt using scoped context
+    prompt = build_scoped_prompt(task)
 
     # Load any clarification answers
     clarification_answers = _load_task_clarification_answers(project_dir, task_id)
@@ -373,16 +321,20 @@ async def _implement_standard(
         prompt += f"\n\nCLARIFICATION ANSWERS:\n{json.dumps(clarification_answers, indent=2)}"
 
     try:
-        # Spawn worker Claude with timeout
-        result = await asyncio.wait_for(
-            _run_task_worker(project_dir, prompt, task_id),
-            timeout=TASK_TIMEOUT,
+        # Use SpecialistRunner to execute A04-implementer
+        # Running in thread to avoid blocking event loop
+        runner = SpecialistRunner(project_dir)
+        
+        result = await asyncio.to_thread(
+            runner.create_agent("A04-implementer").run,
+            prompt
         )
 
-        if not result["success"]:
-            raise Exception(result.get("error", "Task implementation failed"))
+        if not result.success:
+            raise Exception(result.error or "Task implementation failed")
 
-        output = result.get("output", {})
+        # Parse the raw output string into JSON
+        output = _parse_task_output(result.output, task_id)
 
         # Check if worker needs clarification
         if output.get("status") == "needs_clarification":
@@ -414,6 +366,27 @@ async def _implement_standard(
 
         logger.info(f"Task {task_id} implementation completed")
 
+        # Cleanup transient/session artifacts for this task
+        try:
+            cleanup_manager = CleanupManager(project_dir)
+            cleanup_result = cleanup_manager.on_task_done(task_id)
+            logger.debug(
+                f"Cleanup for task {task_id}: {cleanup_result.total_deleted} items, "
+                f"{cleanup_result.bytes_freed} bytes freed"
+            )
+        except Exception as e:
+            logger.warning(f"Cleanup failed for task {task_id}: {e}")
+
+        # Sync to Kanban board
+        try:
+            tasks = state.get("tasks", [])
+            updated_tasks_list = [t for t in tasks if t["id"] != task_id] + [updated_task]
+            sync_state = dict(state)
+            sync_state["tasks"] = updated_tasks_list
+            sync_board(sync_state)
+        except Exception as e:
+            logger.warning(f"Failed to sync board in implement task: {e}")
+
         return {
             "tasks": [updated_task],
             "next_decision": "continue",  # Will go to verify_task
@@ -430,34 +403,6 @@ async def _implement_standard(
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}")
         return _handle_task_error(updated_task, str(e))
-
-
-def _build_completed_context(state: WorkflowState) -> str:
-    """Build context from previously completed tasks.
-
-    Args:
-        state: Current workflow state
-
-    Returns:
-        Context string for prompt
-    """
-    completed_ids = state.get("completed_task_ids", [])
-    if not completed_ids:
-        return ""
-
-    tasks = state.get("tasks", [])
-    completed_tasks = [t for t in tasks if t.get("id") in completed_ids]
-
-    if not completed_tasks:
-        return ""
-
-    context_lines = ["PREVIOUSLY COMPLETED TASKS:"]
-    for task in completed_tasks[:5]:  # Limit to last 5 for context
-        context_lines.append(f"- {task.get('id')}: {task.get('title', 'Unknown')}")
-        if task.get("implementation_notes"):
-            context_lines.append(f"  Notes: {task.get('implementation_notes')}")
-
-    return "\n".join(context_lines)
 
 
 def _format_criteria(criteria: list[str]) -> str:
@@ -590,85 +535,6 @@ def _handle_task_error(task: Task, error_message: str) -> dict[str, Any]:
             }],
             "next_decision": "retry",
             "updated_at": datetime.now().isoformat(),
-        }
-
-
-async def _run_task_worker(
-    project_dir: Path,
-    prompt: str,
-    task_id: str,
-) -> dict:
-    """Run worker Claude for a single task.
-
-    Args:
-        project_dir: Project directory
-        prompt: Task prompt
-        task_id: Task identifier
-
-    Returns:
-        Result dict with success flag and output
-    """
-    allowed_tools = ",".join([
-        "Read",
-        "Write",
-        "Edit",
-        "Glob",
-        "Grep",
-        "Bash(npm*)",
-        "Bash(pytest*)",
-        "Bash(python*)",
-        "Bash(pnpm*)",
-        "Bash(yarn*)",
-        "Bash(bun*)",
-        "Bash(cargo*)",
-        "Bash(go*)",
-    ])
-
-    cmd = [
-        "claude",
-        "-p",
-        prompt,
-        "--output-format",
-        "json",
-        "--allowedTools",
-        allowed_tools,
-        "--max-turns",
-        "20",  # Fewer turns for single task
-    ]
-
-    try:
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=project_dir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "TERM": "dumb"},
-        )
-
-        stdout, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            return {
-                "success": False,
-                "error": stderr.decode() if stderr else f"Exit code: {process.returncode}",
-            }
-
-        output = _parse_task_output(stdout.decode() if stdout else "", task_id)
-
-        return {
-            "success": True,
-            "output": output,
-        }
-
-    except FileNotFoundError:
-        return {
-            "success": False,
-            "error": "Claude CLI not found. Ensure 'claude' is installed and in PATH.",
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
         }
 
 
