@@ -200,32 +200,32 @@ class PlaywrightRunner:
         Returns:
             E2EResult
         """
-        files_str = " ".join(str(f) for f in files)
+        file_paths = [str(f) for f in files]
         output_dir = self.artifacts_dir / "playwright-results"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Build command
-        cmd_parts = [
+        # Build command as list to avoid shell injection
+        cmd = [
             "npx",
             "playwright",
             "test",
-            files_str,
+        ] + file_paths + [
             f"--output={output_dir}",
             "--reporter=json",
         ]
 
         if headed:
-            cmd_parts.append("--headed")
+            cmd.append("--headed")
 
         if browsers:
-            cmd_parts.extend(["--project=" + b for b in browsers])
+            cmd.extend([f"--project={b}" for b in browsers])
 
-        cmd = " ".join(cmd_parts)
-        logger.info(f"Running Playwright tests: {cmd}")
+        logger.info(f"Running Playwright tests: {' '.join(cmd)}")
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                cmd,
+            # Use create_subprocess_exec to avoid shell injection
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.project_dir),
@@ -269,11 +269,12 @@ class PlaywrightRunner:
         result = E2EResult()
 
         for browser in browsers:
-            files_str = " ".join(str(f) for f in files)
+            file_paths = [str(f) for f in files]
 
-            cmd_parts = [
+            # Build command as list to avoid shell injection
+            cmd = [
                 "pytest",
-                files_str,
+            ] + file_paths + [
                 f"--browser={browser}",
                 "-v",
                 "--json-report",
@@ -281,14 +282,14 @@ class PlaywrightRunner:
             ]
 
             if headed:
-                cmd_parts.append("--headed")
+                cmd.append("--headed")
 
-            cmd = " ".join(cmd_parts)
-            logger.info(f"Running pytest-playwright: {cmd}")
+            logger.info(f"Running pytest-playwright: {' '.join(cmd)}")
 
             try:
-                process = await asyncio.create_subprocess_shell(
-                    cmd,
+                # Use create_subprocess_exec to avoid shell injection
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(self.project_dir),
@@ -448,11 +449,13 @@ class PlaywrightRunner:
         # For now, use CLI fallback
         screenshot_path = self.artifacts_dir / filename
 
-        cmd = f'npx playwright screenshot "{url}" "{screenshot_path}"'
+        # Build command as list to avoid shell injection
+        cmd = ["npx", "playwright", "screenshot", url, str(screenshot_path)]
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                cmd,
+            # Use create_subprocess_exec to avoid shell injection
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.project_dir),
@@ -482,12 +485,13 @@ class PlaywrightRunner:
         Returns:
             E2EResult with visual comparison results
         """
-        # Visual regression tests using Playwright's built-in comparison
-        cmd = f"npx playwright test {' '.join(test_files)} --update-snapshots"
+        # Build command as list to avoid shell injection
+        cmd = ["npx", "playwright", "test"] + test_files + ["--update-snapshots"]
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                cmd,
+            # Use create_subprocess_exec to avoid shell injection
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.project_dir),

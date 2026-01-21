@@ -272,16 +272,18 @@ class RecoveryHandler:
         self,
         error: Exception,
         context: ErrorContext,
+        retry_with_backup: Optional[Callable[[], T]] = None,
     ) -> RecoveryResult:
         """Handle agent execution failures.
 
         Strategy:
-        1. Try backup CLI if available
-        2. Escalate if backup also fails
+        1. Try backup CLI if available and retry callable provided
+        2. Escalate if backup also fails or no retry available
 
         Args:
             error: The exception
             context: Error context
+            retry_with_backup: Optional callable to retry with backup CLI
 
         Returns:
             RecoveryResult
@@ -290,15 +292,35 @@ class RecoveryHandler:
         used_backup = context.details.get("used_backup", False)
 
         if not used_backup:
-            # Suggest trying backup CLI
-            return RecoveryResult(
-                success=False,
-                action_taken=RecoveryAction.USE_BACKUP,
-                message=f"Agent {agent_id} failed, try backup CLI",
-                should_continue=True,
-            )
+            # Actually try backup CLI if retry callable provided
+            if retry_with_backup:
+                try:
+                    logger.info(f"Agent {agent_id} failed, attempting backup CLI")
+                    result = await retry_with_backup() if asyncio.iscoroutinefunction(retry_with_backup) else retry_with_backup()
+                    return RecoveryResult(
+                        success=True,
+                        action_taken=RecoveryAction.USE_BACKUP,
+                        message=f"Agent {agent_id} succeeded with backup CLI",
+                        should_continue=True,
+                        recovered_value=result,
+                    )
+                except Exception as backup_error:
+                    logger.warning(f"Backup CLI also failed: {backup_error}")
+                    # Update context to reflect backup was tried
+                    context.details["used_backup"] = True
+                    context.details["backup_error"] = str(backup_error)
+                    # Fall through to escalation
 
-        # Backup also failed - escalate
+            else:
+                # No retry callable - return suggestion to use backup
+                return RecoveryResult(
+                    success=False,
+                    action_taken=RecoveryAction.USE_BACKUP,
+                    message=f"Agent {agent_id} failed, try backup CLI",
+                    should_continue=True,
+                )
+
+        # Backup also failed or was already tried - escalate
         return await self._escalate(
             context=context,
             reason="agent_failure",
@@ -584,10 +606,11 @@ async def handle_agent_failure(
     project_dir: Path,
     error: Exception,
     context: ErrorContext,
+    retry_with_backup: Optional[Callable] = None,
 ) -> RecoveryResult:
     """Handle an agent failure."""
     handler = RecoveryHandler(project_dir)
-    return await handler.handle_agent_failure(error, context)
+    return await handler.handle_agent_failure(error, context, retry_with_backup)
 
 
 async def handle_review_conflict(

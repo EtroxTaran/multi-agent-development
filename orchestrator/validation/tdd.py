@@ -176,23 +176,31 @@ class TDDValidator:
 
         ext = list(extensions)[0] if extensions else ".py"
 
-        # Build command
-        files_str = " ".join(str(self.project_dir / f) for f in test_files)
+        # Build command as list to avoid shell injection
+        file_paths = [str(self.project_dir / f) for f in test_files]
 
-        if with_coverage and ext in self.COVERAGE_RUNNERS:
-            cmd_template = self.COVERAGE_RUNNERS[ext]
-            cmd = cmd_template.format(files=files_str, source_dir=source_dir)
-        elif ext in self.TEST_RUNNERS:
-            cmd_template = self.TEST_RUNNERS[ext]
-            cmd = cmd_template.format(files=files_str)
+        if ext == ".py":
+            if with_coverage:
+                cmd = ["pytest"] + file_paths + [
+                    f"--cov={source_dir}",
+                    "--cov-report=term-missing",
+                    "-v"
+                ]
+            else:
+                cmd = ["pytest"] + file_paths + ["-v", "--tb=short"]
+        elif ext in (".ts", ".js"):
+            cmd = ["npx", "jest"] + file_paths + ["--verbose"]
+            if with_coverage:
+                cmd.append("--coverage")
         else:
             return TestResult(output=f"No test runner configured for {ext} files")
 
-        logger.info(f"Running tests: {cmd}")
+        logger.info(f"Running tests: {' '.join(cmd)}")
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                cmd,
+            # Use create_subprocess_exec to avoid shell injection
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.project_dir),

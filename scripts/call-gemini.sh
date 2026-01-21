@@ -74,14 +74,53 @@ gemini --model "$GEMINI_MODEL" \
     "$PROMPT" \
     > "$TEMP_OUTPUT" 2>&1
 
-# Check if output is valid JSON, if not wrap it
-if python3 -c "import json; json.load(open('$TEMP_OUTPUT'))" 2>/dev/null; then
+# Check if output is valid JSON, if not wrap it - use env vars to avoid shell injection
+export _TEMP_OUTPUT="$TEMP_OUTPUT"
+export _OUTPUT_FILE="$OUTPUT_FILE"
+
+if python3 -c "
+import json
+import os
+import sys
+try:
+    with open(os.environ['_TEMP_OUTPUT']) as f:
+        json.load(f)
+    sys.exit(0)
+except:
+    sys.exit(1)
+" 2>/dev/null; then
     # Already valid JSON, copy as-is
     cp "$TEMP_OUTPUT" "$OUTPUT_FILE"
 else
-    # Wrap raw output in JSON structure
-    CONTENT=$(cat "$TEMP_OUTPUT")
-    echo "{\"status\": \"completed\", \"agent\": \"gemini\", \"raw_output\": $(echo "$CONTENT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" > "$OUTPUT_FILE"
+    # Wrap raw output in JSON structure safely using env vars
+    python3 <<'WRAP_SCRIPT'
+import json
+import os
+import sys
+
+temp_output = os.environ.get('_TEMP_OUTPUT')
+output_file = os.environ.get('_OUTPUT_FILE')
+
+if not temp_output or not output_file:
+    sys.stderr.write("Error: Required env vars not set\n")
+    sys.exit(1)
+
+try:
+    with open(temp_output, 'r') as f:
+        content = f.read()
+    wrapped = {
+        "status": "completed",
+        "agent": "gemini",
+        "raw_output": content
+    }
+    with open(output_file, 'w') as f:
+        json.dump(wrapped, f)
+except Exception as e:
+    sys.stderr.write(f"Error wrapping output: {e}\n")
+    sys.exit(1)
+WRAP_SCRIPT
 fi
+
+unset _TEMP_OUTPUT _OUTPUT_FILE
 
 echo "Gemini review complete. Output saved to: $OUTPUT_FILE"

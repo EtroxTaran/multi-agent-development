@@ -261,21 +261,24 @@ class BDDRunner:
                 output="No feature files found",
             )
 
-        # Build command
-        files_str = " ".join(str(f) for f in files)
+        # Build command as list to avoid shell injection
+        file_paths = [str(f) for f in files]
         report_file = self.project_dir / ".workflow" / "temp" / "bdd_report.json"
         report_file.parent.mkdir(parents=True, exist_ok=True)
 
-        cmd = self.JSON_COMMAND.format(
-            report_file=report_file,
-            files=files_str,
-        )
+        cmd = [
+            "pytest",
+            "--json-report",
+            f"--json-report-file={report_file}",
+            "-v",
+        ] + file_paths
 
-        logger.info(f"Running BDD tests: {cmd}")
+        logger.info(f"Running BDD tests: {' '.join(cmd)}")
 
         try:
-            process = await asyncio.create_subprocess_shell(
-                cmd,
+            # Use create_subprocess_exec to avoid shell injection
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.project_dir),

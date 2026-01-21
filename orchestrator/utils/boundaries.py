@@ -80,6 +80,11 @@ def validate_orchestrator_write(project_dir: Path, target_path: Path) -> bool:
         # Path is outside project directory
         return False
 
+    # Check for symlinks in the path that could escape the project
+    # This prevents TOCTOU attacks where symlinks change after validation
+    if not _validate_no_escaping_symlinks(project_dir, target_path):
+        return False
+
     relative_str = str(relative)
 
     # Check against forbidden patterns first
@@ -94,6 +99,47 @@ def validate_orchestrator_write(project_dir: Path, target_path: Path) -> bool:
 
     # Default: deny
     return False
+
+
+def _validate_no_escaping_symlinks(project_dir: Path, target_path: Path) -> bool:
+    """Check that no symlinks in the path escape the project directory.
+
+    This prevents TOCTOU (time-of-check-time-of-use) attacks where
+    a symlink is created/modified between validation and the actual write.
+
+    Args:
+        project_dir: Root directory of the project
+        target_path: Path to validate
+
+    Returns:
+        True if all symlinks (if any) stay within project directory
+    """
+    project_dir = Path(project_dir).resolve()
+
+    # Check each component of the path from project_dir to target
+    current = project_dir
+    try:
+        relative = target_path.relative_to(project_dir)
+    except ValueError:
+        return False
+
+    for part in relative.parts:
+        current = current / part
+
+        # Check if this component is a symlink
+        if current.is_symlink():
+            # Resolve the symlink and check if it stays within project
+            try:
+                resolved = current.resolve()
+                resolved.relative_to(project_dir)
+            except ValueError:
+                # Symlink escapes project directory
+                return False
+            except OSError:
+                # Broken symlink or permission error
+                return False
+
+    return True
 
 
 def _matches_pattern(path_str: str, pattern: str) -> bool:

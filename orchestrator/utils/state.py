@@ -264,10 +264,15 @@ class StateManager:
 
     @property
     def state(self) -> WorkflowState:
-        """Get current state, loading if necessary."""
-        if self._state is None:
-            self.load()
-        return self._state
+        """Get current state, loading if necessary (thread-safe).
+
+        Returns a copy to prevent external mutation of internal state.
+        """
+        with self._lock:
+            if self._state is None:
+                self.load()
+            # Return a copy to prevent mutation - use from_dict(to_dict()) for deep copy
+            return WorkflowState.from_dict(self._state.to_dict())
 
     def get_current_phase(self) -> PhaseState:
         """Get the current phase state."""

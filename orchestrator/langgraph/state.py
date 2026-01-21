@@ -302,9 +302,10 @@ def _merge_tasks(
     existing: Optional[list[Task]],
     new: list[Task],
 ) -> list[Task]:
-    """Reducer for merging task lists.
+    """Reducer for merging task lists with conflict detection.
 
     Updates existing tasks by ID or appends new ones.
+    Logs conflicts when concurrent updates modify the same task differently.
 
     Args:
         existing: Existing task list
@@ -313,18 +314,100 @@ def _merge_tasks(
     Returns:
         Merged task list
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     if existing is None:
         return list(new)
 
     # Build a map of existing tasks by ID
     task_map = {t["id"]: t for t in existing if "id" in t}
 
-    # Update or add new tasks
+    # Update or add new tasks with conflict detection
     for task in new:
-        if "id" in task:
-            task_map[task["id"]] = task
+        if "id" not in task:
+            continue
+
+        task_id = task["id"]
+        if task_id in task_map:
+            existing_task = task_map[task_id]
+            # Check for conflicting updates (different status, attempts, etc.)
+            if _detect_task_conflict(existing_task, task):
+                logger.warning(
+                    f"Task merge conflict detected for {task_id}: "
+                    f"existing status={existing_task.get('status')}, "
+                    f"new status={task.get('status')}. Using newer update."
+                )
+                # Merge fields instead of full overwrite to preserve data
+                merged_task = _merge_task_fields(existing_task, task)
+                task_map[task_id] = merged_task
+            else:
+                task_map[task_id] = task
+        else:
+            task_map[task_id] = task
 
     return list(task_map.values())
+
+
+def _detect_task_conflict(existing: Task, new: Task) -> bool:
+    """Detect if two task updates conflict.
+
+    Args:
+        existing: Existing task state
+        new: New task state
+
+    Returns:
+        True if there's a conflict that needs resolution
+    """
+    # Conflict if both have been modified and have different statuses
+    existing_status = existing.get("status")
+    new_status = new.get("status")
+
+    # If statuses are different and neither is the original, it's a conflict
+    if existing_status != new_status:
+        if existing_status not in (None, "pending") and new_status not in (None, "pending"):
+            return True
+
+    # Conflict if attempts differ significantly
+    existing_attempts = existing.get("attempts", 0)
+    new_attempts = new.get("attempts", 0)
+    if abs(existing_attempts - new_attempts) > 1:
+        return True
+
+    return False
+
+
+def _merge_task_fields(existing: Task, new: Task) -> Task:
+    """Merge task fields, preferring newer values but preserving history.
+
+    Args:
+        existing: Existing task state
+        new: New task state
+
+    Returns:
+        Merged task
+    """
+    merged = dict(existing)
+
+    # Update with new values
+    for key, value in new.items():
+        if value is not None:
+            # For lists, merge instead of overwrite
+            if isinstance(value, list) and isinstance(merged.get(key), list):
+                existing_list = merged[key]
+                for item in value:
+                    if item not in existing_list:
+                        existing_list.append(item)
+            else:
+                merged[key] = value
+
+    # Take the higher attempt count
+    merged["attempts"] = max(
+        existing.get("attempts", 0),
+        new.get("attempts", 0)
+    )
+
+    return merged
 
 
 class WorkflowState(TypedDict, total=False):
@@ -494,6 +577,126 @@ def create_task(
     )
 
 
+class TaskIndex:
+    """Indexed access to tasks for O(1) lookups.
+
+    Provides fast access to tasks by ID and status, and caches
+    dependency satisfaction checks to avoid O(n²) behavior when
+    repeatedly selecting tasks.
+
+    Usage:
+        index = TaskIndex(state)
+        task = index.get_by_id("T1")  # O(1)
+        available = index.get_available()  # O(pending_count) first call, cached after
+    """
+
+    def __init__(self, state: WorkflowState):
+        """Build task index from workflow state.
+
+        Args:
+            state: Current workflow state
+        """
+        self._tasks_by_id: dict[str, Task] = {}
+        self._tasks_by_status: dict[str, list[Task]] = {
+            TaskStatus.PENDING: [],
+            TaskStatus.IN_PROGRESS: [],
+            TaskStatus.COMPLETED: [],
+            TaskStatus.FAILED: [],
+        }
+        self._completed_ids: set[str] = set(state.get("completed_task_ids", []))
+        self._failed_ids: set[str] = set(state.get("failed_task_ids", []))
+        self._available_cache: Optional[list[Task]] = None
+
+        # Build indexes
+        for task in state.get("tasks", []):
+            task_id = task.get("id")
+            if task_id:
+                self._tasks_by_id[task_id] = task
+                status = task.get("status", TaskStatus.PENDING)
+                if status in self._tasks_by_status:
+                    self._tasks_by_status[status].append(task)
+
+    def get_by_id(self, task_id: str) -> Optional[Task]:
+        """Get task by ID in O(1).
+
+        Args:
+            task_id: Task ID to find
+
+        Returns:
+            Task if found, None otherwise
+        """
+        return self._tasks_by_id.get(task_id)
+
+    def get_by_status(self, status: TaskStatus) -> list[Task]:
+        """Get all tasks with a given status in O(1).
+
+        Args:
+            status: Task status to filter by
+
+        Returns:
+            List of tasks with that status
+        """
+        return self._tasks_by_status.get(status, [])
+
+    def get_available(self) -> list[Task]:
+        """Get tasks ready to execute (pending with satisfied dependencies).
+
+        Results are cached for repeated calls with same state.
+
+        Returns:
+            List of available tasks
+        """
+        if self._available_cache is not None:
+            return self._available_cache
+
+        available = []
+        for task in self._tasks_by_status.get(TaskStatus.PENDING, []):
+            task_id = task.get("id")
+
+            # Skip already completed or failed
+            if task_id in self._completed_ids or task_id in self._failed_ids:
+                continue
+
+            # Check dependencies
+            deps = task.get("dependencies", [])
+            if all(dep in self._completed_ids for dep in deps):
+                available.append(task)
+
+        self._available_cache = available
+        return available
+
+    def is_dependency_satisfied(self, task_id: str) -> bool:
+        """Check if a task's dependencies are all completed.
+
+        Args:
+            task_id: Task ID to check
+
+        Returns:
+            True if all dependencies are satisfied
+        """
+        task = self._tasks_by_id.get(task_id)
+        if not task:
+            return False
+
+        deps = task.get("dependencies", [])
+        return all(dep in self._completed_ids for dep in deps)
+
+    @property
+    def total_count(self) -> int:
+        """Total number of tasks."""
+        return len(self._tasks_by_id)
+
+    @property
+    def completed_count(self) -> int:
+        """Number of completed tasks."""
+        return len(self._completed_ids)
+
+    @property
+    def pending_count(self) -> int:
+        """Number of pending tasks."""
+        return len(self._tasks_by_status.get(TaskStatus.PENDING, []))
+
+
 def get_task_by_id(state: WorkflowState, task_id: str) -> Optional[Task]:
     """Get a task by its ID.
 
@@ -508,6 +711,19 @@ def get_task_by_id(state: WorkflowState, task_id: str) -> Optional[Task]:
         if task.get("id") == task_id:
             return task
     return None
+
+
+def get_task_by_id_indexed(index: TaskIndex, task_id: str) -> Optional[Task]:
+    """Get a task by ID using index (O(1)).
+
+    Args:
+        index: TaskIndex instance
+        task_id: Task ID to find
+
+    Returns:
+        Task if found, None otherwise
+    """
+    return index.get_by_id(task_id)
 
 
 def get_pending_tasks(state: WorkflowState) -> list[Task]:
@@ -554,6 +770,21 @@ def get_available_tasks(state: WorkflowState) -> list[Task]:
             available.append(task)
 
     return available
+
+
+def get_available_tasks_indexed(index: TaskIndex) -> list[Task]:
+    """Get available tasks using pre-built index (O(pending_count), cached).
+
+    Use this instead of get_available_tasks when making repeated calls,
+    such as in a loop selecting tasks one by one.
+
+    Args:
+        index: Pre-built TaskIndex instance
+
+    Returns:
+        List of tasks ready to execute
+    """
+    return index.get_available()
 
 
 def all_tasks_completed(state: WorkflowState) -> bool:

@@ -124,23 +124,45 @@ class Orchestrator:
 
         return len(errors) == 0, errors
 
+    async def run_async(
+        self,
+        start_phase: int = 1,
+        end_phase: int = 5,
+        skip_validation: bool = False,
+    ) -> dict:
+        """Run the orchestration workflow asynchronously using LangGraph.
+
+        Args:
+            start_phase: Phase to start from (1-5)
+            end_phase: Phase to end at (1-5)
+            skip_validation: Skip the validation phase (phase 2)
+
+        Returns:
+            Dictionary with workflow results
+        """
+        return await self.run_langgraph(
+            start_phase=start_phase,
+            end_phase=end_phase,
+            skip_validation=skip_validation,
+        )
+
     def run(
         self,
         start_phase: int = 1,
         end_phase: int = 5,
         skip_validation: bool = False,
     ) -> dict:
-        """Run the orchestration workflow using LangGraph.
+        """Run the orchestration workflow using LangGraph (synchronous wrapper).
 
         Args:
-            start_phase: Phase to start from (1-5) - currently ignored, LangGraph starts fresh
-            end_phase: Phase to end at (1-5) - currently ignored, LangGraph runs to completion
-            skip_validation: Skip the validation phase (phase 2) - currently ignored
+            start_phase: Phase to start from (1-5)
+            end_phase: Phase to end at (1-5)
+            skip_validation: Skip the validation phase (phase 2)
 
         Returns:
             Dictionary with workflow results
         """
-        return asyncio.run(self.run_langgraph())
+        return asyncio.run(self.run_async(start_phase, end_phase, skip_validation))
 
     def _auto_commit(self, phase_num: int, phase_name: str) -> None:
         """Auto-commit changes after a phase.
@@ -308,11 +330,20 @@ class Orchestrator:
             "total_commits": len(state.git_commits),
         }
 
-    async def run_langgraph(self, use_rich_display: bool = True) -> dict:
+    async def run_langgraph(
+        self,
+        use_rich_display: bool = True,
+        start_phase: int = 1,
+        end_phase: int = 5,
+        skip_validation: bool = False,
+    ) -> dict:
         """Run the workflow using LangGraph.
 
         Args:
             use_rich_display: Whether to use Rich live display (default True)
+            start_phase: Phase to start from (1-5)
+            end_phase: Phase to end at (1-5)
+            skip_validation: Skip the validation phase (phase 2)
 
         Returns:
             Dictionary with workflow results
@@ -341,11 +372,18 @@ class Orchestrator:
         display = create_display(self.project_dir.name) if use_rich_display else None
         callback = UICallbackHandler(display) if display else None
 
+        # Pass configuration to runner
+        run_config = {
+            "start_phase": start_phase,
+            "end_phase": end_phase,
+            "skip_validation": skip_validation,
+        }
+
         try:
             if display:
                 with display.start():
                     display.log_event("Starting LangGraph workflow", "info")
-                    result = await runner.run(progress_callback=callback)
+                    result = await runner.run(progress_callback=callback, config=run_config)
 
                     success = self._check_workflow_success(result)
                     if success:
@@ -355,7 +393,7 @@ class Orchestrator:
                     else:
                         display.show_completion(False, "Workflow did not complete successfully")
             else:
-                result = await runner.run()
+                result = await runner.run(config=run_config)
 
             if self._check_workflow_success(result):
                 self.logger.banner("Workflow Complete!")

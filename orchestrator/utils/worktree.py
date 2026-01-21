@@ -27,6 +27,7 @@ Example usage:
 
 import logging
 import subprocess
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,6 +75,7 @@ class WorktreeManager:
         """
         self.project_dir = Path(project_dir).resolve()
         self.worktrees: list[WorktreeInfo] = []
+        self._lock = threading.Lock()  # Thread safety for worktree list operations
 
         # Verify it's a git repository
         if not self._is_git_repo():
@@ -133,6 +135,7 @@ class WorktreeManager:
                 "Use a different suffix or cleanup existing worktrees."
             )
 
+        worktree_created = False
         try:
             # Create worktree at HEAD
             result = subprocess.run(
@@ -142,6 +145,7 @@ class WorktreeManager:
                 text=True,
                 check=True,
             )
+            worktree_created = True
 
             commit = self._get_current_commit()
             info = WorktreeInfo(
@@ -149,7 +153,8 @@ class WorktreeManager:
                 suffix=suffix,
                 commit=commit,
             )
-            self.worktrees.append(info)
+            with self._lock:
+                self.worktrees.append(info)
 
             logger.info(f"Created worktree at {worktree_path} (commit: {commit[:8]})")
             return worktree_path
@@ -158,6 +163,20 @@ class WorktreeManager:
             raise WorktreeError(
                 f"Failed to create worktree: {e.stderr}"
             ) from e
+        except Exception as e:
+            # Clean up orphaned worktree if creation succeeded but setup failed
+            if worktree_created and worktree_path.exists():
+                logger.warning(f"Cleaning up orphaned worktree after setup failure: {worktree_path}")
+                try:
+                    subprocess.run(
+                        ["git", "worktree", "remove", "--force", str(worktree_path)],
+                        cwd=str(self.project_dir),
+                        capture_output=True,
+                        check=False,  # Don't raise if cleanup fails
+                    )
+                except Exception:
+                    pass  # Best-effort cleanup
+            raise WorktreeError(f"Failed to setup worktree: {e}") from e
 
     def remove_worktree(self, worktree_path: Path, force: bool = False) -> bool:
         """Remove a single worktree.
@@ -184,11 +203,12 @@ class WorktreeManager:
                 check=True,
             )
 
-            # Remove from tracked list
-            self.worktrees = [
-                wt for wt in self.worktrees
-                if wt.path != worktree_path
-            ]
+            # Remove from tracked list (thread-safe)
+            with self._lock:
+                self.worktrees = [
+                    wt for wt in self.worktrees
+                    if wt.path != worktree_path
+                ]
 
             logger.info(f"Removed worktree at {worktree_path}")
             return True
@@ -207,7 +227,10 @@ class WorktreeManager:
             Number of worktrees successfully removed
         """
         removed = 0
-        for wt in list(self.worktrees):
+        # Get a copy of the list under lock for safe iteration
+        with self._lock:
+            worktrees_copy = list(self.worktrees)
+        for wt in worktrees_copy:
             if self.remove_worktree(wt.path, force=force):
                 removed += 1
 

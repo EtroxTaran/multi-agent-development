@@ -22,6 +22,7 @@ All other paths must be modified by worker Claude instances.
 import concurrent.futures
 import json
 import logging
+import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
@@ -38,6 +39,53 @@ from .utils.worktree import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class InvalidProjectNameError(ValueError):
+    """Raised when a project name fails validation."""
+    pass
+
+
+def validate_project_name(name: str) -> bool:
+    """Validate project name to prevent path traversal attacks.
+
+    Args:
+        name: Project name to validate
+
+    Returns:
+        True if valid
+
+    Raises:
+        InvalidProjectNameError: If the name is invalid
+    """
+    if not name:
+        raise InvalidProjectNameError("Project name cannot be empty")
+
+    # Reject path traversal patterns
+    if '..' in name or name.startswith('/') or name.startswith('~'):
+        raise InvalidProjectNameError(
+            f"Invalid project name '{name}' - path traversal not allowed"
+        )
+
+    # Reject slashes
+    if '/' in name or '\\' in name:
+        raise InvalidProjectNameError(
+            f"Invalid project name '{name}' - slashes not allowed"
+        )
+
+    # Only allow alphanumeric, underscore, and hyphen
+    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+        raise InvalidProjectNameError(
+            f"Project name must be alphanumeric (with _ or - allowed): '{name}'"
+        )
+
+    # Limit length
+    if len(name) > 64:
+        raise InvalidProjectNameError(
+            f"Project name too long (max 64 chars): '{name}'"
+        )
+
+    return True
 
 
 class ProjectManager:
@@ -100,6 +148,9 @@ class ProjectManager:
 
         Returns:
             Path to project directory or None if not found
+
+        Raises:
+            InvalidProjectNameError: If the project name is invalid
         """
         if path:
             # External project mode
@@ -109,6 +160,8 @@ class ProjectManager:
             return None
 
         if name:
+            # Validate project name to prevent path traversal
+            validate_project_name(name)
             # Nested project mode (existing behavior)
             project_dir = self.projects_dir / name
             if project_dir.exists() and project_dir.is_dir():
@@ -147,6 +200,15 @@ class ProjectManager:
         Returns:
             Result dict with success status
         """
+        # Validate project name first
+        try:
+            validate_project_name(name)
+        except InvalidProjectNameError as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
         project_dir = self.projects_dir / name
 
         if project_dir.exists():
@@ -231,33 +293,39 @@ class ProjectManager:
         if max_turns:
             cmd.extend(["--max-turns", str(max_turns)])
 
+        process = None
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 cwd=str(project_dir),
-                timeout=timeout
             )
 
-            # Try to parse JSON output
-            output = result.stdout
             try:
-                output_json = json.loads(output)
+                stdout, stderr = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # Kill the process and wait for it to avoid zombies
+                process.kill()
+                process.wait()
+                return {
+                    "success": False,
+                    "error": f"Worker Claude timed out after {timeout} seconds"
+                }
+
+            # Try to parse JSON output
+            try:
+                output_json = json.loads(stdout)
             except json.JSONDecodeError:
-                output_json = {"raw_output": output}
+                output_json = {"raw_output": stdout}
 
             return {
-                "success": result.returncode == 0,
+                "success": process.returncode == 0,
                 "output": output_json,
-                "stderr": result.stderr if result.stderr else None
+                "stderr": stderr if stderr else None
             }
 
-        except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": f"Worker Claude timed out after {timeout} seconds"
-            }
         except FileNotFoundError:
             return {
                 "success": False,
@@ -601,35 +669,41 @@ class ProjectManager:
         ]
         cmd.extend(["--allowedTools", ",".join(default_tools)])
 
+        process = None
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 cwd=str(worktree_path),
-                timeout=timeout
             )
 
-            # Try to parse JSON output
-            output = result.stdout
             try:
-                output_json = json.loads(output)
+                stdout, stderr = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # Kill the process and wait for it to avoid zombies
+                process.kill()
+                process.wait()
+                return {
+                    "success": False,
+                    "error": f"Worker timed out after {timeout} seconds",
+                    "worktree": str(worktree_path),
+                }
+
+            # Try to parse JSON output
+            try:
+                output_json = json.loads(stdout)
             except json.JSONDecodeError:
-                output_json = {"raw_output": output}
+                output_json = {"raw_output": stdout}
 
             return {
-                "success": result.returncode == 0,
+                "success": process.returncode == 0,
                 "output": output_json,
-                "stderr": result.stderr if result.stderr else None,
+                "stderr": stderr if stderr else None,
                 "worktree": str(worktree_path),
             }
 
-        except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": f"Worker timed out after {timeout} seconds",
-                "worktree": str(worktree_path),
-            }
         except FileNotFoundError:
             return {
                 "success": False,

@@ -78,11 +78,45 @@ if [ ! -f "$OUTPUT_FILE" ]; then
     exit 1
 fi
 
-# Validate JSON output
-if ! python3 -c "import json; json.load(open('$OUTPUT_FILE'))" 2>/dev/null; then
-    # If not valid JSON, wrap the output
-    CONTENT=$(cat "$OUTPUT_FILE")
-    echo "{\"status\": \"completed\", \"agent\": \"cursor\", \"raw_output\": $(echo "$CONTENT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" > "$OUTPUT_FILE"
+# Validate JSON output - use heredoc with env var to avoid shell injection
+export _OUTPUT_FILE="$OUTPUT_FILE"
+if ! python3 -c "
+import json
+import os
+import sys
+try:
+    with open(os.environ['_OUTPUT_FILE']) as f:
+        json.load(f)
+    sys.exit(0)
+except:
+    sys.exit(1)
+" 2>/dev/null; then
+    # If not valid JSON, wrap the output safely using env var
+    python3 <<'WRAP_SCRIPT'
+import json
+import os
+import sys
+
+output_file = os.environ.get('_OUTPUT_FILE')
+if not output_file:
+    sys.stderr.write("Error: _OUTPUT_FILE not set\n")
+    sys.exit(1)
+
+try:
+    with open(output_file, 'r') as f:
+        content = f.read()
+    wrapped = {
+        "status": "completed",
+        "agent": "cursor",
+        "raw_output": content
+    }
+    with open(output_file, 'w') as f:
+        json.dump(wrapped, f)
+except Exception as e:
+    sys.stderr.write(f"Error wrapping output: {e}\n")
+    sys.exit(1)
+WRAP_SCRIPT
 fi
+unset _OUTPUT_FILE
 
 echo "Cursor review complete. Output saved to: $OUTPUT_FILE"

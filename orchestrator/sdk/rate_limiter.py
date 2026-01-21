@@ -171,6 +171,9 @@ class AsyncRateLimiter:
         self._day_start = datetime.now()
         self._day_cost = 0.0
 
+        # Track consecutive throttles for backoff (reset on success)
+        self._consecutive_throttles = 0
+
         self._lock = asyncio.Lock()
 
     async def _cleanup_old_data(self) -> None:
@@ -228,9 +231,13 @@ class AsyncRateLimiter:
         return True, ""
 
     def _calculate_backoff(self) -> float:
-        """Calculate backoff time based on throttle count."""
+        """Calculate backoff time based on consecutive throttle count.
+
+        Uses consecutive throttles (reset on success) instead of cumulative
+        to avoid excessive backoff after recovery.
+        """
         # Cap the exponent to prevent excessive backoff
-        throttle_count = min(self.stats.throttled_requests, 10)
+        throttle_count = min(self._consecutive_throttles, 10)
         backoff = self.config.backoff_base * (1.5 ** throttle_count)
         return min(backoff, self.config.backoff_max)
 
@@ -252,13 +259,19 @@ class AsyncRateLimiter:
         Raises:
             asyncio.TimeoutError: If timeout exceeded
         """
-        async with self._lock:
-            start = time.monotonic()
+        start = time.monotonic()
 
-            while True:
+        while True:
+            async with self._lock:
                 allowed, reason = await self._check_limits(estimated_tokens)
 
                 if allowed:
+                    # Record that we're starting a request
+                    now = datetime.now()
+                    self._minute_requests.append(now)
+                    self._hour_requests.append(now)
+                    # Reset consecutive throttles on success
+                    self._consecutive_throttles = 0
                     return RateLimitContext(self)
 
                 # Check timeout
@@ -266,18 +279,16 @@ class AsyncRateLimiter:
                     elapsed = time.monotonic() - start
                     if elapsed >= timeout:
                         self.stats.throttled_requests += 1
+                        self._consecutive_throttles += 1
                         raise asyncio.TimeoutError(f"Rate limit timeout: {reason}")
 
-                # Wait with backoff
+                # Track throttle for backoff calculation
                 self.stats.throttled_requests += 1
-                backoff = self._calculate_backoff()
+                self._consecutive_throttles += 1
 
-                # Release lock while waiting
-                self._lock.release()
-                try:
-                    await asyncio.sleep(min(backoff, 0.1))  # Short sleep for responsiveness
-                finally:
-                    await self._lock.acquire()
+            # Sleep outside lock to allow other coroutines to proceed
+            # Use short sleep for responsiveness
+            await asyncio.sleep(0.05)
 
     async def record_usage(self, tokens: int = 0, cost: float = 0.0) -> None:
         """
@@ -336,8 +347,10 @@ class AsyncRateLimiter:
             await asyncio.sleep(0.1)
 
 
-# Global rate limiter registry
+# Global rate limiter registry with thread safety
+import threading
 _rate_limiters: Dict[str, AsyncRateLimiter] = {}
+_registry_lock = threading.Lock()
 
 
 def get_rate_limiter(
@@ -345,7 +358,7 @@ def get_rate_limiter(
     config: Optional[RateLimitConfig] = None,
 ) -> AsyncRateLimiter:
     """
-    Get or create a rate limiter by name.
+    Get or create a rate limiter by name (thread-safe).
 
     Args:
         name: Limiter name
@@ -354,14 +367,16 @@ def get_rate_limiter(
     Returns:
         AsyncRateLimiter instance
     """
-    if name not in _rate_limiters:
-        _rate_limiters[name] = AsyncRateLimiter(config=config, name=name)
-    return _rate_limiters[name]
+    with _registry_lock:
+        if name not in _rate_limiters:
+            _rate_limiters[name] = AsyncRateLimiter(config=config, name=name)
+        return _rate_limiters[name]
 
 
 def get_all_rate_limiters() -> Dict[str, AsyncRateLimiter]:
-    """Get all registered rate limiters."""
-    return dict(_rate_limiters)
+    """Get all registered rate limiters (thread-safe)."""
+    with _registry_lock:
+        return dict(_rate_limiters)
 
 
 # Predefined configurations for common services

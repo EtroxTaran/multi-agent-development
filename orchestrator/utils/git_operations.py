@@ -67,19 +67,23 @@ class GitOperationsManager:
         # 1. Check if there are changes (status --porcelain)
         # 2. If changes exist, add all and commit
         # 3. Output the commit hash
+        # Security: Message passed via GIT_COMMIT_MSG env var to avoid shell injection
         script = '''
         if [ -n "$(git status --porcelain)" ]; then
-            git add -A && git commit -m "$1" && git rev-parse HEAD
+            git add -A && git commit -m "$GIT_COMMIT_MSG" && git rev-parse HEAD
         fi
         '''
 
         try:
+            # Pass commit message via environment variable for safety
+            env = {**__import__('os').environ, 'GIT_COMMIT_MSG': message}
             result = subprocess.run(
-                ["bash", "-c", script, "--", message],
+                ["bash", "-c", script],
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
                 timeout=60,
+                env=env,
             )
 
             if result.returncode == 0 and result.stdout.strip():

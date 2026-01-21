@@ -78,9 +78,42 @@ check_prereqs() {
     echo -e "\n${GREEN}All prerequisites satisfied!${NC}"
 }
 
+# Validate project name to prevent path traversal attacks
+validate_project_name() {
+    local name="$1"
+
+    # Reject names with path traversal patterns
+    if [[ "$name" == *".."* ]] || [[ "$name" == "/"* ]] || [[ "$name" == "~"* ]]; then
+        echo -e "${RED}Error: Invalid project name '$name' - path traversal not allowed${NC}"
+        exit 1
+    fi
+
+    # Reject names with slashes
+    if [[ "$name" == *"/"* ]]; then
+        echo -e "${RED}Error: Invalid project name '$name' - slashes not allowed${NC}"
+        exit 1
+    fi
+
+    # Only allow alphanumeric, underscore, and hyphen
+    if ! [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo -e "${RED}Error: Project name must be alphanumeric (with _ or - allowed): '$name'${NC}"
+        exit 1
+    fi
+
+    # Limit length
+    if [ ${#name} -gt 64 ]; then
+        echo -e "${RED}Error: Project name too long (max 64 chars): '$name'${NC}"
+        exit 1
+    fi
+}
+
 # Initialize project structure
 init_project() {
     local name="$1"
+
+    # Validate project name first
+    validate_project_name "$name"
+
     local project_dir="$ROOT_DIR/projects/$name"
 
     echo -e "\n${YELLOW}Initializing project: ${name}${NC}"

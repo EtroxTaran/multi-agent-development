@@ -229,7 +229,7 @@ export PARALLEL_WORKERS=3
 
 ### Agent CLI Overrides
 ```bash
-export CURSOR_MODEL=gpt-4.5-turbo    # Override Cursor model
+export CURSOR_MODEL=gpt-4-turbo      # Override Cursor model
 export GEMINI_MODEL=gemini-2.0-flash  # Override Gemini model
 ```
 

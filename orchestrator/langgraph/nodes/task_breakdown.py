@@ -106,6 +106,21 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
     # Assign dependencies based on file relationships
     tasks = _assign_dependencies(tasks)
 
+    # Detect circular dependencies
+    cycles = detect_circular_dependencies(tasks)
+    if cycles:
+        cycle_details = "; ".join([" -> ".join(cycle) for cycle in cycles[:3]])  # Show first 3
+        logger.error(f"Circular dependencies detected: {cycle_details}")
+        return {
+            "errors": [{
+                "type": "circular_dependency_error",
+                "message": f"Circular dependencies detected in tasks: {cycle_details}",
+                "cycles": cycles,
+                "timestamp": datetime.now().isoformat(),
+            }],
+            "next_decision": "escalate",
+        }
+
     # Save tasks to workflow directory
     tasks_output = {
         "tasks": [dict(t) for t in tasks],
@@ -520,3 +535,55 @@ def _assign_dependencies(tasks: list[Task]) -> list[Task]:
         task["dependencies"] = list(existing_deps)
 
     return tasks
+
+
+def detect_circular_dependencies(tasks: list[Task]) -> list[list[str]]:
+    """Detect circular dependencies in tasks using DFS.
+
+    Uses depth-first search to find cycles in the task dependency graph.
+
+    Args:
+        tasks: List of tasks with dependencies
+
+    Returns:
+        List of cycles found, each cycle is a list of task IDs forming the cycle
+    """
+    # Build adjacency list (task_id -> list of dependencies)
+    graph: dict[str, list[str]] = {}
+    for task in tasks:
+        task_id = task.get("id", "")
+        dependencies = task.get("dependencies", [])
+        graph[task_id] = dependencies
+
+    # Track visited nodes and current recursion stack
+    visited: set[str] = set()
+    rec_stack: set[str] = set()
+    cycles: list[list[str]] = []
+
+    def dfs(node: str, path: list[str]) -> None:
+        """Depth-first search to detect cycles."""
+        if node in rec_stack:
+            # Found a cycle - extract the cycle portion from path
+            if node in path:
+                cycle_start = path.index(node)
+                cycle = path[cycle_start:] + [node]
+                cycles.append(cycle)
+            return
+
+        if node in visited:
+            return
+
+        visited.add(node)
+        rec_stack.add(node)
+
+        for dep in graph.get(node, []):
+            dfs(dep, path + [node])
+
+        rec_stack.remove(node)
+
+    # Run DFS from each node
+    for task_id in graph:
+        if task_id not in visited:
+            dfs(task_id, [])
+
+    return cycles

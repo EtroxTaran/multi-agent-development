@@ -5,14 +5,16 @@ with real-time console output and queryable persistence.
 """
 
 import json
+import os
 import sys
+import tempfile
 import threading
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 
 class ActionType(str, Enum):
@@ -240,9 +242,37 @@ class ActionLog:
                 pass  # Start with empty index
 
     def _save_index(self) -> None:
-        """Save index to file."""
-        with open(self.index_file, "w", encoding="utf-8") as f:
-            json.dump(self._index, f, indent=2)
+        """Save index to file atomically.
+
+        Uses write-to-temp then atomic rename to prevent corruption.
+        """
+        tmp_path = None
+        try:
+            # Write to temp file first
+            with tempfile.NamedTemporaryFile(
+                mode='w',
+                dir=self.workflow_dir,
+                prefix='.index_',
+                suffix='.json',
+                delete=False,
+                encoding='utf-8'
+            ) as tmp_file:
+                tmp_path = tmp_file.name
+                json.dump(self._index, tmp_file, indent=2)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
+
+            # Atomic replace
+            os.replace(tmp_path, str(self.index_file))
+            tmp_path = None  # Mark as successfully moved
+
+        finally:
+            # Clean up temp file if atomic replace failed
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     def _update_index(self, entry: ActionEntry) -> None:
         """Update the index with a new entry."""
@@ -353,11 +383,13 @@ class ActionLog:
         )
 
         with self._lock:
-            # Append to log file
+            # Append to log file with proper flush/sync
             with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry.to_dict()) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
 
-            # Update index
+            # Update index (uses atomic write internally)
             self._update_index(entry)
 
             # Console output
@@ -588,29 +620,44 @@ class ActionLog:
             self._save_index()
 
 
-# Global action log instance
-_action_log: Optional[ActionLog] = None
+# Global action log registry - keyed by resolved path to prevent cross-contamination
+_action_logs: Dict[str, ActionLog] = {}
+_action_log_lock = threading.Lock()
 
 
 def get_action_log(workflow_dir: Optional[str | Path] = None) -> ActionLog:
-    """Get or create the global action log instance.
+    """Get or create an action log instance for a specific workflow directory.
+
+    Uses a registry keyed by the resolved absolute path to prevent
+    cross-contamination between different projects.
 
     Args:
         workflow_dir: Workflow directory (defaults to .workflow/)
 
     Returns:
-        ActionLog instance
+        ActionLog instance for this workflow directory
     """
-    global _action_log
+    workflow_dir = Path(workflow_dir or ".workflow").resolve()
+    key = str(workflow_dir)
 
-    if _action_log is None:
-        workflow_dir = workflow_dir or Path(".workflow")
-        _action_log = ActionLog(workflow_dir)
+    with _action_log_lock:
+        if key not in _action_logs:
+            _action_logs[key] = ActionLog(workflow_dir)
+        return _action_logs[key]
 
-    return _action_log
 
+def reset_action_log(workflow_dir: Optional[str | Path] = None) -> None:
+    """Reset an action log instance for a specific workflow directory.
 
-def reset_action_log() -> None:
-    """Reset the global action log instance."""
-    global _action_log
-    _action_log = None
+    Args:
+        workflow_dir: Workflow directory to reset (None resets all)
+    """
+    global _action_logs
+
+    with _action_log_lock:
+        if workflow_dir is None:
+            _action_logs.clear()
+        else:
+            key = str(Path(workflow_dir).resolve())
+            if key in _action_logs:
+                del _action_logs[key]

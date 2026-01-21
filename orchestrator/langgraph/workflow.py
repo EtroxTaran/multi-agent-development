@@ -501,25 +501,31 @@ class WorkflowRunner:
         """
         try:
             from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-            import aiosqlite
 
             db_path = self.checkpoint_dir / "checkpoints.db"
-            logger.info(f"Using AsyncSqliteSaver: {db_path}")
+            # Ensure checkpoint directory exists
+            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-            # AsyncSqliteSaver requires async context management
-            # For now, fall back to MemorySaver and note the limitation
-            # TODO: Properly integrate async checkpointer initialization
-            logger.warning(
-                "AsyncSqliteSaver requires async initialization. "
-                "Using MemorySaver. See LangGraph docs for async setup."
-            )
-            return MemorySaver()
+            # Create connection string for SQLite
+            conn_string = f"sqlite:///{db_path}"
+
+            # Create the checkpointer using from_conn_string (sync factory method)
+            # This returns an AsyncSqliteSaver that manages its own async connection
+            checkpointer = AsyncSqliteSaver.from_conn_string(str(db_path))
+            logger.info(f"Using AsyncSqliteSaver: {db_path}")
+            return checkpointer
 
         except ImportError as e:
             logger.warning(
                 f"Could not import AsyncSqliteSaver: {e}. "
-                "Install with: pip install aiosqlite. "
+                "Install with: pip install aiosqlite langgraph-checkpoint-sqlite. "
                 "Falling back to MemorySaver."
+            )
+            return MemorySaver()
+        except Exception as e:
+            logger.warning(
+                f"Failed to create AsyncSqliteSaver: {e}. "
+                "Falling back to MemorySaver (state lost on restart)."
             )
             return MemorySaver()
 

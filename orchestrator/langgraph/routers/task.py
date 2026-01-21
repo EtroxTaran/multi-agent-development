@@ -150,7 +150,8 @@ def verify_task_router(
 
     if decision == WorkflowDecision.CONTINUE or decision == "continue":
         # Task verified successfully - LOOP BACK to get next task
-        return "select_task"
+        # But first check if there are any tasks we can actually select
+        return _check_for_available_tasks_or_escalate(state, "select_task")
 
     if decision == WorkflowDecision.RETRY or decision == "retry":
         # Verification failed but can retry
@@ -172,14 +173,67 @@ def verify_task_router(
     # Default: check task status
     current_task_id = state.get("current_task_id")
     if not current_task_id:
-        # No current task - loop back to select
-        return "select_task"
+        # No current task - check if we can select one or need to escalate
+        return _check_for_available_tasks_or_escalate(state, "select_task")
 
     task = get_task_by_id(state, current_task_id)
     if task:
         if task.get("status") == TaskStatus.COMPLETED:
-            return "select_task"
+            return _check_for_available_tasks_or_escalate(state, "select_task")
         elif task.get("status") == TaskStatus.FAILED:
             return "human_escalation"
 
-    return "select_task"
+    return _check_for_available_tasks_or_escalate(state, "select_task")
+
+
+def _check_for_available_tasks_or_escalate(
+    state: WorkflowState,
+    default_route: Literal["select_task"],
+) -> Literal["select_task", "human_escalation"]:
+    """Check if there are available tasks to select, or escalate if deadlocked.
+
+    This prevents infinite loops when remaining tasks exist but are all blocked
+    by unfulfilled dependencies or other conditions.
+
+    Args:
+        state: Current workflow state
+        default_route: Route to return if tasks are available
+
+    Returns:
+        "select_task" if tasks available, "human_escalation" if deadlocked
+    """
+    tasks = state.get("tasks", [])
+    if not tasks:
+        # No tasks at all - escalate (shouldn't happen but handle gracefully)
+        return "human_escalation"
+
+    # Check if all tasks are completed
+    if all_tasks_completed(state):
+        # All done - select_task will route to build_verification
+        return default_route
+
+    # Check if any tasks are available (not completed, not blocked by dependencies)
+    completed_ids = set(state.get("completed_task_ids", []))
+
+    available_count = 0
+    for task in tasks:
+        task_id = task.get("id")
+        if task_id in completed_ids:
+            continue
+
+        status = task.get("status")
+        if status == TaskStatus.COMPLETED:
+            continue
+
+        # Check if dependencies are met
+        dependencies = task.get("dependencies", [])
+        deps_met = all(dep in completed_ids for dep in dependencies)
+        if deps_met and status != TaskStatus.FAILED:
+            available_count += 1
+
+    if available_count > 0:
+        return default_route
+
+    # No available tasks but incomplete tasks remain - deadlock
+    # This happens when remaining tasks have unmet dependencies or all failed
+    return "human_escalation"

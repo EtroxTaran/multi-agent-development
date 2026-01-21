@@ -66,5 +66,5 @@ Always output JSON with:
 
 Read these for context:
 - `PRODUCT.md` - Feature specification
-- `AGENTS.md` - Workflow rules
+- `CLAUDE.md` - Workflow rules (orchestrator context)
 - `GEMINI.md` - Your context (this content)

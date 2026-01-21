@@ -31,7 +31,7 @@
 - Include `score` field: 1-10 scale
 
 ### Context Files
-- Always read AGENTS.md for workflow rules
+- Always read CLAUDE.md for workflow rules (or agent-specific context file)
 - Always read PRODUCT.md for requirements
 - Check .workflow/state.json for current state
 
@@ -41,7 +41,7 @@
 - Log the error clearly with context
 - Suggest remediation steps
 - Don't proceed with broken state
-- Update blockers.md if blocked
+- Escalate to human if blocked (via workflow interrupt)
 
 ### When Uncertain
 - Ask for clarification rather than guess

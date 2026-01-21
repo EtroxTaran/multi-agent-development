@@ -46,6 +46,38 @@ class SecretsRedactor:
         # OpenAI/Anthropic style API keys (must come first to catch before generic patterns)
         (r'\bsk-[a-zA-Z0-9]{10,}',
          '***API_KEY_REDACTED***'),
+
+        # GitHub tokens (classic and fine-grained)
+        # ghp_ = personal access tokens, ghu_ = user-to-server, gho_ = OAuth
+        # ghs_ = server-to-server, ghr_ = refresh tokens
+        (r'\b(ghp_[a-zA-Z0-9]{36,})',
+         '***GITHUB_PAT_REDACTED***'),
+        (r'\b(ghu_[a-zA-Z0-9]{36,})',
+         '***GITHUB_USER_TOKEN_REDACTED***'),
+        (r'\b(gho_[a-zA-Z0-9]{36,})',
+         '***GITHUB_OAUTH_REDACTED***'),
+        (r'\b(ghs_[a-zA-Z0-9]{36,})',
+         '***GITHUB_SERVER_TOKEN_REDACTED***'),
+        (r'\b(ghr_[a-zA-Z0-9]{36,})',
+         '***GITHUB_REFRESH_TOKEN_REDACTED***'),
+        # GitHub App tokens
+        (r'\b(github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})',
+         '***GITHUB_PAT_REDACTED***'),
+
+        # AWS credentials (comprehensive patterns)
+        (r'(?i)(AWS_SECRET_ACCESS_KEY)["\s:=]+["\']?([a-zA-Z0-9/+]{40})["\']?',
+         r'\1=***REDACTED***'),
+        (r'(?i)(AWS_ACCESS_KEY_ID)["\s:=]+["\']?([A-Z0-9]{20})["\']?',
+         r'\1=***REDACTED***'),
+        (r'\b(AKIA[0-9A-Z]{16})',
+         '***AWS_KEY_REDACTED***'),
+
+        # Google Cloud / Firebase
+        (r'(?i)(GOOGLE_API_KEY|FIREBASE_API_KEY)["\s:=]+["\']?([a-zA-Z0-9_\-]{20,})["\']?',
+         r'\1=***REDACTED***'),
+        (r'\bAIza[0-9A-Za-z\-_]{35}',
+         '***GOOGLE_API_KEY_REDACTED***'),
+
         # API keys (various formats)
         (r'(?i)(api[_-]?key|apikey)["\s:=]+["\']?([a-zA-Z0-9_\-]{20,})["\']?',
          r'\1=***REDACTED***'),
@@ -58,9 +90,14 @@ class SecretsRedactor:
         # Bearer tokens
         (r'(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)',
          r'\1***REDACTED***'),
-        # AWS-style credentials
+        # AWS-style credentials (legacy pattern, kept for compatibility)
         (r'(?i)(aws[_-]?(?:access[_-]?key|secret)[_-]?(?:id)?)["\s:=]+["\']?([A-Z0-9]{16,})["\']?',
          r'\1=***REDACTED***'),
+
+        # Slack tokens
+        (r'\b(xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24})',
+         '***SLACK_TOKEN_REDACTED***'),
+
         # Generic private key patterns
         (r'-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----',
          '***PRIVATE_KEY_REDACTED***'),
@@ -95,12 +132,19 @@ class OrchestrationLogger:
     Optionally forwards events to a Rich UI display.
     """
 
+    # Default rotation settings
+    DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+    DEFAULT_MAX_BACKUP_COUNT = 5
+    ROTATION_CHECK_INTERVAL = 100  # Check every N log writes
+
     def __init__(
         self,
         workflow_dir: str | Path,
         console_output: bool = True,
         min_level: LogLevel = LogLevel.INFO,
         redact_secrets: bool = True,
+        max_file_size: int = DEFAULT_MAX_FILE_SIZE,
+        max_backup_count: int = DEFAULT_MAX_BACKUP_COUNT,
     ):
         """Initialize the logger.
 
@@ -109,16 +153,110 @@ class OrchestrationLogger:
             console_output: Whether to print to console
             min_level: Minimum log level to record
             redact_secrets: Whether to redact secrets from logs
+            max_file_size: Maximum log file size in bytes before rotation (default 10MB)
+            max_backup_count: Number of backup files to keep (default 5)
         """
         self.workflow_dir = Path(workflow_dir)
         self.log_file = self.workflow_dir / "coordination.log"
         self.json_log_file = self.workflow_dir / "coordination.jsonl"
         self.console_output = console_output
         self.min_level = min_level
+        self.max_file_size = max_file_size
+        self.max_backup_count = max_backup_count
         self._log_lock = threading.Lock()
         self._redactor = SecretsRedactor() if redact_secrets else None
         self._ui_display = None  # Optional Rich UI display
+        self._write_count = 0  # Track writes for rotation check
         self._ensure_log_dir()
+        # Keep file handles open to avoid descriptor exhaustion
+        # Use line buffering (buffering=1) for immediate writes
+        self._log_handle = open(self.log_file, "a", encoding="utf-8", buffering=1)
+        self._json_handle = open(self.json_log_file, "a", encoding="utf-8", buffering=1)
+        self._closed = False
+
+    def __del__(self):
+        """Close file handles on destruction."""
+        self.close()
+
+    def close(self):
+        """Close log file handles."""
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            if hasattr(self, '_log_handle') and self._log_handle:
+                self._log_handle.close()
+            if hasattr(self, '_json_handle') and self._json_handle:
+                self._json_handle.close()
+        except Exception:
+            pass  # Ignore errors during cleanup
+
+    def _rotate_file(self, file_path: Path, file_handle) -> any:
+        """Rotate a log file if it exceeds max size.
+
+        Args:
+            file_path: Path to the log file
+            file_handle: Current file handle
+
+        Returns:
+            New file handle (or same handle if no rotation needed)
+        """
+        try:
+            # Check file size
+            if not file_path.exists():
+                return file_handle
+
+            file_size = file_path.stat().st_size
+            if file_size < self.max_file_size:
+                return file_handle
+
+            # Close current handle
+            file_handle.close()
+
+            # Rotate existing backups (e.g., .log.4 -> .log.5, .log.3 -> .log.4, ...)
+            for i in range(self.max_backup_count - 1, 0, -1):
+                src = Path(f"{file_path}.{i}")
+                dst = Path(f"{file_path}.{i + 1}")
+                if src.exists():
+                    if dst.exists():
+                        dst.unlink()
+                    src.rename(dst)
+
+            # Rotate current file to .1
+            backup_path = Path(f"{file_path}.1")
+            if backup_path.exists():
+                backup_path.unlink()
+            file_path.rename(backup_path)
+
+            # Open new file
+            return open(file_path, "a", encoding="utf-8", buffering=1)
+
+        except Exception:
+            # If rotation fails, try to reopen the file
+            try:
+                return open(file_path, "a", encoding="utf-8", buffering=1)
+            except Exception:
+                return file_handle
+
+    def _check_rotation(self) -> None:
+        """Check and perform log rotation if needed.
+
+        Called periodically (every ROTATION_CHECK_INTERVAL writes) to avoid
+        checking file size on every log call.
+        """
+        self._write_count += 1
+        if self._write_count < self.ROTATION_CHECK_INTERVAL:
+            return
+
+        self._write_count = 0
+
+        # Rotate text log
+        if self._log_handle and not self._closed:
+            self._log_handle = self._rotate_file(self.log_file, self._log_handle)
+
+        # Rotate JSON log
+        if self._json_handle and not self._closed:
+            self._json_handle = self._rotate_file(self.json_log_file, self._json_handle)
 
     def set_ui_display(self, display) -> None:
         """Set a UI display to forward log events to.
@@ -261,15 +399,15 @@ class OrchestrationLogger:
                 formatted = self._format_console(level, message, phase, agent)
                 print(formatted, file=sys.stderr if level == LogLevel.ERROR else sys.stdout)
 
-            # File output (plain text)
-            with open(self.log_file, "a", encoding="utf-8") as f:
+            # File output (plain text) - use cached handle
+            if not self._closed and self._log_handle:
                 formatted = self._format_file(level, message, phase, agent)
-                f.write(formatted + "\n")
+                self._log_handle.write(formatted + "\n")
 
-            # JSON log
-            with open(self.json_log_file, "a", encoding="utf-8") as f:
+            # JSON log - use cached handle
+            if not self._closed and self._json_handle:
                 entry = self._format_json(level, message, phase, agent, extra)
-                f.write(json.dumps(entry) + "\n")
+                self._json_handle.write(json.dumps(entry) + "\n")
 
             # Forward to UI display if set
             if self._ui_display:
@@ -281,6 +419,9 @@ class OrchestrationLogger:
                     self._ui_display.log_event(display_message, ui_level)
                 except Exception:
                     pass  # Don't let UI errors affect logging
+
+            # Check for log rotation periodically
+            self._check_rotation()
 
     def _map_level_to_ui(self, level: LogLevel) -> str:
         """Map internal log level to UI display level.

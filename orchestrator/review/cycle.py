@@ -178,6 +178,7 @@ class ReviewCycle:
     DEFAULT_APPROVAL_SCORE = 7.0
     DEFAULT_MAX_ITERATIONS = 3
     DEFAULT_REVIEW_TIMEOUT = 300  # 5 minutes per reviewer
+    MAX_CYCLE_LOG_ENTRIES = 100  # Limit log size to prevent unbounded growth
 
     def __init__(
         self,
@@ -327,6 +328,21 @@ class ReviewCycle:
                     final_status="approved",
                     iterations=iterations,
                     final_output=final_output,
+                    total_execution_time_seconds=(
+                        datetime.utcnow() - start_time
+                    ).total_seconds(),
+                )
+
+            # Step 4b: Handle unresolved conflict - escalate immediately
+            if decision == ReviewDecision.CONFLICT:
+                logger.warning(f"Unresolved reviewer conflict for task {task.id}")
+                return ReviewCycleResult(
+                    task_id=task.id,
+                    working_agent_id=working_agent_id,
+                    final_status="escalated",
+                    iterations=iterations,
+                    final_output=final_output,
+                    escalation_reason="Unresolved reviewer conflict - reviewers disagree and weighted resolution failed",
                     total_execution_time_seconds=(
                         datetime.utcnow() - start_time
                     ).total_seconds(),
@@ -494,6 +510,11 @@ class ReviewCycle:
             "timestamp": iteration.timestamp.isoformat(),
         }
         self._cycle_log.append(log_entry)
+
+        # Enforce bounded growth - keep only the last N entries
+        if len(self._cycle_log) > self.MAX_CYCLE_LOG_ENTRIES:
+            self._cycle_log = self._cycle_log[-self.MAX_CYCLE_LOG_ENTRIES:]
+
         logger.debug(f"Iteration {iteration.iteration_number}: {log_entry}")
 
     def get_cycle_log(self) -> List[Dict[str, Any]]:
