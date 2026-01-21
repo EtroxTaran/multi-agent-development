@@ -258,12 +258,13 @@ class PromptCache:
         if not self._cache:
             return
 
-        # Sort by timestamp, remove oldest 10%
+        # Sort by timestamp, remove oldest 25% (increased from 10% to prevent
+        # frequent evictions and reduce memory pressure)
         sorted_entries = sorted(
             self._cache.items(),
             key=lambda x: x[1].timestamp,
         )
-        evict_count = max(1, len(sorted_entries) // 10)
+        evict_count = max(1, len(sorted_entries) // 4)
 
         for key, _ in sorted_entries[:evict_count]:
             del self._cache[key]
@@ -416,3 +417,36 @@ class ConversationCompressor:
             "tokens_saved": savings,
             "savings_pct": (savings / original_tokens * 100) if original_tokens > 0 else 0,
         }
+
+
+# Global prompt cache instance
+_prompt_cache: Optional[PromptCache] = None
+
+
+def get_prompt_cache(cache_dir: Optional[str | Path] = None) -> PromptCache:
+    """Get or create the global prompt cache instance.
+
+    Args:
+        cache_dir: Cache directory (defaults to .workflow/cache)
+
+    Returns:
+        PromptCache instance
+    """
+    global _prompt_cache
+
+    if _prompt_cache is None:
+        cache_dir = cache_dir or Path(".workflow/cache")
+        _prompt_cache = PromptCache(cache_dir)
+
+    return _prompt_cache
+
+
+def reset_prompt_cache() -> None:
+    """Reset the global prompt cache instance.
+
+    Call this at workflow boundaries to prevent unbounded memory growth.
+    """
+    global _prompt_cache
+    if _prompt_cache is not None:
+        _prompt_cache.clear()
+    _prompt_cache = None

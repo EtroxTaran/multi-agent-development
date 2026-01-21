@@ -99,6 +99,9 @@ class LinearAdapter:
     without requiring async/await at the call site.
     """
 
+    # Cache TTL in seconds (1 hour)
+    CACHE_TTL_SECONDS = 3600
+
     def __init__(self, config: LinearConfig):
         """Initialize Linear adapter.
 
@@ -107,7 +110,7 @@ class LinearAdapter:
         """
         self.config = config
         self._mcp_available: Optional[bool] = None
-        self._issue_cache: dict[str, str] = {}  # task_id -> linear_issue_id
+        self._issue_cache: dict[str, tuple[str, float]] = {}  # task_id -> (linear_issue_id, timestamp)
 
     @property
     def enabled(self) -> bool:
@@ -137,12 +140,15 @@ class LinearAdapter:
             return {}
 
         results = {}
+        import time
+        now = time.time()
+
         for task in tasks:
             try:
                 issue_id = self._create_issue(task, project_name)
                 if issue_id:
                     results[task["id"]] = issue_id
-                    self._issue_cache[task["id"]] = issue_id
+                    self._issue_cache[task["id"]] = (issue_id, now)
             except Exception as e:
                 logger.warning(f"Failed to create Linear issue for {task.get('id')}: {e}")
 
@@ -165,7 +171,7 @@ class LinearAdapter:
         if not self.enabled:
             return True  # Not a failure if disabled
 
-        issue_id = self._issue_cache.get(task_id)
+        issue_id = self._get_cached_issue_id(task_id)
         if not issue_id:
             logger.debug(f"No Linear issue found for task {task_id}")
             return True
@@ -198,7 +204,7 @@ class LinearAdapter:
         if not self.enabled:
             return True
 
-        issue_id = self._issue_cache.get(task_id)
+        issue_id = self._get_cached_issue_id(task_id)
         if not issue_id:
             logger.debug(f"No Linear issue found for task {task_id}")
             return True
@@ -226,7 +232,7 @@ class LinearAdapter:
         if not self.enabled:
             return True
 
-        issue_id = self._issue_cache.get(task_id)
+        issue_id = self._get_cached_issue_id(task_id)
         if not issue_id:
             return True
 
@@ -235,6 +241,66 @@ class LinearAdapter:
         except Exception as e:
             logger.warning(f"Failed to add completion comment: {e}")
             return False
+
+    def _get_cached_issue_id(self, task_id: str) -> Optional[str]:
+        """Get issue ID from cache with TTL checking.
+
+        Args:
+            task_id: Task ID
+
+        Returns:
+            Issue ID if found and not expired, None otherwise
+        """
+        import time
+
+        cached = self._issue_cache.get(task_id)
+        if cached is None:
+            return None
+
+        issue_id, timestamp = cached
+        now = time.time()
+
+        # Check if cache entry is expired
+        if now - timestamp > self.CACHE_TTL_SECONDS:
+            # Entry expired, remove from cache
+            del self._issue_cache[task_id]
+            return None
+
+        return issue_id
+
+    def clear_cache(self) -> int:
+        """Clear the entire issue cache.
+
+        Call this at workflow initialization to prevent stale data.
+
+        Returns:
+            Number of entries cleared
+        """
+        count = len(self._issue_cache)
+        self._issue_cache.clear()
+        return count
+
+    def cleanup_stale_cache(self) -> int:
+        """Remove expired entries from the cache.
+
+        Returns:
+            Number of entries removed
+        """
+        import time
+
+        now = time.time()
+        expired = [
+            task_id for task_id, (_, timestamp) in self._issue_cache.items()
+            if now - timestamp > self.CACHE_TTL_SECONDS
+        ]
+
+        for task_id in expired:
+            del self._issue_cache[task_id]
+
+        if expired:
+            logger.debug(f"Removed {len(expired)} expired entries from Linear cache")
+
+        return len(expired)
 
     def _check_mcp_available(self) -> bool:
         """Check if Linear MCP is available.

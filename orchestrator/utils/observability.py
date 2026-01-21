@@ -197,13 +197,18 @@ class Tracer:
     - Automatic context propagation
     - Cost and latency metrics
     - Persistence and export
+    - Rolling trace buffer with configurable max size
     """
+
+    # Default maximum traces to keep in memory
+    DEFAULT_MAX_TRACES = 100
 
     def __init__(
         self,
         service_name: str,
         storage_dir: str | Path,
         session_id: Optional[str] = None,
+        max_traces: int = None,
     ):
         """Initialize tracer.
 
@@ -211,11 +216,13 @@ class Tracer:
             service_name: Name of the service being traced
             storage_dir: Directory to store traces
             session_id: Optional session ID for grouping traces
+            max_traces: Maximum traces to keep in memory (default 100)
         """
         self.service_name = service_name
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.session_id = session_id or str(uuid.uuid4())
+        self.max_traces = max_traces or self.DEFAULT_MAX_TRACES
 
         self._current_trace: Optional[Trace] = None
         self._span_stack: list[Span] = []
@@ -249,6 +256,8 @@ class Tracer:
     def end_trace(self) -> Optional[Trace]:
         """End the current trace.
 
+        Implements rolling window - drops oldest traces when max_traces exceeded.
+
         Returns:
             Completed Trace object
         """
@@ -259,6 +268,10 @@ class Tracer:
         self._traces.append(self._current_trace)
         self._save_trace(self._current_trace)
 
+        # Enforce rolling window - drop oldest traces if over limit
+        while len(self._traces) > self.max_traces:
+            self._traces.pop(0)
+
         logger.debug(
             f"Ended trace: {self._current_trace.trace_id} "
             f"({self._current_trace.total_duration_ms:.0f}ms, "
@@ -268,6 +281,22 @@ class Tracer:
         trace = self._current_trace
         self._current_trace = None
         return trace
+
+    def clear_traces(self) -> int:
+        """Clear all in-memory traces.
+
+        Call this at workflow end to free memory.
+        Traces are still persisted to disk.
+
+        Returns:
+            Number of traces cleared
+        """
+        count = len(self._traces)
+        self._traces.clear()
+        self._span_stack.clear()
+        self._current_trace = None
+        logger.debug(f"Cleared {count} traces from memory")
+        return count
 
     @contextmanager
     def span(
@@ -537,3 +566,15 @@ def get_tracer(
         _tracer = Tracer(service_name, storage_dir)
 
     return _tracer
+
+
+def reset_tracer() -> None:
+    """Reset the global tracer instance.
+
+    Call this at workflow boundaries to prevent memory accumulation.
+    Clears in-memory traces (disk traces are preserved).
+    """
+    global _tracer
+    if _tracer is not None:
+        _tracer.clear_traces()
+    _tracer = None

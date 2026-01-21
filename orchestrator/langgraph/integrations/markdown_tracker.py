@@ -599,6 +599,45 @@ class MarkdownTracker:
         except OSError as e:
             logger.warning(f"Could not set writable: {e}")
 
+    def prune_stale_checksums(self) -> int:
+        """Remove checksums for task files that no longer exist.
+
+        This prevents unbounded growth of the checksums dict.
+
+        Returns:
+            Number of stale checksums removed
+        """
+        self._load_checksums()
+
+        stale = []
+        for task_id in self._checksums:
+            task_file = self._tasks_dir / f"{task_id}.md"
+            if not task_file.exists():
+                stale.append(task_id)
+
+        for task_id in stale:
+            del self._checksums[task_id]
+
+        if stale:
+            self._save_checksums()
+            logger.debug(f"Removed {len(stale)} stale checksums")
+
+        return len(stale)
+
+    def clear_checksums(self) -> int:
+        """Clear all checksums from memory and disk.
+
+        Returns:
+            Number of checksums cleared
+        """
+        count = len(self._checksums)
+        self._checksums.clear()
+
+        if self._checksums_file.exists():
+            self._checksums_file.write_text("{}")
+
+        return count
+
 
 def create_markdown_tracker(project_dir: Path) -> MarkdownTracker:
     """Factory function to create a markdown tracker.

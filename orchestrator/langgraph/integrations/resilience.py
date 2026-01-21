@@ -291,6 +291,32 @@ def get_async_circuit_breaker(
     return _async_circuit_breakers[name]
 
 
+def clear_circuit_breakers() -> int:
+    """Clear all registered circuit breakers.
+
+    Call this at workflow initialization and cleanup to prevent memory leaks
+    from accumulated circuit breaker instances.
+
+    Returns:
+        Number of circuit breakers cleared
+    """
+    global _async_circuit_breakers
+    count = len(_async_circuit_breakers)
+    _async_circuit_breakers.clear()
+    logger.info(f"Cleared {count} circuit breakers from registry")
+    return count
+
+
+async def reset_all_circuit_breakers() -> None:
+    """Reset all circuit breakers to closed state.
+
+    Useful for recovery after cascading failures are resolved.
+    """
+    for name, breaker in _async_circuit_breakers.items():
+        await breaker.reset()
+        logger.debug(f"Reset circuit breaker: {name}")
+
+
 # Pre-configured circuit breakers for common services
 CLAUDE_CIRCUIT_BREAKER = AsyncCircuitBreaker(
     "claude-sdk",

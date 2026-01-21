@@ -138,8 +138,10 @@ class AgentFeedback:
     blocking_issues: list[str] = field(default_factory=list)
     summary: str = ""
     raw_output: Optional[dict] = None
+    _archived_path: Optional[str] = None  # Path where raw_output was archived
 
     def to_dict(self) -> dict:
+        """Convert to dict for serialization (excludes raw_output)."""
         return {
             "agent": self.agent,
             "approved": self.approved,
@@ -149,6 +151,49 @@ class AgentFeedback:
             "blocking_issues": self.blocking_issues,
             "summary": self.summary,
         }
+
+    def archive_raw_output(self, workflow_dir: str) -> Optional[str]:
+        """Archive raw_output to disk and clear from memory.
+
+        Args:
+            workflow_dir: Path to .workflow directory
+
+        Returns:
+            Path to archived file or None if no raw_output
+        """
+        import json
+        from pathlib import Path
+
+        if self.raw_output is None:
+            return None
+
+        feedback_dir = Path(workflow_dir) / "feedback"
+        feedback_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{self.agent}_{timestamp}.json"
+        archive_path = feedback_dir / filename
+
+        archive_path.write_text(json.dumps(self.raw_output, indent=2))
+
+        # Clear raw_output from memory
+        self._archived_path = str(archive_path)
+        self.raw_output = None
+
+        return str(archive_path)
+
+    def get_archived_output(self) -> Optional[dict]:
+        """Load archived raw_output from disk if available."""
+        import json
+        from pathlib import Path
+
+        if self._archived_path is None:
+            return self.raw_output
+
+        archive_path = Path(self._archived_path)
+        if archive_path.exists():
+            return json.loads(archive_path.read_text())
+        return None
 
 
 def _merge_feedback(
@@ -169,22 +214,35 @@ def _merge_feedback(
     return {**existing, **new}
 
 
+# Maximum errors to keep in state
+MAX_ERRORS = 100
+
+
 def _append_errors(
     existing: Optional[list[dict]],
     new: list[dict],
 ) -> list[dict]:
-    """Reducer for appending errors.
+    """Reducer for appending errors with size limit.
+
+    Keeps most recent MAX_ERRORS to prevent unbounded state growth.
 
     Args:
         existing: Existing error list
         new: New errors to append
 
     Returns:
-        Combined error list
+        Combined error list (limited to MAX_ERRORS)
     """
     if existing is None:
-        return new
-    return existing + new
+        result = new
+    else:
+        result = existing + new
+
+    # Keep only most recent errors if over limit
+    if len(result) > MAX_ERRORS:
+        result = result[-MAX_ERRORS:]
+
+    return result
 
 
 def _latest_timestamp(
@@ -206,25 +264,37 @@ def _latest_timestamp(
     return max(existing, new)
 
 
+# Maximum unique IDs to track in state
+MAX_UNIQUE_IDS = 1000
+
+
 def _append_unique(
     existing: Optional[list[str]],
     new: list[str],
 ) -> list[str]:
-    """Reducer for appending unique items to a list.
+    """Reducer for appending unique items with size limit.
+
+    Keeps most recent MAX_UNIQUE_IDS to prevent unbounded state growth.
 
     Args:
         existing: Existing list
         new: New items to append
 
     Returns:
-        Combined list with unique items
+        Combined list with unique items (limited to MAX_UNIQUE_IDS)
     """
     if existing is None:
-        return list(new)
-    result = list(existing)
-    for item in new:
-        if item not in result:
-            result.append(item)
+        result = list(new)
+    else:
+        result = list(existing)
+        for item in new:
+            if item not in result:
+                result.append(item)
+
+    # Keep only most recent IDs if over limit
+    if len(result) > MAX_UNIQUE_IDS:
+        result = result[-MAX_UNIQUE_IDS:]
+
     return result
 
 

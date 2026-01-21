@@ -150,16 +150,23 @@ class ErrorAggregator:
     of all errors in the workflow.
     """
 
-    def __init__(self, workflow_dir: str | Path):
+    # Maximum unresolved errors to keep in memory
+    MAX_UNRESOLVED = 500
+    # Percentage to prune when limit reached
+    PRUNE_PERCENTAGE = 0.25
+
+    def __init__(self, workflow_dir: str | Path, max_unresolved: int = None):
         """Initialize the error aggregator.
 
         Args:
             workflow_dir: Directory for error storage
+            max_unresolved: Maximum unresolved errors to keep (default 500)
         """
         self.workflow_dir = Path(workflow_dir)
         self.errors_dir = self.workflow_dir / "errors"
         self.all_errors_file = self.errors_dir / "aggregated.jsonl"
         self.unresolved_file = self.errors_dir / "unresolved.json"
+        self.max_unresolved = max_unresolved or self.MAX_UNRESOLVED
         self._lock = threading.Lock()
         self._unresolved: dict[str, AggregatedError] = {}
         self._fingerprints: dict[str, str] = {}  # fingerprint -> error_id
@@ -193,6 +200,37 @@ class ErrorAggregator:
         }
         with open(self.unresolved_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+
+    def _prune_old_errors(self) -> int:
+        """Prune oldest errors when limit reached.
+
+        Removes oldest 25% of unresolved errors by first_seen timestamp.
+
+        Returns:
+            Number of errors pruned
+        """
+        if len(self._unresolved) <= self.max_unresolved:
+            return 0
+
+        # Sort by first_seen (oldest first)
+        sorted_errors = sorted(
+            self._unresolved.items(),
+            key=lambda x: x[1].first_seen or x[1].timestamp,
+        )
+
+        # Prune oldest 25%
+        prune_count = max(1, int(len(sorted_errors) * self.PRUNE_PERCENTAGE))
+        pruned = 0
+
+        for error_id, error in sorted_errors[:prune_count]:
+            # Remove from unresolved
+            del self._unresolved[error_id]
+            # Remove fingerprint mapping
+            fingerprint = error.fingerprint()
+            self._fingerprints.pop(fingerprint, None)
+            pruned += 1
+
+        return pruned
 
     def _categorize_error(self, error_type: str, message: str) -> ErrorSeverity:
         """Determine severity based on error type and message."""
@@ -262,6 +300,9 @@ class ErrorAggregator:
         fingerprint = temp_error.fingerprint()
 
         with self._lock:
+            # Prune old errors if at capacity
+            self._prune_old_errors()
+
             # Check for existing error with same fingerprint
             if fingerprint in self._fingerprints:
                 existing_id = self._fingerprints[fingerprint]
@@ -370,33 +411,64 @@ class ErrorAggregator:
 
         return errors
 
-    def get_all_errors(self, limit: Optional[int] = None) -> list[AggregatedError]:
-        """Get all errors (including resolved) from the log.
+    def get_all_errors(self, limit: int = 100) -> list[AggregatedError]:
+        """Get errors from the log with pagination.
+
+        Uses efficient reverse file reading for large files.
 
         Args:
-            limit: Maximum number of errors to return
+            limit: Maximum number of errors to return (default 100)
 
         Returns:
-            List of all errors (newest first)
+            List of errors (newest first, excluding resolution entries)
         """
         errors = []
         if not self.all_errors_file.exists():
             return errors
 
-        with open(self.all_errors_file, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        file_size = self.all_errors_file.stat().st_size
+        if file_size < 100_000:  # 100KB threshold
+            # Small file - read all
+            with open(self.all_errors_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
 
-        for line in reversed(lines):
-            if line.strip():
-                try:
-                    data = json.loads(line)
-                    if not data.get("_resolved"):  # Skip resolution entries
-                        errors.append(AggregatedError.from_dict(data))
-                except json.JSONDecodeError:
-                    continue
+            for line in reversed(lines):
+                if len(errors) >= limit:
+                    break
+                if line.strip():
+                    try:
+                        data = json.loads(line)
+                        if not data.get("_resolved"):
+                            errors.append(AggregatedError.from_dict(data))
+                    except json.JSONDecodeError:
+                        continue
+        else:
+            # Large file - read from end
+            buffer_size = 8192
+            with open(self.all_errors_file, "rb") as f:
+                f.seek(0, 2)
+                position = f.tell()
+                remainder = b""
 
-            if limit and len(errors) >= limit:
-                break
+                while position > 0 and len(errors) < limit:
+                    read_size = min(buffer_size, position)
+                    position -= read_size
+                    f.seek(position)
+                    chunk = f.read(read_size)
+                    data = chunk + remainder
+                    lines = data.split(b"\n")
+                    remainder = lines[0]
+
+                    for line in reversed(lines[1:]):
+                        if len(errors) >= limit:
+                            break
+                        if line.strip():
+                            try:
+                                entry = json.loads(line.decode("utf-8"))
+                                if not entry.get("_resolved"):
+                                    errors.append(AggregatedError.from_dict(entry))
+                            except (json.JSONDecodeError, UnicodeDecodeError):
+                                continue
 
         return errors
 

@@ -171,6 +171,9 @@ async def run_ralph_loop(
     if config is None:
         config = RalphLoopConfig()
 
+    # Clean up old iteration logs at start of each run
+    cleanup_old_logs(project_dir)
+
     start_time = datetime.now()
     test_results = []
     iteration = 0
@@ -294,7 +297,8 @@ async def _run_single_iteration(
 ) -> dict[str, Any]:
     """Run a single Ralph loop iteration.
 
-    Spawns fresh Claude process with the prompt.
+    Spawns fresh Claude process with the prompt. Ensures proper cleanup
+    on timeout or error to prevent zombie processes.
 
     Args:
         project_dir: Project directory
@@ -320,34 +324,78 @@ async def _run_single_iteration(
         str(config.max_turns_per_iteration),
     ]
 
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=project_dir,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env={**os.environ, "TERM": "dumb"},
-    )
+    process = None
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=project_dir,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, "TERM": "dumb"},
+        )
 
-    stdout, stderr = await process.communicate()
-    output_text = stdout.decode() if stdout else ""
+        stdout, stderr = await process.communicate()
+        output_text = stdout.decode() if stdout else ""
 
-    # Check for completion promise in output
-    completion_detected = config.completion_pattern in output_text
+        # Check for completion promise in output
+        completion_detected = config.completion_pattern in output_text
 
-    # Parse any JSON output
-    parsed_output = _parse_iteration_output(output_text)
+        # Parse any JSON output
+        parsed_output = _parse_iteration_output(output_text)
 
-    # Extract list of changed files from output (if any)
-    files_changed = parsed_output.get("files_modified", []) + parsed_output.get("files_created", [])
+        # Extract list of changed files from output (if any)
+        files_changed = parsed_output.get("files_modified", []) + parsed_output.get("files_created", [])
 
-    return {
-        "iteration": iteration,
-        "completion_detected": completion_detected,
-        "output": parsed_output,
-        "files_changed": files_changed,
-        "raw_output": output_text,
-        "return_code": process.returncode,
-    }
+        return {
+            "iteration": iteration,
+            "completion_detected": completion_detected,
+            "output": parsed_output,
+            "files_changed": files_changed,
+            "raw_output": output_text,
+            "return_code": process.returncode,
+        }
+
+    except asyncio.CancelledError:
+        # Task was cancelled (likely due to timeout)
+        if process is not None:
+            await _terminate_process(process)
+        raise
+
+    except Exception as e:
+        # Ensure cleanup on any error
+        if process is not None:
+            await _terminate_process(process)
+        raise
+
+
+async def _terminate_process(process: asyncio.subprocess.Process) -> None:
+    """Safely terminate a subprocess.
+
+    Attempts graceful termination first, then forceful kill.
+
+    Args:
+        process: The subprocess to terminate
+    """
+    if process.returncode is not None:
+        # Process already finished
+        return
+
+    try:
+        # Try graceful termination first
+        process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5.0)
+            logger.debug("Process terminated gracefully")
+        except asyncio.TimeoutError:
+            # Process didn't terminate, force kill
+            logger.warning("Process didn't terminate gracefully, sending SIGKILL")
+            process.kill()
+            await process.wait()
+    except ProcessLookupError:
+        # Process already dead
+        pass
+    except Exception as e:
+        logger.error(f"Error terminating process: {e}")
 
 
 async def _run_tests(
@@ -548,6 +596,54 @@ def _save_iteration_log(
     }
 
     log_file.write_text(json.dumps(log_data, indent=2))
+
+
+# Log retention period in days
+LOG_RETENTION_DAYS = 7
+
+
+def cleanup_old_logs(project_dir: Path, retention_days: int = LOG_RETENTION_DAYS) -> int:
+    """Clean up iteration logs older than retention period.
+
+    Args:
+        project_dir: Project directory
+        retention_days: Number of days to retain logs (default 7)
+
+    Returns:
+        Number of files deleted
+    """
+    import time
+
+    logs_dir = project_dir / ".workflow" / "ralph_logs"
+    if not logs_dir.exists():
+        return 0
+
+    cutoff_time = time.time() - (retention_days * 24 * 60 * 60)
+    deleted = 0
+
+    for task_dir in logs_dir.iterdir():
+        if not task_dir.is_dir():
+            continue
+
+        for log_file in task_dir.glob("iteration_*.json"):
+            try:
+                if log_file.stat().st_mtime < cutoff_time:
+                    log_file.unlink()
+                    deleted += 1
+            except (OSError, FileNotFoundError):
+                continue
+
+        # Remove empty task directories
+        try:
+            if task_dir.is_dir() and not any(task_dir.iterdir()):
+                task_dir.rmdir()
+        except (OSError, FileNotFoundError):
+            pass
+
+    if deleted > 0:
+        logger.info(f"Cleaned up {deleted} old iteration log files")
+
+    return deleted
 
 
 def detect_test_framework(project_dir: Path) -> str:

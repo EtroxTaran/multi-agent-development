@@ -369,7 +369,7 @@ class ActionLog:
         return entry
 
     def get_recent(self, limit: int = 20) -> list[ActionEntry]:
-        """Get the most recent log entries.
+        """Get the most recent log entries using efficient reverse file reading.
 
         Args:
             limit: Maximum number of entries to return
@@ -382,131 +382,187 @@ class ActionLog:
             return entries
 
         with self._lock:
-            # Read all lines and take the last N
-            with open(self.log_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-
-            for line in reversed(lines[-limit:]):
-                if line.strip():
-                    try:
-                        data = json.loads(line)
-                        entries.append(ActionEntry.from_dict(data))
-                    except json.JSONDecodeError:
-                        continue
+            # Use efficient reverse reading to avoid loading entire file
+            entries = self._read_from_end(limit)
 
         return entries
 
-    def get_errors(self, since: Optional[str] = None) -> list[ActionEntry]:
-        """Get all error entries.
+    def _read_from_end(self, limit: int, filter_fn: callable = None) -> list[ActionEntry]:
+        """Read entries from end of file efficiently.
+
+        Uses seek and read backwards to avoid loading entire file.
+
+        Args:
+            limit: Maximum entries to return
+            filter_fn: Optional filter function (entry_dict -> bool)
+
+        Returns:
+            List of ActionEntry objects (newest first)
+        """
+        entries = []
+        if not self.log_file.exists():
+            return entries
+
+        # For small files, just read all
+        file_size = self.log_file.stat().st_size
+        if file_size < 100_000:  # 100KB threshold
+            return self._read_all_filtered(limit, filter_fn)
+
+        # Read backwards for large files
+        buffer_size = 8192
+        with open(self.log_file, "rb") as f:
+            f.seek(0, 2)  # Seek to end
+            file_size = f.tell()
+            remainder = b""
+            position = file_size
+
+            while position > 0 and len(entries) < limit:
+                # Move backwards
+                read_size = min(buffer_size, position)
+                position -= read_size
+                f.seek(position)
+                chunk = f.read(read_size)
+
+                # Combine with remainder from previous chunk
+                data = chunk + remainder
+                lines = data.split(b"\n")
+
+                # Last element may be incomplete - save for next iteration
+                remainder = lines[0]
+                lines = lines[1:]
+
+                # Process lines in reverse
+                for line in reversed(lines):
+                    if line.strip():
+                        try:
+                            entry_dict = json.loads(line.decode("utf-8"))
+                            if filter_fn is None or filter_fn(entry_dict):
+                                entries.append(ActionEntry.from_dict(entry_dict))
+                                if len(entries) >= limit:
+                                    break
+                        except (json.JSONDecodeError, UnicodeDecodeError):
+                            continue
+
+            # Handle remainder from beginning of file
+            if remainder.strip() and len(entries) < limit:
+                try:
+                    entry_dict = json.loads(remainder.decode("utf-8"))
+                    if filter_fn is None or filter_fn(entry_dict):
+                        entries.append(ActionEntry.from_dict(entry_dict))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    pass
+
+        return entries
+
+    def _read_all_filtered(self, limit: int, filter_fn: callable = None) -> list[ActionEntry]:
+        """Read all entries with optional filter (for small files).
+
+        Args:
+            limit: Maximum entries to return
+            filter_fn: Optional filter function
+
+        Returns:
+            List of ActionEntry objects (newest first)
+        """
+        entries = []
+        with open(self.log_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        for line in reversed(lines):
+            if len(entries) >= limit:
+                break
+            if line.strip():
+                try:
+                    data = json.loads(line)
+                    if filter_fn is None or filter_fn(data):
+                        entries.append(ActionEntry.from_dict(data))
+                except json.JSONDecodeError:
+                    continue
+
+        return entries
+
+    def get_errors(self, since: Optional[str] = None, limit: int = 100) -> list[ActionEntry]:
+        """Get error entries with pagination.
 
         Args:
             since: ISO timestamp to filter errors after
+            limit: Maximum number of errors to return (default 100)
 
         Returns:
-            List of error ActionEntry objects
+            List of error ActionEntry objects (newest first)
         """
-        errors = []
         if not self.log_file.exists():
-            return errors
+            return []
+
+        def is_error(data: dict) -> bool:
+            """Check if entry is an error."""
+            if since and data.get("timestamp", "") < since:
+                return False
+            return (
+                data.get("error")
+                or data.get("status") == "failed"
+                or data.get("action_type") in ["error", "agent_error", "phase_failed", "task_failed"]
+            )
 
         with self._lock:
-            with open(self.log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            data = json.loads(line)
-                            # Check if it's an error
-                            if (
-                                data.get("error")
-                                or data.get("status") == "failed"
-                                or data.get("action_type") in ["error", "agent_error", "phase_failed", "task_failed"]
-                            ):
-                                # Filter by timestamp if provided
-                                if since and data.get("timestamp", "") < since:
-                                    continue
-                                errors.append(ActionEntry.from_dict(data))
-                        except json.JSONDecodeError:
-                            continue
+            return self._read_from_end(limit, filter_fn=is_error)
 
-        return errors
-
-    def get_by_phase(self, phase: int) -> list[ActionEntry]:
-        """Get all entries for a specific phase.
+    def get_by_phase(self, phase: int, limit: int = 500) -> list[ActionEntry]:
+        """Get entries for a specific phase with pagination.
 
         Args:
             phase: Phase number (1-5)
+            limit: Maximum number of entries to return (default 500)
 
         Returns:
-            List of ActionEntry objects for the phase
+            List of ActionEntry objects for the phase (newest first)
         """
-        entries = []
         if not self.log_file.exists():
-            return entries
+            return []
+
+        def matches_phase(data: dict) -> bool:
+            return data.get("phase") == phase
 
         with self._lock:
-            with open(self.log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            data = json.loads(line)
-                            if data.get("phase") == phase:
-                                entries.append(ActionEntry.from_dict(data))
-                        except json.JSONDecodeError:
-                            continue
+            return self._read_from_end(limit, filter_fn=matches_phase)
 
-        return entries
-
-    def get_by_agent(self, agent: str) -> list[ActionEntry]:
-        """Get all entries for a specific agent.
+    def get_by_agent(self, agent: str, limit: int = 500) -> list[ActionEntry]:
+        """Get entries for a specific agent with pagination.
 
         Args:
             agent: Agent name (claude, cursor, gemini)
+            limit: Maximum number of entries to return (default 500)
 
         Returns:
-            List of ActionEntry objects for the agent
+            List of ActionEntry objects for the agent (newest first)
         """
-        entries = []
         if not self.log_file.exists():
-            return entries
+            return []
+
+        def matches_agent(data: dict) -> bool:
+            return data.get("agent") == agent
 
         with self._lock:
-            with open(self.log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            data = json.loads(line)
-                            if data.get("agent") == agent:
-                                entries.append(ActionEntry.from_dict(data))
-                        except json.JSONDecodeError:
-                            continue
+            return self._read_from_end(limit, filter_fn=matches_agent)
 
-        return entries
-
-    def get_by_task(self, task_id: str) -> list[ActionEntry]:
-        """Get all entries for a specific task.
+    def get_by_task(self, task_id: str, limit: int = 200) -> list[ActionEntry]:
+        """Get entries for a specific task with pagination.
 
         Args:
             task_id: Task identifier
+            limit: Maximum number of entries to return (default 200)
 
         Returns:
-            List of ActionEntry objects for the task
+            List of ActionEntry objects for the task (newest first)
         """
-        entries = []
         if not self.log_file.exists():
-            return entries
+            return []
+
+        def matches_task(data: dict) -> bool:
+            return data.get("task_id") == task_id
 
         with self._lock:
-            with open(self.log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            data = json.loads(line)
-                            if data.get("task_id") == task_id:
-                                entries.append(ActionEntry.from_dict(data))
-                        except json.JSONDecodeError:
-                            continue
-
-        return entries
+            return self._read_from_end(limit, filter_fn=matches_task)
 
     def get_summary(self) -> dict:
         """Get a summary of the action log.

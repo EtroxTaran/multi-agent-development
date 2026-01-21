@@ -221,7 +221,8 @@ class StateManager:
         """Perform atomic save operation.
 
         Writes state to a temp file first, then atomically replaces
-        the target file using os.replace().
+        the target file using os.replace(). Uses try/finally to guarantee
+        temp file cleanup even if exceptions occur between write and replace.
         """
         # Create backup before save (if main file exists)
         if self.state_file.exists():
@@ -232,6 +233,7 @@ class StateManager:
 
         data = self._state.to_dict()
         tmp_path = None
+        success = False
 
         try:
             # Write to temp file first
@@ -250,15 +252,15 @@ class StateManager:
 
             # Atomic replace
             os.replace(tmp_path, str(self.state_file))
+            success = True
 
-        except Exception:
-            # Clean up temp file on failure
-            if tmp_path:
+        finally:
+            # Guaranteed cleanup: remove temp file if operation didn't succeed
+            if tmp_path and not success:
                 try:
                     os.unlink(tmp_path)
                 except (FileNotFoundError, OSError):
                     pass
-            raise
 
     @property
     def state(self) -> WorkflowState:

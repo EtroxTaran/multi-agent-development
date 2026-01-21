@@ -734,12 +734,19 @@ class WorkflowRunner:
             logger.warning(f"Could not get state: {e}")
             return None
 
-    async def get_history(self) -> list[dict]:
-        """Get the workflow execution history.
+    # Maximum checkpoints to return in history
+    MAX_HISTORY_CHECKPOINTS = 50
+
+    async def get_history(self, limit: int = None) -> list[dict]:
+        """Get the workflow execution history with pagination.
+
+        Args:
+            limit: Maximum checkpoints to return (default 50)
 
         Returns:
-            List of state snapshots
+            List of state snapshots (limited to prevent memory issues)
         """
+        limit = limit or self.MAX_HISTORY_CHECKPOINTS
         run_config = {
             "configurable": {
                 "thread_id": self.thread_id,
@@ -753,6 +760,9 @@ class WorkflowRunner:
                 "next": snapshot.next,
                 "config": snapshot.config,
             })
+            # Stop collecting after limit to prevent unbounded memory
+            if len(history) >= limit:
+                break
 
         return history
 
