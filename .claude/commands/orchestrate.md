@@ -10,17 +10,22 @@ Start or resume the 5-phase workflow to implement features using the nested orch
 ## Quick Start
 
 ```bash
-# Create a new project first
-python scripts/create-project.py my-feature
+# Initialize a new project
+./scripts/init.sh init my-feature
 
-# Edit the product spec
-# vim projects/my-feature/PRODUCT.md
+# User adds:
+# - Documents/ with product vision and architecture docs
+# - CLAUDE.md, GEMINI.md, .cursor/rules (context files)
+# - PRODUCT.md (feature specification)
 
 # Start workflow for the project
-python -m orchestrator --project my-feature --start
+./scripts/init.sh run my-feature
 
-# Or resume an interrupted workflow
-python -m orchestrator --project my-feature --resume
+# Or via Python
+python -m orchestrator --project my-feature --use-langgraph --start
+
+# Resume an interrupted workflow
+python -m orchestrator --project my-feature --resume --use-langgraph
 ```
 
 ## Nested Architecture
@@ -35,16 +40,20 @@ This system uses a two-layer architecture:
 ## Project Management
 
 ```bash
+# Initialize new project
+./scripts/init.sh init my-app
+
 # List all projects
+./scripts/init.sh list
+
+# Run workflow
+./scripts/init.sh run my-app
+
+# Check status
+./scripts/init.sh status my-app
+
+# Or via Python
 python -m orchestrator --list-projects
-
-# Create new project from template
-python -m orchestrator --create-project my-app --template base
-
-# Sync templates to projects
-python -m orchestrator --sync-projects
-
-# Check project status
 python -m orchestrator --project my-app --status
 ```
 
@@ -61,16 +70,16 @@ python -m orchestrator --project my-app --status
 ## Context Loading
 
 For a project, read these files in order:
-1. `projects/<name>/PRODUCT.md` - Feature specification
-2. `projects/<name>/.workflow/state.json` - Current workflow state
-3. `AGENTS.md` - Workflow rules
+1. `projects/<name>/Documents/` - Product vision and architecture
+2. `projects/<name>/PRODUCT.md` - Feature specification
+3. `projects/<name>/.workflow/state.json` - Current workflow state
 
 ## Instructions
 
 ### Starting a New Workflow
 
-1. Ensure project exists: `python -m orchestrator --list-projects`
-2. Read `projects/<name>/PRODUCT.md` thoroughly
+1. Ensure project exists: `./scripts/init.sh list`
+2. Read `projects/<name>/Documents/` and `PRODUCT.md` thoroughly
 3. Create `plan.json` with:
    - Feature overview
    - File changes required
@@ -85,7 +94,6 @@ For a project, read these files in order:
 Run both agents in parallel, pointing at the project directory:
 
 ```bash
-# Create validation prompts first, then run:
 bash scripts/call-cursor.sh \
     projects/<name>/.workflow/phases/validation/cursor-prompt.md \
     projects/<name>/.workflow/phases/validation/cursor-feedback.json \

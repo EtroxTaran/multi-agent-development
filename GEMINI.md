@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-21 16:36:29 -->
+<!-- Last synced: 2026-01-21 18:13:27 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Gemini as architecture reviewer.
@@ -530,34 +530,25 @@ When you discover a bug, mistake, or pattern that should be remembered:
 
 ## Recent Lessons
 
-### 2026-01-21 - Project Update Mechanism with Versioning
+### 2026-01-21 - Simplified Project Workflow
 
-- **Issue**: Projects created from meta-architect needed a way to receive template updates without losing project-specific work
-- **Root Cause**: No version tracking; manual file copying required; no safe rollback mechanism
-- **Fix**: Implemented comprehensive update system:
-  - `VERSION` file at repo root with semantic versioning
-  - Project config tracks `meta_architect_version` and `last_sync_version`
-  - `/check-updates` command to compare versions and show changelog
-  - `/update-project` command with automatic backup before applying
-  - Rollback capability from `.workflow/backups/`
-  - Update policies: `auto`, `prompt`, `manual`
+- **Issue**: Complex templating system with multiple project types, version tracking, and sync mechanisms added unnecessary complexity
+- **Root Cause**: Over-engineering for hypothetical future needs
+- **Fix**: Simplified to minimal workflow:
+  - Projects initialized with just Documents/, .workflow/, and .project-config.json
+  - User provides context files (CLAUDE.md, GEMINI.md, .cursor/rules) pre-researched for their project
+  - No templates, no version tracking, no sync mechanisms
+  - Projects are self-contained with their own git repos
 - **Prevention**:
-  - Always check updates before major workflow runs
-  - Backup is created automatically; can rollback if issues
-  - CHANGELOG.md documents all changes between versions
+  - Start simple, add complexity only when needed
+  - Let users bring their own context rather than generating it
+  - Focus on workflow orchestration, not project scaffolding
 - **Applies To**: all
 - **Files Changed**:
-  - `VERSION` (new)
-  - `CHANGELOG.md` (new)
-  - `orchestrator/__version__.py` (new)
-  - `orchestrator/update_manager.py` (new)
-  - `orchestrator/orchestrator.py` (modified - CLI flags)
-  - `scripts/check-updates.py` (new)
-  - `scripts/create-project.py` (modified - version tracking)
-  - `scripts/sync-project-templates.py` (modified - version tracking)
-  - `schemas/project-config-schema.json` (modified - versioning section)
-  - `.claude/commands/check-updates.md` (new)
-  - `.claude/commands/update-project.md` (new)
+  - Removed: project-templates/, VERSION, CHANGELOG.md
+  - Removed: create-project.py, sync-project-templates.py, check-updates.py
+  - Removed: update_manager.py, __version__.py
+  - Simplified: init.sh, orchestrator.py, project_manager.py
 
 ### 2026-01-21 - Ralph Wiggum Loop for TDD Implementation
 

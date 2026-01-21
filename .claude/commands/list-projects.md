@@ -10,23 +10,22 @@ List all projects in the `projects/` directory.
 ## Usage
 
 ```bash
-python -m orchestrator --list-projects
+./scripts/init.sh list
 ```
 
-Or use the create-project script:
+Or via Python:
 
 ```bash
-python scripts/create-project.py --list
+python -m orchestrator --list-projects
 ```
 
 ## Output
 
 Shows for each project:
 - Project name
-- Template used
-- Creation date
 - Current workflow phase
-- Whether PRODUCT.md exists
+- Whether Documents/ exists
+- Whether context files exist (CLAUDE.md, GEMINI.md, .cursor/rules)
 
 ## Example Output
 
@@ -34,16 +33,17 @@ Shows for each project:
 Projects:
 ------------------------------------------------------------
   my-auth-service
-    Template: base, Status: Phase 3, Has spec
+    Status: Phase 3, Has docs
+    Context: CLAUDE, GEMINI, Cursor
   my-dashboard
-    Template: base, Status: Not started, No spec
+    Status: Not started, No docs
+    Context: No context files
   api-gateway
-    Template: base, Status: Phase 5, Has spec
+    Status: Phase 5, Has docs
+    Context: CLAUDE, GEMINI
 ```
 
 ## Related Commands
 
-- `/create-project <name>` - Create a new project
 - `/phase-status --project <name>` - Detailed project status
 - `/orchestrate --project <name>` - Start/resume workflow
-- `/sync-projects` - Sync templates to projects

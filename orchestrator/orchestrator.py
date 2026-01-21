@@ -3,16 +3,13 @@
 Supports nested architecture where projects live in projects/<name>/ and
 the orchestrator coordinates without directly writing application code.
 
-Supports two execution modes:
-- Legacy mode: Sequential phase execution via subprocess calls
-- LangGraph mode: Graph-based workflow with native parallelism
+Uses LangGraph for graph-based workflow execution with native parallelism.
 """
 
 import argparse
 import asyncio
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -23,7 +20,6 @@ from .utils.git_operations import GitOperationsManager
 from .utils.log_manager import LogManager, load_config as load_log_config, should_auto_cleanup
 from .utils.handoff import HandoffGenerator, generate_handoff
 from .project_manager import ProjectManager
-from .ui import create_display, UICallbackHandler
 
 
 def is_langgraph_enabled() -> bool:
@@ -52,7 +48,6 @@ class Orchestrator:
     - Structured logging
     """
 
-    # Legacy PHASES removed - now using LangGraph workflow exclusively
     PHASE_NAMES = [
         (1, "planning"),
         (2, "validation"),
@@ -137,9 +132,6 @@ class Orchestrator:
     ) -> dict:
         """Run the orchestration workflow using LangGraph.
 
-        Note: Legacy phase execution has been removed. This method now
-        delegates to run_langgraph() for all workflow execution.
-
         Args:
             start_phase: Phase to start from (1-5) - currently ignored, LangGraph starts fresh
             end_phase: Phase to end at (1-5) - currently ignored, LangGraph runs to completion
@@ -148,14 +140,12 @@ class Orchestrator:
         Returns:
             Dictionary with workflow results
         """
-        # Delegate to LangGraph workflow
         return asyncio.run(self.run_langgraph())
 
     def _auto_commit(self, phase_num: int, phase_name: str) -> None:
         """Auto-commit changes after a phase.
 
-        Uses GitOperationsManager for efficient batched git operations,
-        reducing subprocess overhead from 5 calls to 1.
+        Uses GitOperationsManager for efficient batched git operations.
 
         Args:
             phase_num: Phase number
@@ -168,7 +158,6 @@ class Orchestrator:
 
             commit_message = f"[orchestrator] Phase {phase_num}: {phase_name} complete"
 
-            # Single batched operation: status check + add + commit + hash
             commit_hash = self.git.auto_commit(commit_message)
 
             if commit_hash:
@@ -183,13 +172,9 @@ class Orchestrator:
     def resume(self) -> dict:
         """Resume workflow from last checkpoint using LangGraph.
 
-        Note: Legacy phase-based resume has been removed. This method now
-        delegates to resume_langgraph() for checkpoint-based resume.
-
         Returns:
             Dictionary with workflow results
         """
-        # Delegate to LangGraph resume
         return asyncio.run(self.resume_langgraph())
 
     def status(self) -> dict:
@@ -213,7 +198,6 @@ class Orchestrator:
             self.state.reset_phase(phase)
             self.logger.info(f"Reset phase {phase}")
         else:
-            # Reset all phases
             for phase_num, _ in self.PHASE_NAMES:
                 phase_state = self.state.get_phase(phase_num)
                 phase_state.status = PhaseStatus.PENDING
@@ -243,7 +227,6 @@ class Orchestrator:
         self.state.load()
         commits = self.state.state.git_commits
 
-        # Find commit before this phase
         target_commit = None
         for commit in reversed(commits):
             if commit.get("phase", 0) < phase_num:
@@ -256,10 +239,8 @@ class Orchestrator:
                 "error": f"No commit found before phase {phase_num}"
             }
 
-        # Git reset to that commit using GitOperationsManager
         try:
             if self.git.reset_hard(target_commit):
-                # Update state
                 self.state.reset_to_phase(phase_num)
 
                 self.logger.info(f"Rolled back to commit {target_commit[:8]} (before phase {phase_num})")
@@ -284,15 +265,12 @@ class Orchestrator:
     def health_check(self) -> dict:
         """Return current health status.
 
-        Checks the status of the workflow and availability of all agents.
-
         Returns:
             Dictionary with health status information
         """
         self.state.load()
         state = self.state.state
 
-        # Check agent availability
         from .agents import ClaudeAgent, CursorAgent, GeminiAgent
 
         claude = ClaudeAgent(self.project_dir)
@@ -305,20 +283,6 @@ class Orchestrator:
             "gemini": gemini.check_available(),
         }
 
-        # Check SDK availability
-        sdk_status = {}
-        try:
-            from .sdk import AgentFactory
-            factory = AgentFactory(self.project_dir)
-            sdk_report = factory.get_availability_report()
-            sdk_status = {
-                "claude_sdk": sdk_report.get("claude_sdk", False),
-                "gemini_sdk": sdk_report.get("gemini_sdk", False),
-            }
-        except ImportError:
-            sdk_status = {"claude_sdk": False, "gemini_sdk": False}
-
-        # Determine overall health
         all_agents_available = all(agents_status.values())
         current_phase_status = None
         if state.current_phase:
@@ -339,7 +303,6 @@ class Orchestrator:
             "iteration_count": state.iteration_count,
             "last_updated": state.updated_at,
             "agents": agents_status,
-            "sdk": sdk_status,
             "langgraph_enabled": is_langgraph_enabled(),
             "has_context": state.context is not None,
             "total_commits": len(state.git_commits),
@@ -348,9 +311,6 @@ class Orchestrator:
     async def run_langgraph(self, use_rich_display: bool = True) -> dict:
         """Run the workflow using LangGraph.
 
-        Uses the LangGraph workflow graph for graph-based execution
-        with native parallelism and checkpointing.
-
         Args:
             use_rich_display: Whether to use Rich live display (default True)
 
@@ -358,10 +318,10 @@ class Orchestrator:
             Dictionary with workflow results
         """
         from .langgraph import WorkflowRunner, create_initial_state
+        from .ui import create_display, UICallbackHandler
 
         self.logger.banner("Multi-Agent Orchestration System (LangGraph Mode)")
 
-        # Check prerequisites
         prereq_ok, prereq_errors = self.check_prerequisites()
         if not prereq_ok:
             for error in prereq_errors:
@@ -372,25 +332,21 @@ class Orchestrator:
                 "details": prereq_errors,
             }
 
-        # Create LangGraph runner
         runner = WorkflowRunner(self.project_dir)
 
         self.logger.info(f"Project: {self.project_dir.name}")
         self.logger.info(f"Checkpoint directory: {runner.checkpoint_dir}")
         self.logger.separator()
 
-        # Create display and callback
         display = create_display(self.project_dir.name) if use_rich_display else None
         callback = UICallbackHandler(display) if display else None
 
         try:
             if display:
-                # Run with Rich live display
                 with display.start():
                     display.log_event("Starting LangGraph workflow", "info")
                     result = await runner.run(progress_callback=callback)
 
-                    # Show completion status
                     success = self._check_workflow_success(result)
                     if success:
                         display.show_completion(True, "Workflow completed successfully!")
@@ -399,10 +355,8 @@ class Orchestrator:
                     else:
                         display.show_completion(False, "Workflow did not complete successfully")
             else:
-                # Run without display
                 result = await runner.run()
 
-            # Check result
             if self._check_workflow_success(result):
                 self.logger.banner("Workflow Complete!")
                 return {
@@ -411,7 +365,6 @@ class Orchestrator:
                     "results": result,
                 }
             else:
-                # Check if escalated
                 if result.get("next_decision") == "escalate":
                     self.logger.warning("Workflow paused for human intervention")
                     return {
@@ -468,23 +421,21 @@ class Orchestrator:
             Dictionary with workflow results
         """
         from .langgraph import WorkflowRunner
+        from .ui import create_display, UICallbackHandler
 
         self.logger.banner("Resuming LangGraph Workflow")
 
         runner = WorkflowRunner(self.project_dir)
 
-        # Check for pending interrupt
         pending = runner.get_pending_interrupt()
         if pending:
             self.logger.info(f"Workflow paused at: {pending['paused_at']}")
 
-        # Create display and callback
         display = create_display(self.project_dir.name) if use_rich_display else None
         callback = UICallbackHandler(display) if display else None
 
         try:
             if display:
-                # Run with Rich live display
                 with display.start():
                     display.log_event("Resuming LangGraph workflow", "info")
                     result = await runner.resume(
@@ -492,14 +443,12 @@ class Orchestrator:
                         progress_callback=callback,
                     )
 
-                    # Show completion status
                     success = self._check_workflow_success(result)
                     if success:
                         display.show_completion(True, "Workflow completed successfully!")
                     else:
                         display.show_completion(False, "Workflow did not complete successfully")
             else:
-                # Run without display
                 result = await runner.resume(human_response=human_response)
 
             if self._check_workflow_success(result):
@@ -568,15 +517,14 @@ class Orchestrator:
         """
         phases = ["Planning", "Validation", "Implementation", "Verification", "Completion"]
 
-        # Build progress bar
         progress_parts = []
         for i, name in enumerate(phases, 1):
             if i < phase_num:
-                progress_parts.append(f"[{i}]")  # Completed
+                progress_parts.append(f"[{i}]")
             elif i == phase_num:
-                progress_parts.append(f"[{i}*]")  # Current
+                progress_parts.append(f"[{i}*]")
             else:
-                progress_parts.append(f"[ ]")  # Pending
+                progress_parts.append(f"[ ]")
 
         progress_bar = " ".join(progress_parts)
 
@@ -596,28 +544,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Nested architecture (recommended)
+  # Project workflow
   python -m orchestrator --project my-app --start
   python -m orchestrator --project my-app --resume
   python -m orchestrator --project my-app --status
 
   # Project management
   python -m orchestrator --list-projects
-  python -m orchestrator --create-project my-new-app
-  python -m orchestrator --sync-projects
+  python -m orchestrator --init-project my-new-app
 
-  # Legacy mode (works in current directory)
-  python -m orchestrator --start
-  python -m orchestrator --resume
-  python -m orchestrator --status
-  python -m orchestrator --health
-  python -m orchestrator --reset
-  python -m orchestrator --rollback 3
-  python -m orchestrator --phase 3
+  # Workflow operations
+  python -m orchestrator --project my-app --health
+  python -m orchestrator --project my-app --reset
+  python -m orchestrator --project my-app --rollback 3
         """,
     )
 
-    # Project management (nested architecture)
+    # Project management
     parser.add_argument(
         "--project", "-p",
         type=str,
@@ -629,21 +572,10 @@ Examples:
         help="List all projects",
     )
     parser.add_argument(
-        "--create-project",
+        "--init-project",
         type=str,
         metavar="NAME",
-        help="Create a new project from template",
-    )
-    parser.add_argument(
-        "--sync-projects",
-        action="store_true",
-        help="Sync templates to all projects",
-    )
-    parser.add_argument(
-        "--template",
-        type=str,
-        default="base",
-        help="Template for new project (default: base)",
+        help="Initialize a new project directory",
     )
 
     # Workflow commands
@@ -711,7 +643,7 @@ Examples:
         "--project-dir",
         type=str,
         default=".",
-        help="Project directory (default: current) - legacy mode",
+        help="Project directory (default: current)",
     )
     parser.add_argument(
         "--quiet",
@@ -729,39 +661,6 @@ Examples:
         "--use-langgraph",
         action="store_true",
         help="Use LangGraph workflow (graph-based with parallelism)",
-    )
-    parser.add_argument(
-        "--legacy",
-        action="store_true",
-        help="Force legacy mode (sequential subprocess calls)",
-    )
-
-    # Update management options
-    parser.add_argument(
-        "--check-updates",
-        action="store_true",
-        help="Check for available updates to project",
-    )
-    parser.add_argument(
-        "--update",
-        action="store_true",
-        help="Apply available updates to project",
-    )
-    parser.add_argument(
-        "--check-all-updates",
-        action="store_true",
-        help="Check updates for all projects",
-    )
-    parser.add_argument(
-        "--list-backups",
-        action="store_true",
-        help="List available backups for project",
-    )
-    parser.add_argument(
-        "--rollback-backup",
-        type=str,
-        metavar="BACKUP_ID",
-        help="Rollback project to specified backup",
     )
 
     # Observability options
@@ -788,7 +687,7 @@ Examples:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be done without doing it (use with --cleanup-logs)",
+        help="Show what would be done without doing it",
     )
     parser.add_argument(
         "--handoff",
@@ -806,8 +705,6 @@ Examples:
     # Set LangGraph mode from flag
     if args.use_langgraph:
         os.environ["ORCHESTRATOR_USE_LANGGRAPH"] = "true"
-    elif args.legacy:
-        os.environ["ORCHESTRATOR_USE_LANGGRAPH"] = "false"
 
     # Determine log level
     log_level = LogLevel.INFO
@@ -833,71 +730,41 @@ Examples:
     if args.list_projects:
         projects = project_manager.list_projects()
         if not projects:
-            print("No projects found. Create one with: --create-project <name>")
+            print("No projects found. Initialize one with: --init-project <name>")
             return
 
         print("\nProjects:")
         print("-" * 60)
         for p in projects:
             phase_str = f"Phase {p['current_phase']}" if p['current_phase'] else "Not started"
-            spec_str = "Has spec" if p['has_product_spec'] else "No spec"
+            docs_str = "Has docs" if p['has_documents'] else "No docs"
+            context_str = []
+            if p['has_claude_md']:
+                context_str.append("CLAUDE")
+            if p['has_gemini_md']:
+                context_str.append("GEMINI")
+            if p['has_cursor_rules']:
+                context_str.append("Cursor")
+            context_display = ", ".join(context_str) if context_str else "No context files"
+
             print(f"  {p['name']}")
-            print(f"    Template: {p['template']}, Status: {phase_str}, {spec_str}")
+            print(f"    Status: {phase_str}, {docs_str}")
+            print(f"    Context: {context_display}")
         return
 
-    if args.create_project:
-        result = project_manager.create_project(args.create_project, args.template)
+    if args.init_project:
+        result = project_manager.init_project(args.init_project)
         if result['success']:
-            print(result['output'])
+            print(f"\nProject initialized: {result['project_dir']}")
+            print(result['message'])
+            print("\nNext steps:")
+            print("  1. Add Documents/ folder with product vision and architecture docs")
+            print("  2. Add context files (CLAUDE.md, GEMINI.md, .cursor/rules)")
+            print("  3. Create PRODUCT.md with feature specification")
+            print(f"  4. Run: python -m orchestrator --project {args.init_project} --start")
         else:
             print(f"Error: {result['error']}")
-            if result.get('output'):
-                print(result['output'])
             sys.exit(1)
-        return
-
-    if args.sync_projects:
-        result = project_manager.sync_all_projects()
-        print(result['output'])
-        if not result['success']:
-            sys.exit(1)
-        return
-
-    # Handle update management commands
-    if args.check_all_updates:
-        from .update_manager import UpdateManager, format_update_check
-
-        manager = UpdateManager(root_dir)
-        projects_dir = manager.projects_dir
-
-        if not projects_dir.exists():
-            print("No projects directory found.")
-            return
-
-        projects = [d for d in projects_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
-
-        if not projects:
-            print("No projects found.")
-            return
-
-        updates_count = 0
-        print("\n" + "=" * 60)
-        print("Project Update Status")
-        print("=" * 60)
-
-        for project_dir in sorted(projects):
-            update_info = manager.check_updates(project_dir.name)
-            if update_info.updates_available:
-                updates_count += 1
-                print(f"\n  {project_dir.name}")
-                print(f"    Current: {update_info.current_version} -> Latest: {update_info.latest_version}")
-                if update_info.is_breaking_update:
-                    print("    ⚠️  Breaking update!")
-            else:
-                print(f"\n  {project_dir.name}: Up to date ({update_info.current_version})")
-
-        print("\n" + "-" * 60)
-        print(f"Summary: {updates_count}/{len(projects)} projects need updates")
         return
 
     # Determine project directory
@@ -910,116 +777,10 @@ Examples:
                 print(f"  - {p['name']}")
             sys.exit(1)
     else:
-        # Legacy mode: use current directory or --project-dir
         project_dir = Path(args.project_dir).resolve()
 
     # Handle observability commands before creating full orchestrator
     workflow_dir = project_dir / ".workflow"
-
-    # Handle update management commands for specific project
-    if args.check_updates:
-        from .update_manager import UpdateManager, format_update_check
-
-        manager = UpdateManager(root_dir)
-        project_name = args.project or project_dir.name
-        update_info = manager.check_updates(project_name)
-
-        if args.json:
-            print(json.dumps(update_info.to_dict(), indent=2))
-        else:
-            print(format_update_check(update_info))
-        return
-
-    if args.update:
-        from .update_manager import UpdateManager
-
-        manager = UpdateManager(root_dir)
-        project_name = args.project or project_dir.name
-
-        # Check if updates available first
-        update_info = manager.check_updates(project_name)
-        if not update_info.updates_available:
-            print(f"Project '{project_name}' is already up to date.")
-            return
-
-        # Warn about breaking updates
-        if update_info.is_breaking_update:
-            print(f"⚠️  Warning: This is a breaking update ({update_info.current_version} -> {update_info.latest_version})")
-            if not args.dry_run:
-                response = input("Continue? [y/N]: ").strip().lower()
-                if response != "y":
-                    print("Update cancelled.")
-                    return
-
-        # Apply updates
-        result = manager.apply_updates(project_name, dry_run=args.dry_run)
-
-        if args.json:
-            print(json.dumps(result.to_dict(), indent=2))
-        else:
-            if args.dry_run:
-                print("\nDry run - would make the following changes:")
-            else:
-                print("\nUpdate result:")
-
-            if result.success:
-                print(f"  Status: {'Would update' if args.dry_run else 'Updated'}")
-                if result.backup_id:
-                    print(f"  Backup created: {result.backup_id}")
-                if result.files_updated:
-                    print("  Files updated:")
-                    for f in result.files_updated:
-                        print(f"    - {f}")
-            else:
-                print("  Status: Failed")
-                for error in result.errors:
-                    print(f"  Error: {error}")
-                sys.exit(1)
-        return
-
-    if args.list_backups:
-        from .update_manager import UpdateManager
-
-        manager = UpdateManager(root_dir)
-        project_name = args.project or project_dir.name
-        backups = manager.list_backups(project_name)
-
-        if args.json:
-            print(json.dumps(backups, indent=2))
-        else:
-            if not backups:
-                print(f"No backups found for project '{project_name}'")
-            else:
-                print(f"\nBackups for '{project_name}':")
-                print("-" * 50)
-                for backup in backups:
-                    print(f"\n  ID: {backup['backup_id']}")
-                    print(f"  Created: {backup['created_at']}")
-                    print(f"  Version: {backup.get('project_version', 'unknown')}")
-        return
-
-    if args.rollback_backup:
-        from .update_manager import UpdateManager
-
-        manager = UpdateManager(root_dir)
-        project_name = args.project or project_dir.name
-
-        result = manager.rollback(project_name, args.rollback_backup)
-
-        if args.json:
-            print(json.dumps(result.to_dict(), indent=2))
-        else:
-            if result.success:
-                print(f"\n✅ Rollback successful!")
-                print(f"  Restored files:")
-                for f in result.files_updated:
-                    print(f"    - {f}")
-            else:
-                print(f"\n❌ Rollback failed")
-                for error in result.errors:
-                    print(f"  Error: {error}")
-                sys.exit(1)
-        return
 
     # Dashboard command
     if args.dashboard:
@@ -1141,12 +902,12 @@ Examples:
             print(f"  Project: {status.get('project', 'N/A')}")
             print(f"  Current Phase: {status.get('current_phase', 'N/A')}")
             if status.get('pending_interrupt'):
-                print(f"  ⚠️ Paused for human intervention at: {status['pending_interrupt']['paused_at']}")
+                print(f"  Warning: Paused for human intervention at: {status['pending_interrupt']['paused_at']}")
             if 'phase_status' in status:
                 print("\nPhase Statuses:")
                 for phase, state in status['phase_status'].items():
-                    emoji = "✅" if state == "completed" else "❌" if state == "failed" else "⏳"
-                    print(f"  {emoji} Phase {phase}: {state}")
+                    emoji = "+" if state == "completed" else "x" if state == "failed" else "."
+                    print(f"  [{emoji}] Phase {phase}: {state}")
         else:
             status = orchestrator.status()
             print("\nWorkflow Status:")
@@ -1155,14 +916,14 @@ Examples:
             print(f"  Total Commits: {status['total_commits']}")
             print("\nPhase Statuses:")
             for phase, state in status['phase_statuses'].items():
-                emoji = "✅" if state == "completed" else "❌" if state == "failed" else "⏳"
-                print(f"  {emoji} {phase}: {state}")
+                emoji = "+" if state == "completed" else "x" if state == "failed" else "."
+                print(f"  [{emoji}] {phase}: {state}")
         return
 
     if args.health:
         health = orchestrator.health_check()
-        status_emoji = "✅" if health['status'] == "healthy" else "⚠️" if health['status'] == "degraded" else "❌"
-        print(f"\nHealth Check: {status_emoji} {health['status'].upper()}")
+        status_emoji = "+" if health['status'] == "healthy" else "?" if health['status'] == "degraded" else "x"
+        print(f"\nHealth Check: [{status_emoji}] {health['status'].upper()}")
         print(f"\n  Project: {health['project']}")
         print(f"  Current Phase: {health['current_phase']}")
         print(f"  Phase Status: {health['phase_status'] or 'N/A'}")
@@ -1170,24 +931,19 @@ Examples:
         print(f"  Last Updated: {health['last_updated']}")
         print("\nAgent Availability (CLI):")
         for agent, available in health['agents'].items():
-            emoji = "✅" if available else "❌"
-            print(f"  {emoji} {agent}: {'Available' if available else 'Unavailable'}")
-        if 'sdk' in health:
-            print("\nSDK Availability:")
-            for sdk, available in health['sdk'].items():
-                emoji = "✅" if available else "❌"
-                print(f"  {emoji} {sdk}: {'Available' if available else 'Unavailable'}")
+            emoji = "+" if available else "x"
+            print(f"  [{emoji}] {agent}: {'Available' if available else 'Unavailable'}")
         print(f"\nLangGraph Mode: {'Enabled' if health.get('langgraph_enabled') else 'Disabled'}")
         return
 
     if args.rollback:
         result = orchestrator.rollback_to_phase(args.rollback)
         if result['success']:
-            print(f"\n✅ Rollback successful!")
+            print(f"\nRollback successful!")
             print(f"  Rolled back to commit: {result['rolled_back_to'][:8]}")
             print(f"  Current phase: {result['current_phase']}")
         else:
-            print(f"\n❌ Rollback failed: {result['error']}")
+            print(f"\nRollback failed: {result['error']}")
             sys.exit(1)
         return
 
@@ -1195,9 +951,6 @@ Examples:
         orchestrator.reset()
         print("Workflow reset.")
         return
-
-    # Check if using LangGraph mode
-    use_langgraph = is_langgraph_enabled()
 
     if args.resume:
         if use_langgraph:

@@ -5,34 +5,14 @@
   "description": "Configuration schema for meta-architect project settings",
   "type": "object",
   "properties": {
-    "project_type": {
+    "project_name": {
       "type": "string",
-      "description": "Type of project (e.g., base, react-tanstack, node-api, java-spring)",
-      "enum": ["base", "react-tanstack", "node-api", "java-spring", "nx-fullstack", "python"],
-      "default": "base"
+      "description": "Name of the project"
     },
-    "versioning": {
-      "type": "object",
-      "description": "Version tracking for updates",
-      "properties": {
-        "meta_architect_version": {
-          "type": "string",
-          "description": "Version of meta-architect when project was created or last synced",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
-        },
-        "last_sync_version": {
-          "type": "string",
-          "description": "Version when templates were last synced",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
-        },
-        "update_policy": {
-          "type": "string",
-          "description": "How to handle updates",
-          "enum": ["auto", "prompt", "manual"],
-          "default": "prompt"
-        }
-      },
-      "additionalProperties": false
+    "created_at": {
+      "type": "string",
+      "description": "ISO timestamp when project was created",
+      "format": "date-time"
     },
     "validation": {
       "type": "object",
@@ -255,10 +235,11 @@
       "additionalProperties": false
     }
   },
-  "additionalProperties": false,
+  "additionalProperties": true,
   "examples": [
     {
-      "project_type": "node-api",
+      "project_name": "my-feature",
+      "created_at": "2026-01-21T10:00:00Z",
       "validation": {
         "validation_threshold": 7.0,
         "verification_threshold": 8.0
@@ -280,23 +261,6 @@
           "security_scan": true,
           "approval_gates": false
         }
-      }
-    },
-    {
-      "project_type": "react-tanstack",
-      "validation": {
-        "validation_threshold": 6.5,
-        "verification_threshold": 7.5
-      },
-      "quality": {
-        "coverage_threshold": 80,
-        "coverage_blocking": false
-      },
-      "workflow": {
-        "features": {
-          "approval_gates": true
-        },
-        "approval_phases": [2, 4]
       }
     }
   ]

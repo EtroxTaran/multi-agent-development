@@ -1,9 +1,0 @@
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: none
-
-logging:
-  level:
-    root: WARN
-    {{PACKAGE}}: INFO

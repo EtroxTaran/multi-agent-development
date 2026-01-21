@@ -1,15 +1,19 @@
 """Project management for the nested orchestration architecture.
 
 This module handles project lifecycle management including:
-- Creating projects from templates
-- Syncing templates to projects
+- Listing projects
+- Getting project status
 - Spawning worker Claude instances
 - Managing project workflow state
+
+Projects are expected to be set up manually with:
+- Documents/ folder containing product vision and architecture docs
+- Context files (CLAUDE.md, GEMINI.md, .cursor/rules) - provided or generated
+- .workflow/ folder for state tracking
 """
 
 import json
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -30,8 +34,6 @@ class ProjectManager:
         """
         self.root_dir = Path(root_dir).resolve()
         self.projects_dir = self.root_dir / "projects"
-        self.templates_dir = self.root_dir / "project-templates"
-        self.scripts_dir = self.root_dir / "scripts"
 
     def list_projects(self) -> list[dict]:
         """List all projects.
@@ -53,10 +55,13 @@ class ProjectManager:
             projects.append({
                 "name": project_dir.name,
                 "path": str(project_dir),
-                "template": config.get("template", "unknown") if config else "unknown",
                 "created_at": config.get("created_at") if config else None,
                 "current_phase": state.get("current_phase", 0) if state else 0,
+                "has_documents": (project_dir / "Documents").exists(),
                 "has_product_spec": (project_dir / "PRODUCT.md").exists(),
+                "has_claude_md": (project_dir / "CLAUDE.md").exists(),
+                "has_gemini_md": (project_dir / "GEMINI.md").exists(),
+                "has_cursor_rules": (project_dir / ".cursor" / "rules").exists(),
             })
 
         return projects
@@ -75,88 +80,56 @@ class ProjectManager:
             return project_dir
         return None
 
-    def create_project(self, name: str, template: str = "base") -> dict:
-        """Create a new project.
+    def init_project(self, name: str) -> dict:
+        """Initialize a project directory with basic structure.
+
+        Creates the minimal project structure:
+        - Documents/           (for product vision and architecture docs)
+        - .workflow/           (for workflow state)
+        - .workflow/phases/    (for phase outputs)
 
         Args:
             name: Project name
-            template: Template to use
 
         Returns:
             Result dict with success status
         """
-        script_path = self.scripts_dir / "create-project.py"
+        project_dir = self.projects_dir / name
 
-        result = subprocess.run(
-            [sys.executable, str(script_path), name, "--template", template],
-            capture_output=True,
-            text=True,
-            cwd=str(self.root_dir)
-        )
+        if project_dir.exists():
+            return {
+                "success": False,
+                "error": f"Project '{name}' already exists"
+            }
 
-        return {
-            "success": result.returncode == 0,
-            "output": result.stdout,
-            "error": result.stderr if result.returncode != 0 else None,
-            "project_dir": str(self.projects_dir / name) if result.returncode == 0 else None
-        }
+        try:
+            # Create project structure
+            project_dir.mkdir(parents=True)
+            (project_dir / "Documents").mkdir()
+            (project_dir / ".workflow").mkdir()
+            (project_dir / ".workflow" / "phases").mkdir()
 
-    def sync_project(self, name: str, dry_run: bool = False) -> dict:
-        """Sync template to a project.
+            # Create initial config
+            config = {
+                "project_name": name,
+                "created_at": datetime.now().isoformat(),
+            }
 
-        Args:
-            name: Project name
-            dry_run: If True, don't make changes
+            config_path = project_dir / ".project-config.json"
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
 
-        Returns:
-            Result dict with sync status
-        """
-        script_path = self.scripts_dir / "sync-project-templates.py"
+            return {
+                "success": True,
+                "project_dir": str(project_dir),
+                "message": f"Project '{name}' initialized. Add your Documents/ and context files."
+            }
 
-        args = [sys.executable, str(script_path), "--project", name]
-        if dry_run:
-            args.append("--dry-run")
-
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            cwd=str(self.root_dir)
-        )
-
-        return {
-            "success": result.returncode == 0,
-            "output": result.stdout,
-            "error": result.stderr if result.returncode != 0 else None
-        }
-
-    def sync_all_projects(self, dry_run: bool = False) -> dict:
-        """Sync template to all projects.
-
-        Args:
-            dry_run: If True, don't make changes
-
-        Returns:
-            Result dict with sync status
-        """
-        script_path = self.scripts_dir / "sync-project-templates.py"
-
-        args = [sys.executable, str(script_path), "--all"]
-        if dry_run:
-            args.append("--dry-run")
-
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            cwd=str(self.root_dir)
-        )
-
-        return {
-            "success": result.returncode == 0,
-            "output": result.stdout,
-            "error": result.stderr if result.returncode != 0 else None
-        }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     def spawn_worker_claude(
         self,
@@ -261,6 +234,7 @@ class ProjectManager:
 
         # Check which files exist
         files_status = {
+            "Documents/": (project_dir / "Documents").exists(),
             "PRODUCT.md": (project_dir / "PRODUCT.md").exists(),
             "CLAUDE.md": (project_dir / "CLAUDE.md").exists(),
             "GEMINI.md": (project_dir / "GEMINI.md").exists(),
@@ -338,6 +312,10 @@ class ProjectManager:
             return False
 
         state_path = project_dir / ".workflow" / "state.json"
+
+        # Ensure .workflow directory exists
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+
         state = self._load_project_state(project_dir) or {}
 
         # Apply updates
