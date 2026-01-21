@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-21 15:21:49 -->
+<!-- Last synced: 2026-01-21 16:36:29 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Claude Code as lead orchestrator.
@@ -586,6 +586,34 @@ Projects can configure how updates are handled:
 | `.workflow/` | **No** | Workflow state preserved |
 | `src/`, `tests/` | **No** | Application code preserved |
 | `project-overrides/` | **No** | Custom overrides preserved |
+
+### Git Repository Isolation
+
+**Important**: Projects have their own git repositories separate from meta-architect.
+
+```
+meta-architect/                    ← Git repo #1 (orchestrator code)
+├── .git/
+├── projects/
+│   └── my-app/                    ← Git repo #2 (project code)
+│       ├── .git/                  ← Separate git history
+│       └── CLAUDE.md              ← Tracked by project's git, NOT meta-architect
+```
+
+When you run `/update-project`:
+
+| Action | What Happens |
+|--------|--------------|
+| Template source | Read from **meta-architect** templates |
+| File changes | Written to project directory |
+| Git tracking | Changes appear in **project's** `git status` |
+| Meta-architect git | **Unaffected** - stays clean |
+| Project's remote | **Never touched** - you push manually |
+
+This means:
+- Updates fetch from meta-architect's templates (local or via `git pull` on meta-architect)
+- Your project's own GitHub/remote repository is never modified by update commands
+- After updates, commit changes to your **project's** repo: `cd projects/my-app && git commit`
 
 ### CLI Quick Reference
 
