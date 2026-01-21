@@ -1,0 +1,37 @@
+{
+  "agent_id": "A10",
+  "agent_name": "Integration Tester",
+  "description": "Tool restrictions for integration/E2E testing agent",
+  "allowed": [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash(pytest*)",
+    "Bash(npm test*)",
+    "Bash(npx playwright*)",
+    "Bash(npx jest*)",
+    "mcp__Playwright__*"
+  ],
+  "forbidden": [
+    "Bash(rm*)",
+    "Bash(git push*)"
+  ],
+  "file_restrictions": {
+    "allowed_paths": [
+      "tests/**/*",
+      "test/**/*",
+      "e2e/**/*",
+      "features/**/*",
+      "*.feature"
+    ],
+    "forbidden_paths": [
+      "src/**/*",
+      "lib/**/*",
+      "app/**/*",
+      ".workflow/**/*"
+    ]
+  },
+  "notes": "A10 can write integration and E2E tests, and has access to Playwright MCP tools."
+}

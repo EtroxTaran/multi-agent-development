@@ -1,0 +1,20 @@
+{
+  "agent_id": "A01",
+  "agent_name": "Planner",
+  "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "forbidden_tools": [
+    "Write",
+    "Edit",
+    "Bash"
+  ],
+  "tool_descriptions": {
+    "Read": "Read PRODUCT.md, Documents/, and existing code structure",
+    "Glob": "Find files to understand project layout",
+    "Grep": "Search for patterns to understand dependencies"
+  },
+  "rationale": "Planner only reads and analyzes - never modifies files"
+}

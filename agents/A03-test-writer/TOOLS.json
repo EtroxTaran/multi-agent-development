@@ -1,0 +1,29 @@
+{
+  "agent_id": "A03",
+  "agent_name": "Test Writer",
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(pytest*)",
+    "Bash(python -m pytest*)"
+  ],
+  "forbidden_tools": [
+    "Bash(rm*)",
+    "Bash(git push*)"
+  ],
+  "file_restrictions": {
+    "can_create": ["tests/**/*.py", "tests/**/*.json"],
+    "can_modify": ["tests/**/*.py"],
+    "cannot_modify": ["src/**/*", "*.md"]
+  },
+  "tool_descriptions": {
+    "Read": "Read existing tests and source code interfaces",
+    "Write": "Create new test files in tests/ directory",
+    "Edit": "Modify existing test files only",
+    "Bash(pytest*)": "Run tests to verify they fail initially"
+  },
+  "rationale": "Test writer creates tests in tests/ directory only, never touches src/"
+}

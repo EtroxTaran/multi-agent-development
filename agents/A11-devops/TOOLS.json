@@ -1,0 +1,43 @@
+{
+  "agent_id": "A11",
+  "agent_name": "DevOps Engineer",
+  "description": "Tool restrictions for DevOps/CI-CD agent",
+  "allowed": [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash(docker*)",
+    "Bash(kubectl*)",
+    "Bash(terraform*)",
+    "Bash(make*)",
+    "Bash(gh*)"
+  ],
+  "forbidden": [
+    "Bash(rm -rf /)",
+    "Bash(*--force*delete*)"
+  ],
+  "file_restrictions": {
+    "allowed_paths": [
+      ".github/**/*",
+      "Dockerfile*",
+      "docker-compose*",
+      "*.yaml",
+      "*.yml",
+      "Makefile",
+      "scripts/**/*",
+      ".gitlab-ci.yml",
+      "Jenkinsfile",
+      "terraform/**/*",
+      "k8s/**/*"
+    ],
+    "forbidden_paths": [
+      "src/**/*",
+      "tests/**/*",
+      "lib/**/*",
+      "app/**/*"
+    ]
+  },
+  "notes": "A11 manages CI/CD and infrastructure. Cannot modify application code."
+}

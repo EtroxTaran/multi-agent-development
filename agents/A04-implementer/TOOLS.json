@@ -1,0 +1,32 @@
+{
+  "agent_id": "A04",
+  "agent_name": "Implementer",
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(pytest*)",
+    "Bash(python -m pytest*)",
+    "Bash(npm test*)",
+    "Bash(npm run*)"
+  ],
+  "forbidden_tools": [
+    "Bash(rm -rf*)",
+    "Bash(git push*)",
+    "Bash(git reset --hard*)"
+  ],
+  "file_restrictions": {
+    "can_create": ["src/**/*"],
+    "can_modify": ["src/**/*"],
+    "cannot_modify": ["tests/**/*", "*.md"]
+  },
+  "tool_descriptions": {
+    "Read": "Read failing tests and existing code",
+    "Write": "Create new source files",
+    "Edit": "Modify source files to make tests pass",
+    "Bash(pytest*)": "Run tests after each change"
+  },
+  "rationale": "Implementer modifies src/ only, never modifies tests"
+}

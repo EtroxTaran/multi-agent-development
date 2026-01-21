@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TestWriterOutput",
+  "description": "Schema for A03 Test Writer agent output",
+  "type": "object",
+  "required": ["agent", "task_id", "status", "test_files"],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "const": "A03",
+      "description": "Agent identifier"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "The task tests were written for"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "partial", "failed", "needs_clarification"],
+      "description": "Test writing status"
+    },
+    "test_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "test_type"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to test file"
+          },
+          "test_type": {
+            "type": "string",
+            "enum": ["unit", "integration", "e2e", "contract"],
+            "description": "Type of tests in this file"
+          },
+          "test_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "coverage_targets": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Source files these tests cover"
+          }
+        }
+      },
+      "description": "Test files created"
+    },
+    "test_execution": {
+      "type": "object",
+      "properties": {
+        "all_fail": {
+          "type": "boolean",
+          "description": "Confirms tests fail without implementation (TDD RED phase)"
+        },
+        "failure_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "execution_output": {
+          "type": "string",
+          "description": "Test runner output (truncated)"
+        }
+      },
+      "description": "Results of running tests (should all fail in TDD)"
+    },
+    "criteria_coverage": {
+      "type": "object",
+      "properties": {
+        "total_criteria": { "type": "integer" },
+        "covered_criteria": { "type": "integer" },
+        "coverage_percentage": { "type": "number" },
+        "uncovered": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "description": "How well tests cover acceptance criteria"
+    },
+    "test_patterns_used": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["arrange_act_assert", "given_when_then", "fixture_based", "parameterized", "mocked"]
+      },
+      "description": "Testing patterns applied"
+    },
+    "dependencies_added": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Test dependencies that need to be installed"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes for the implementer"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

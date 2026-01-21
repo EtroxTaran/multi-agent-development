@@ -1,0 +1,36 @@
+{
+  "agent_id": "A12",
+  "agent_name": "UI Designer",
+  "description": "Tool restrictions for UI/component design agent",
+  "allowed": [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash(npm*)",
+    "Bash(npx shadcn*)",
+    "mcp__shadcn__*"
+  ],
+  "forbidden": [
+    "Bash(rm*)",
+    "Bash(git push*)"
+  ],
+  "file_restrictions": {
+    "allowed_paths": [
+      "src/components/**/*",
+      "src/ui/**/*",
+      "src/styles/**/*",
+      "*.css",
+      "*.scss",
+      "*.tsx"
+    ],
+    "forbidden_paths": [
+      "tests/**/*",
+      "test/**/*",
+      "*.md",
+      ".workflow/**/*"
+    ]
+  },
+  "notes": "A12 creates UI components and styles. Has access to shadcn MCP tools."
+}

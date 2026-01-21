@@ -1,0 +1,29 @@
+{
+  "agent_id": "A05",
+  "agent_name": "Bug Fixer",
+  "allowed_tools": [
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(pytest*)",
+    "Bash(python -m pytest*)",
+    "Bash(npm test*)",
+    "Bash(python -c*)"
+  ],
+  "forbidden_tools": [
+    "Bash(rm -rf*)",
+    "Bash(git push*)"
+  ],
+  "file_restrictions": {
+    "can_modify": ["src/**/*", "tests/**/*"],
+    "cannot_modify": ["*.md", ".board/**/*"]
+  },
+  "tool_descriptions": {
+    "Read": "Read error logs, stack traces, source code",
+    "Edit": "Apply minimal bug fixes",
+    "Bash(python -c*)": "Quick debugging snippets"
+  },
+  "rationale": "Bug fixer can modify both src and tests when the bug is in either"
+}

@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentMessage",
+  "description": "Schema for inter-agent communication messages",
+  "type": "object",
+  "required": ["message_id", "timestamp", "from_agent", "to_agent", "type", "payload"],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this message"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when message was created"
+    },
+    "from_agent": {
+      "type": "string",
+      "enum": ["orchestrator", "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", "A12"],
+      "description": "Agent that sent this message"
+    },
+    "to_agent": {
+      "type": "string",
+      "description": "Target agent or 'orchestrator'"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "task_assignment",
+        "task_result",
+        "review_request",
+        "review_feedback",
+        "escalation",
+        "completion",
+        "clarification_request",
+        "clarification_response"
+      ],
+      "description": "Type of message"
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Links related messages together"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message-type-specific payload"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "iteration": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "critical"]
+        }
+      }
+    }
+  },
+  "definitions": {
+    "task_assignment_payload": {
+      "type": "object",
+      "required": ["task_id", "task_description", "acceptance_criteria"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "task_description": { "type": "string" },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "input_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "expected_output_format": { "type": "string" },
+        "iteration_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "previous_feedback": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/feedback_item" }
+        }
+      }
+    },
+    "task_result_payload": {
+      "type": "object",
+      "required": ["task_id", "status"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "blocked", "failed", "needs_clarification"]
+        },
+        "files_created": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "files_modified": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "output_data": { "type": "object" },
+        "test_results": {
+          "type": "object",
+          "properties": {
+            "passed": { "type": "integer" },
+            "failed": { "type": "integer" },
+            "skipped": { "type": "integer" },
+            "coverage": { "type": "number" }
+          }
+        },
+        "notes": { "type": "string" },
+        "blocking_reason": { "type": "string" }
+      }
+    },
+    "review_request_payload": {
+      "type": "object",
+      "required": ["task_id", "work_to_review", "review_checklist"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "work_to_review": {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "changes_summary": { "type": "string" }
+          }
+        },
+        "review_checklist": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "previous_reviews": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/review_feedback_payload" }
+        }
+      }
+    },
+    "review_feedback_payload": {
+      "type": "object",
+      "required": ["task_id", "reviewer_id", "approved", "score"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "reviewer_id": { "type": "string" },
+        "approved": { "type": "boolean" },
+        "score": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "blocking_issues": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "suggestions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "security_findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "high", "medium", "low", "info"]
+              },
+              "description": { "type": "string" },
+              "location": { "type": "string" },
+              "recommendation": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "escalation_payload": {
+      "type": "object",
+      "required": ["task_id", "reason", "context"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "max_iterations_exceeded",
+            "reviewer_conflict_unresolved",
+            "test_spec_mismatch",
+            "blocking_security_issue",
+            "clarification_needed",
+            "resource_unavailable"
+          ]
+        },
+        "context": { "type": "string" },
+        "attempts_made": { "type": "integer" },
+        "options": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "recommendation": { "type": "string" }
+      }
+    },
+    "feedback_item": {
+      "type": "object",
+      "properties": {
+        "from_reviewer": { "type": "string" },
+        "iteration": { "type": "integer" },
+        "issues": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "suggestions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

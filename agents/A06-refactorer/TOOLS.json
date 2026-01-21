@@ -1,0 +1,35 @@
+{
+  "agent_id": "A06",
+  "agent_name": "Refactorer",
+  "description": "Tool restrictions for code refactoring agent",
+  "allowed": [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob",
+    "Bash(pytest*)",
+    "Bash(npm test*)",
+    "Bash(npx jest*)"
+  ],
+  "forbidden": [
+    "Bash(rm*)",
+    "Bash(git push*)",
+    "Bash(curl*)",
+    "Bash(wget*)"
+  ],
+  "file_restrictions": {
+    "allowed_paths": [
+      "src/**/*",
+      "lib/**/*",
+      "app/**/*"
+    ],
+    "forbidden_paths": [
+      "tests/**/*",
+      "test/**/*",
+      "*.md",
+      ".workflow/**/*"
+    ]
+  },
+  "notes": "A06 can modify source code but NOT test files. Must run tests to verify refactoring."
+}

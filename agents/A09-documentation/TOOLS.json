@@ -1,0 +1,32 @@
+{
+  "agent_id": "A09",
+  "agent_name": "Documentation Writer",
+  "description": "Tool restrictions for documentation agent",
+  "allowed": [
+    "Read",
+    "Write",
+    "Edit",
+    "Grep",
+    "Glob"
+  ],
+  "forbidden": [
+    "Bash",
+    "NotebookEdit"
+  ],
+  "file_restrictions": {
+    "allowed_paths": [
+      "docs/**/*",
+      "*.md",
+      "README*"
+    ],
+    "forbidden_paths": [
+      "src/**/*",
+      "tests/**/*",
+      "*.py",
+      "*.ts",
+      "*.js",
+      ".workflow/**/*"
+    ]
+  },
+  "notes": "A09 can only modify documentation files. No code or test modifications."
+}

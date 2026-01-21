@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IntegrationTesterOutput",
+  "description": "Schema for A10 Integration Tester agent output (BDD/Gherkin/Playwright)",
+  "type": "object",
+  "required": ["agent", "task_id", "status", "test_results"],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "const": "A10",
+      "description": "Agent identifier"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "The task tests were written/run for"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "partial", "failed", "blocked"],
+      "description": "Testing status"
+    },
+    "feature_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "scenarios"],
+        "properties": {
+          "path": { "type": "string" },
+          "feature_name": { "type": "string" },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "tags": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["passed", "failed", "skipped", "pending"]
+                },
+                "steps": { "type": "integer" },
+                "duration_ms": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "description": "BDD/Gherkin feature files"
+    },
+    "integration_tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "test_type"],
+        "properties": {
+          "path": { "type": "string" },
+          "test_type": {
+            "type": "string",
+            "enum": ["api", "database", "service", "contract"]
+          },
+          "test_count": { "type": "integer" },
+          "passed": { "type": "integer" },
+          "failed": { "type": "integer" }
+        }
+      },
+      "description": "Integration test files"
+    },
+    "e2e_tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "browser"],
+        "properties": {
+          "path": { "type": "string" },
+          "browser": {
+            "type": "string",
+            "enum": ["chromium", "firefox", "webkit"]
+          },
+          "test_count": { "type": "integer" },
+          "passed": { "type": "integer" },
+          "failed": { "type": "integer" },
+          "screenshots": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "traces": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "description": "Playwright E2E test files"
+    },
+    "test_results": {
+      "type": "object",
+      "required": ["summary"],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "integer" },
+            "passed": { "type": "integer" },
+            "failed": { "type": "integer" },
+            "skipped": { "type": "integer" },
+            "pending": { "type": "integer" }
+          }
+        },
+        "by_type": {
+          "type": "object",
+          "properties": {
+            "bdd": {
+              "type": "object",
+              "properties": {
+                "features": { "type": "integer" },
+                "scenarios": { "type": "integer" },
+                "passed": { "type": "integer" },
+                "failed": { "type": "integer" }
+              }
+            },
+            "integration": {
+              "type": "object",
+              "properties": {
+                "tests": { "type": "integer" },
+                "passed": { "type": "integer" },
+                "failed": { "type": "integer" }
+              }
+            },
+            "e2e": {
+              "type": "object",
+              "properties": {
+                "tests": { "type": "integer" },
+                "passed": { "type": "integer" },
+                "failed": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "api_endpoints": { "type": "number" },
+            "user_flows": { "type": "number" },
+            "critical_paths": { "type": "number" }
+          }
+        },
+        "execution_time_seconds": { "type": "number" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "screenshots": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "videos": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "traces": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reports": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "description": "Test artifacts generated"
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "base_url": { "type": "string" },
+        "browser_version": { "type": "string" },
+        "node_version": { "type": "string" }
+      }
+    },
+    "failed_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "file": { "type": "string" },
+          "error": { "type": "string" },
+          "screenshot": { "type": "string" }
+        }
+      }
+    },
+    "notes": { "type": "string" },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "agent_id": "A08",
+  "agent_name": "Code Reviewer",
+  "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(pytest --cov*)",
+    "Bash(pylint*)",
+    "Bash(eslint*)",
+    "Bash(mypy*)"
+  ],
+  "forbidden_tools": [
+    "Write",
+    "Edit",
+    "Bash(rm*)",
+    "Bash(git*)"
+  ],
+  "tool_descriptions": {
+    "Read": "Read code to review for quality and patterns",
+    "Grep": "Search for patterns and anti-patterns",
+    "Bash(pytest --cov*)": "Check test coverage",
+    "Bash(pylint*)": "Check code quality",
+    "Bash(mypy*)": "Check type hints"
+  },
+  "rationale": "Code reviewer is READ ONLY - provides feedback, never modifies code"
+}

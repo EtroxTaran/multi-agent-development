@@ -1,0 +1,28 @@
+{
+  "agent_id": "A07",
+  "agent_name": "Security Reviewer",
+  "allowed_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(bandit*)",
+    "Bash(safety*)",
+    "Bash(pip-audit*)",
+    "Bash(npm audit*)",
+    "Bash(trivy*)"
+  ],
+  "forbidden_tools": [
+    "Write",
+    "Edit",
+    "Bash(rm*)",
+    "Bash(git*)"
+  ],
+  "tool_descriptions": {
+    "Read": "Read code to review for vulnerabilities",
+    "Grep": "Search for security patterns (hardcoded secrets, eval, etc.)",
+    "Bash(bandit*)": "Python security linter",
+    "Bash(safety*)": "Check dependencies for known vulnerabilities",
+    "Bash(npm audit*)": "Check npm dependencies"
+  },
+  "rationale": "Security reviewer is READ ONLY - never modifies code, only reports findings"
+}

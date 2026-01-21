@@ -1,0 +1,17 @@
+{
+  "agent_id": "A02",
+  "agent_name": "Architect",
+  "description": "Tool restrictions for architecture review agent",
+  "allowed": [
+    "Read",
+    "Grep",
+    "Glob"
+  ],
+  "forbidden": [
+    "Write",
+    "Edit",
+    "Bash",
+    "NotebookEdit"
+  ],
+  "notes": "A02 is a review-only agent. Cannot modify any files."
+}
