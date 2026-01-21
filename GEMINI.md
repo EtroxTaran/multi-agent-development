@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-21 18:13:27 -->
+<!-- Last synced: 2026-01-21 19:49:11 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Gemini as architecture reviewer.
@@ -262,8 +262,8 @@ The following rules apply to all agents in the workflow.
 # Guardrails (All Agents)
 
 <!-- SHARED: This file applies to ALL agents -->
-<!-- Version: 1.0 -->
-<!-- Last Updated: 2026-01-20 -->
+<!-- Version: 2.0 -->
+<!-- Last Updated: 2026-01-21 -->
 
 ## Security Guardrails
 
@@ -282,6 +282,54 @@ The following rules apply to all agents in the workflow.
 - Use secure defaults (HTTPS, secure cookies)
 - Follow least privilege principle
 
+---
+
+## Orchestrator File Boundary Guardrails
+
+**These rules apply specifically to the orchestrator (Claude as lead orchestrator).**
+
+### Orchestrator CAN Write To
+```
+projects/<name>/.workflow/**         <- Workflow state, phase outputs
+projects/<name>/.project-config.json <- Project configuration
+```
+
+### Orchestrator CANNOT Write To
+```
+projects/<name>/src/**               <- Application source code
+projects/<name>/tests/**             <- Test files
+projects/<name>/test/**              <- Test files (alternative)
+projects/<name>/lib/**               <- Library code
+projects/<name>/app/**               <- Application code
+projects/<name>/*.py                 <- Python files at root
+projects/<name>/*.ts, *.js, *.tsx    <- TypeScript/JavaScript files
+projects/<name>/*.go, *.rs           <- Go/Rust files
+projects/<name>/CLAUDE.md            <- Worker context file
+projects/<name>/GEMINI.md            <- Gemini context file
+projects/<name>/PRODUCT.md           <- Feature specification
+projects/<name>/.cursor/**           <- Cursor context files
+```
+
+### Never Do (Orchestrator)
+- Write application code directly (spawn workers instead)
+- Modify files outside `.workflow/` directory
+- Change project context files (CLAUDE.md, GEMINI.md)
+- Bypass boundary validation with direct file writes
+
+### Always Do (Orchestrator)
+- Use `safe_write_workflow_file()` for workflow state
+- Use `safe_write_project_config()` for configuration
+- Spawn worker Claude for any code changes
+- Validate paths before writing
+
+### Error Recovery
+If you see `OrchestratorBoundaryError`:
+1. Check that you're writing to `.workflow/` or `.project-config.json`
+2. Use the safe write methods in ProjectManager
+3. If code changes are needed, spawn a worker Claude
+
+---
+
 ## Code Quality Guardrails
 
 ### Never Do
@@ -297,6 +345,8 @@ The following rules apply to all agents in the workflow.
 - Follow existing code patterns
 - Clean up temporary files
 
+---
+
 ## Workflow Guardrails
 
 ### Never Do
@@ -310,6 +360,8 @@ The following rules apply to all agents in the workflow.
 - Document decisions in decisions.md
 - Write handoff notes for session resumption
 - Check prerequisites before starting phases
+
+---
 
 ## File Operation Guardrails
 
@@ -325,6 +377,8 @@ The following rules apply to all agents in the workflow.
 - Use project-relative paths
 - Clean up created temporary files
 
+---
+
 ## Git Guardrails
 
 ### Never Do
@@ -338,6 +392,26 @@ The following rules apply to all agents in the workflow.
 - Check git status before committing
 - Stage only intended changes
 - Pull before pushing
+
+---
+
+## Git Worktree Guardrails
+
+**For parallel worker execution using git worktrees.**
+
+### Never Do
+- Create worktrees for dependent tasks
+- Modify the same file in multiple worktrees
+- Leave orphaned worktrees after completion
+- Merge worktrees with conflicts without resolution
+
+### Always Do
+- Use WorktreeManager context manager for auto-cleanup
+- Verify tasks are independent before parallel execution
+- Check worktree status before merging
+- Handle cherry-pick failures gracefully
+
+---
 
 ## API/CLI Guardrails
 
@@ -355,11 +429,32 @@ The following rules apply to all agents in the workflow.
 
 ---
 
+## External Project Guardrails
+
+**For projects outside the nested `projects/` directory.**
+
+### Before Running on External Project
+- Verify `PRODUCT.md` exists with proper structure
+- Check project is a git repository (for worktree support)
+- Confirm no uncommitted changes (recommended)
+
+### Never Do
+- Assume external projects have same structure as nested
+- Run workflow without validating PRODUCT.md first
+- Modify files outside expected locations
+
+### Always Do
+- Use `--project-path` flag for external projects
+- Validate project structure before starting workflow
+- Create `.workflow/` directory if missing
+
+---
+
 # CLI Reference (All Agents)
 
 <!-- SHARED: This file applies to ALL agents -->
-<!-- Version: 1.0 -->
-<!-- Last Updated: 2026-01-20 -->
+<!-- Version: 2.0 -->
+<!-- Last Updated: 2026-01-21 -->
 
 ## Correct CLI Usage
 
@@ -464,24 +559,99 @@ gemini --model gemini-2.0-flash \
 
 **Command**: `python -m orchestrator`
 
-### Commands
+### Project Management
 ```bash
-# Start new workflow
-python -m orchestrator --start
+# Initialize new project
+python -m orchestrator --init-project <name>
+
+# List all projects
+python -m orchestrator --list-projects
+```
+
+### Workflow Commands (Nested Projects)
+```bash
+# Start workflow for a nested project
+python -m orchestrator --project <name> --start
+python -m orchestrator --project <name> --use-langgraph --start
 
 # Resume interrupted workflow
-python -m orchestrator --resume
+python -m orchestrator --project <name> --resume
 
-# Check health/prerequisites
-python -m orchestrator --health
+# Check status
+python -m orchestrator --project <name> --status
 
-# Initialize missing files
-python -m orchestrator --init
+# Health check
+python -m orchestrator --project <name> --health
+
+# Reset workflow
+python -m orchestrator --project <name> --reset
+
+# Rollback to phase
+python -m orchestrator --project <name> --rollback 3
 ```
+
+### Workflow Commands (External Projects)
+```bash
+# Start workflow for external project
+python -m orchestrator --project-path /path/to/project --start
+python -m orchestrator --project-path ~/repos/my-app --use-langgraph --start
+
+# Check status
+python -m orchestrator --project-path /path/to/project --status
+```
+
+### Key Flags
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--project`, `-p` | Project name (nested) | `--project my-app` |
+| `--project-path` | External project path | `--project-path ~/repos/my-app` |
+| `--start` | Start workflow | `--start` |
+| `--resume` | Resume from checkpoint | `--resume` |
+| `--status` | Show workflow status | `--status` |
+| `--use-langgraph` | Use LangGraph mode | `--use-langgraph` |
+| `--health` | Health check | `--health` |
+| `--reset` | Reset workflow | `--reset` |
+| `--rollback` | Rollback to phase (1-5) | `--rollback 3` |
+| `--list-projects` | List all projects | `--list-projects` |
+| `--init-project` | Initialize project | `--init-project my-app` |
 
 ---
 
 ## Shell Script Wrappers
+
+### init.sh - Main Entry Point
+
+```bash
+# Check prerequisites
+./scripts/init.sh check
+
+# Initialize new project
+./scripts/init.sh init <project-name>
+
+# List all projects
+./scripts/init.sh list
+
+# Run workflow (nested project)
+./scripts/init.sh run <project-name>
+
+# Run workflow (external project)
+./scripts/init.sh run --path /path/to/project
+
+# Run with parallel workers (experimental)
+./scripts/init.sh run <project-name> --parallel 3
+
+# Check status
+./scripts/init.sh status <project-name>
+
+# Show help
+./scripts/init.sh help
+```
+
+### init.sh Flags
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--path` | External project path | `run --path ~/repos/app` |
+| `--parallel` | Parallel workers count | `run my-app --parallel 3` |
 
 ### call-cursor.sh
 ```bash
@@ -493,7 +663,23 @@ bash scripts/call-cursor.sh <prompt-file> <output-file> [project-dir]
 bash scripts/call-gemini.sh <prompt-file> <output-file> [project-dir]
 ```
 
-### Environment Variables
+---
+
+## Environment Variables
+
+### Orchestrator
+```bash
+# Enable LangGraph mode
+export ORCHESTRATOR_USE_LANGGRAPH=true
+
+# Enable Ralph Wiggum loop for TDD
+export USE_RALPH_LOOP=auto  # auto | true | false
+
+# Set parallel workers
+export PARALLEL_WORKERS=3
+```
+
+### Agent CLI Overrides
 ```bash
 export CURSOR_MODEL=gpt-4.5-turbo    # Override Cursor model
 export GEMINI_MODEL=gemini-2.0-flash  # Override Gemini model
@@ -511,11 +697,54 @@ export GEMINI_MODEL=gemini-2.0-flash  # Override Gemini model
 
 ---
 
+## Complete Workflow Examples
+
+### Example 1: New Nested Project
+```bash
+# 1. Initialize
+./scripts/init.sh init my-api
+
+# 2. Add files (manually)
+# - projects/my-api/Documents/
+# - projects/my-api/PRODUCT.md
+# - projects/my-api/CLAUDE.md
+
+# 3. Run workflow
+./scripts/init.sh run my-api
+```
+
+### Example 2: External Project
+```bash
+# 1. Ensure project has PRODUCT.md
+# 2. Run workflow
+./scripts/init.sh run --path ~/repos/existing-project
+
+# Or via Python
+python -m orchestrator --project-path ~/repos/existing-project --use-langgraph --start
+```
+
+### Example 3: Parallel Implementation
+```bash
+# Run with 3 parallel workers for independent tasks
+./scripts/init.sh run my-app --parallel 3
+```
+
+### Example 4: Check and Resume
+```bash
+# Check status
+./scripts/init.sh status my-app
+
+# If paused, resume
+python -m orchestrator --project my-app --resume
+```
+
+---
+
 # Lessons Learned
 
 <!-- SHARED: This file applies to ALL agents -->
 <!-- Add new lessons at the TOP of this file -->
-<!-- Version: 1.2 -->
+<!-- Version: 1.3 -->
 <!-- Last Updated: 2026-01-21 -->
 
 ## How to Add a Lesson
@@ -529,6 +758,34 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons
+
+### 2026-01-21 - Enhanced Nested Architecture with Safety Features
+
+- **Issue**: Orchestrator could accidentally write to project code files; no support for external projects or parallel workers
+- **Root Cause**: Missing file boundary enforcement; tight coupling between orchestrator and projects; sequential-only worker execution
+- **Fix**: Implemented four major enhancements:
+  1. **File Boundary Enforcement**: Orchestrator can only write to `.workflow/` and `.project-config.json`. Violations raise `OrchestratorBoundaryError`.
+  2. **External Project Mode**: `--project-path` flag allows running workflow on any directory, not just `projects/`.
+  3. **Scoped Worker Prompts**: Minimal context prompts focus workers on specific files, preventing context bloat.
+  4. **Git Worktree Parallel Workers**: Independent tasks can run in parallel using isolated git worktrees with automatic cleanup.
+- **Prevention**:
+  - Always use `safe_write_workflow_file()` and `safe_write_project_config()` in orchestrator
+  - Use `validate_orchestrator_write()` before any file write
+  - Spawn workers for any code changes; orchestrator never writes code
+  - Use worktrees only for independent tasks; verify no shared file modifications
+- **Applies To**: claude
+- **Files Changed**:
+  - `orchestrator/utils/boundaries.py` (new)
+  - `orchestrator/utils/worktree.py` (new)
+  - `orchestrator/project_manager.py` (modified)
+  - `orchestrator/orchestrator.py` (modified)
+  - `orchestrator/langgraph/nodes/implement_task.py` (modified)
+  - `scripts/init.sh` (modified)
+  - `tests/test_boundaries.py` (new)
+  - `tests/test_worktree.py` (new)
+  - `shared-rules/agent-overrides/claude.md` (updated)
+  - `shared-rules/cli-reference.md` (updated)
+  - `shared-rules/guardrails.md` (updated)
 
 ### 2026-01-21 - Simplified Project Workflow
 

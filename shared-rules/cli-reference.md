@@ -1,8 +1,8 @@
 # CLI Reference (All Agents)
 
 <!-- SHARED: This file applies to ALL agents -->
-<!-- Version: 1.0 -->
-<!-- Last Updated: 2026-01-20 -->
+<!-- Version: 2.0 -->
+<!-- Last Updated: 2026-01-21 -->
 
 ## Correct CLI Usage
 
@@ -107,24 +107,99 @@ gemini --model gemini-2.0-flash \
 
 **Command**: `python -m orchestrator`
 
-### Commands
+### Project Management
 ```bash
-# Start new workflow
-python -m orchestrator --start
+# Initialize new project
+python -m orchestrator --init-project <name>
+
+# List all projects
+python -m orchestrator --list-projects
+```
+
+### Workflow Commands (Nested Projects)
+```bash
+# Start workflow for a nested project
+python -m orchestrator --project <name> --start
+python -m orchestrator --project <name> --use-langgraph --start
 
 # Resume interrupted workflow
-python -m orchestrator --resume
+python -m orchestrator --project <name> --resume
 
-# Check health/prerequisites
-python -m orchestrator --health
+# Check status
+python -m orchestrator --project <name> --status
 
-# Initialize missing files
-python -m orchestrator --init
+# Health check
+python -m orchestrator --project <name> --health
+
+# Reset workflow
+python -m orchestrator --project <name> --reset
+
+# Rollback to phase
+python -m orchestrator --project <name> --rollback 3
 ```
+
+### Workflow Commands (External Projects)
+```bash
+# Start workflow for external project
+python -m orchestrator --project-path /path/to/project --start
+python -m orchestrator --project-path ~/repos/my-app --use-langgraph --start
+
+# Check status
+python -m orchestrator --project-path /path/to/project --status
+```
+
+### Key Flags
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--project`, `-p` | Project name (nested) | `--project my-app` |
+| `--project-path` | External project path | `--project-path ~/repos/my-app` |
+| `--start` | Start workflow | `--start` |
+| `--resume` | Resume from checkpoint | `--resume` |
+| `--status` | Show workflow status | `--status` |
+| `--use-langgraph` | Use LangGraph mode | `--use-langgraph` |
+| `--health` | Health check | `--health` |
+| `--reset` | Reset workflow | `--reset` |
+| `--rollback` | Rollback to phase (1-5) | `--rollback 3` |
+| `--list-projects` | List all projects | `--list-projects` |
+| `--init-project` | Initialize project | `--init-project my-app` |
 
 ---
 
 ## Shell Script Wrappers
+
+### init.sh - Main Entry Point
+
+```bash
+# Check prerequisites
+./scripts/init.sh check
+
+# Initialize new project
+./scripts/init.sh init <project-name>
+
+# List all projects
+./scripts/init.sh list
+
+# Run workflow (nested project)
+./scripts/init.sh run <project-name>
+
+# Run workflow (external project)
+./scripts/init.sh run --path /path/to/project
+
+# Run with parallel workers (experimental)
+./scripts/init.sh run <project-name> --parallel 3
+
+# Check status
+./scripts/init.sh status <project-name>
+
+# Show help
+./scripts/init.sh help
+```
+
+### init.sh Flags
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--path` | External project path | `run --path ~/repos/app` |
+| `--parallel` | Parallel workers count | `run my-app --parallel 3` |
 
 ### call-cursor.sh
 ```bash
@@ -136,7 +211,23 @@ bash scripts/call-cursor.sh <prompt-file> <output-file> [project-dir]
 bash scripts/call-gemini.sh <prompt-file> <output-file> [project-dir]
 ```
 
-### Environment Variables
+---
+
+## Environment Variables
+
+### Orchestrator
+```bash
+# Enable LangGraph mode
+export ORCHESTRATOR_USE_LANGGRAPH=true
+
+# Enable Ralph Wiggum loop for TDD
+export USE_RALPH_LOOP=auto  # auto | true | false
+
+# Set parallel workers
+export PARALLEL_WORKERS=3
+```
+
+### Agent CLI Overrides
 ```bash
 export CURSOR_MODEL=gpt-4.5-turbo    # Override Cursor model
 export GEMINI_MODEL=gemini-2.0-flash  # Override Gemini model
@@ -151,3 +242,46 @@ export GEMINI_MODEL=gemini-2.0-flash  # Override Gemini model
 | `claude` | `-p "prompt"` | Part of `-p` | `--output-format json` |
 | `cursor-agent` | `--print` | Positional (end) | `--output-format json` |
 | `gemini` | `--yolo` | Positional | N/A (wrap externally) |
+
+---
+
+## Complete Workflow Examples
+
+### Example 1: New Nested Project
+```bash
+# 1. Initialize
+./scripts/init.sh init my-api
+
+# 2. Add files (manually)
+# - projects/my-api/Documents/
+# - projects/my-api/PRODUCT.md
+# - projects/my-api/CLAUDE.md
+
+# 3. Run workflow
+./scripts/init.sh run my-api
+```
+
+### Example 2: External Project
+```bash
+# 1. Ensure project has PRODUCT.md
+# 2. Run workflow
+./scripts/init.sh run --path ~/repos/existing-project
+
+# Or via Python
+python -m orchestrator --project-path ~/repos/existing-project --use-langgraph --start
+```
+
+### Example 3: Parallel Implementation
+```bash
+# Run with 3 parallel workers for independent tasks
+./scripts/init.sh run my-app --parallel 3
+```
+
+### Example 4: Check and Resume
+```bash
+# Check status
+./scripts/init.sh status my-app
+
+# If paused, resume
+python -m orchestrator --project my-app --resume
+```

@@ -2,7 +2,7 @@
 
 <!-- SHARED: This file applies to ALL agents -->
 <!-- Add new lessons at the TOP of this file -->
-<!-- Version: 1.2 -->
+<!-- Version: 1.3 -->
 <!-- Last Updated: 2026-01-21 -->
 
 ## How to Add a Lesson
@@ -16,6 +16,34 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons
+
+### 2026-01-21 - Enhanced Nested Architecture with Safety Features
+
+- **Issue**: Orchestrator could accidentally write to project code files; no support for external projects or parallel workers
+- **Root Cause**: Missing file boundary enforcement; tight coupling between orchestrator and projects; sequential-only worker execution
+- **Fix**: Implemented four major enhancements:
+  1. **File Boundary Enforcement**: Orchestrator can only write to `.workflow/` and `.project-config.json`. Violations raise `OrchestratorBoundaryError`.
+  2. **External Project Mode**: `--project-path` flag allows running workflow on any directory, not just `projects/`.
+  3. **Scoped Worker Prompts**: Minimal context prompts focus workers on specific files, preventing context bloat.
+  4. **Git Worktree Parallel Workers**: Independent tasks can run in parallel using isolated git worktrees with automatic cleanup.
+- **Prevention**:
+  - Always use `safe_write_workflow_file()` and `safe_write_project_config()` in orchestrator
+  - Use `validate_orchestrator_write()` before any file write
+  - Spawn workers for any code changes; orchestrator never writes code
+  - Use worktrees only for independent tasks; verify no shared file modifications
+- **Applies To**: claude
+- **Files Changed**:
+  - `orchestrator/utils/boundaries.py` (new)
+  - `orchestrator/utils/worktree.py` (new)
+  - `orchestrator/project_manager.py` (modified)
+  - `orchestrator/orchestrator.py` (modified)
+  - `orchestrator/langgraph/nodes/implement_task.py` (modified)
+  - `scripts/init.sh` (modified)
+  - `tests/test_boundaries.py` (new)
+  - `tests/test_worktree.py` (new)
+  - `shared-rules/agent-overrides/claude.md` (updated)
+  - `shared-rules/cli-reference.md` (updated)
+  - `shared-rules/guardrails.md` (updated)
 
 ### 2026-01-21 - Simplified Project Workflow
 

@@ -99,6 +99,42 @@ Then STOP and wait for human input.
 DO NOT implement anything beyond this task's scope.
 """
 
+# Scoped prompt for minimal context workers - focuses only on task-relevant files
+SCOPED_TASK_PROMPT = """## Task
+{description}
+
+## Acceptance Criteria
+{acceptance_criteria}
+
+## Files to Create
+{files_to_create}
+
+## Files to Modify
+{files_to_modify}
+
+## Test Files
+{test_files}
+
+## Instructions
+1. Read only the files listed above
+2. Implement using TDD (write/update tests first)
+3. Do NOT read orchestration files (.workflow/, plan.json)
+4. Follow existing code patterns in the project
+5. Signal completion with: <promise>DONE</promise>
+
+## Output
+When complete, output a JSON object:
+{{
+    "task_id": "{task_id}",
+    "status": "completed",
+    "files_created": [],
+    "files_modified": [],
+    "tests_written": [],
+    "tests_passed": true,
+    "implementation_notes": "Brief notes"
+}}
+"""
+
 
 async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
     """Implement the current task.
@@ -436,6 +472,38 @@ def _format_files(files: list[str]) -> str:
     if not files:
         return "- None specified"
     return "\n".join(f"- {f}" for f in files)
+
+
+def build_scoped_prompt(task: Task) -> str:
+    """Build a scoped prompt with only task-relevant context.
+
+    This creates a minimal prompt that focuses the worker on:
+    - The specific task description
+    - Only the files needed for this task
+    - Clear instructions to avoid reading orchestration files
+
+    Args:
+        task: Task to implement
+
+    Returns:
+        Scoped prompt string
+    """
+    return SCOPED_TASK_PROMPT.format(
+        task_id=task.get("id", "unknown"),
+        description=task.get("description", task.get("title", "Unknown task")),
+        acceptance_criteria="\n".join(
+            f"- {c}" for c in task.get("acceptance_criteria", [])
+        ) or "- No specific criteria defined",
+        files_to_create="\n".join(
+            f"- {f}" for f in task.get("files_to_create", [])
+        ) or "- None",
+        files_to_modify="\n".join(
+            f"- {f}" for f in task.get("files_to_modify", [])
+        ) or "- None",
+        test_files="\n".join(
+            f"- {f}" for f in task.get("test_files", [])
+        ) or "- None",
+    )
 
 
 def _load_task_clarification_answers(project_dir: Path, task_id: str) -> dict:

@@ -10,13 +10,34 @@ Projects are expected to be set up manually with:
 - Documents/ folder containing product vision and architecture docs
 - Context files (CLAUDE.md, GEMINI.md, .cursor/rules) - provided or generated
 - .workflow/ folder for state tracking
+
+File Boundary Enforcement:
+The orchestrator can only write to:
+- .workflow/**     - Workflow state and phase outputs
+- .project-config.json - Project configuration
+
+All other paths must be modified by worker Claude instances.
 """
 
+import concurrent.futures
 import json
+import logging
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from .utils.boundaries import (
+    ensure_orchestrator_can_write,
+    OrchestratorBoundaryError,
+)
+from .utils.worktree import (
+    WorktreeManager,
+    WorktreeError,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectManager:
@@ -66,19 +87,51 @@ class ProjectManager:
 
         return projects
 
-    def get_project(self, name: str) -> Optional[Path]:
-        """Get project directory by name.
+    def get_project(self, name: str = None, path: Path = None) -> Optional[Path]:
+        """Get project directory by name or path.
+
+        Supports two modes:
+        1. Nested mode: Project name resolves to projects/<name>/
+        2. External mode: Absolute path to any directory
 
         Args:
-            name: Project name
+            name: Project name (for nested projects in projects/)
+            path: Absolute path to external project directory
 
         Returns:
             Path to project directory or None if not found
         """
-        project_dir = self.projects_dir / name
-        if project_dir.exists() and project_dir.is_dir():
-            return project_dir
+        if path:
+            # External project mode
+            external_path = Path(path).resolve()
+            if external_path.exists() and external_path.is_dir():
+                return external_path
+            return None
+
+        if name:
+            # Nested project mode (existing behavior)
+            project_dir = self.projects_dir / name
+            if project_dir.exists() and project_dir.is_dir():
+                return project_dir
+
         return None
+
+    def is_external_project(self, project_dir: Path) -> bool:
+        """Check if a project directory is external (not in projects/).
+
+        Args:
+            project_dir: Path to project directory
+
+        Returns:
+            True if the project is outside the projects/ directory
+        """
+        project_dir = Path(project_dir).resolve()
+        try:
+            # Check if it's under projects/
+            project_dir.relative_to(self.projects_dir)
+            return False
+        except ValueError:
+            return True
 
     def init_project(self, name: str) -> dict:
         """Initialize a project directory with basic structure.
@@ -306,12 +359,19 @@ class ProjectManager:
 
         Returns:
             True if successful
+
+        Raises:
+            OrchestratorBoundaryError: If write violates boundaries (shouldn't happen
+                for state.json but enforced for safety)
         """
         project_dir = self.get_project(name)
         if not project_dir:
             return False
 
         state_path = project_dir / ".workflow" / "state.json"
+
+        # Validate boundary (should always pass for .workflow/)
+        ensure_orchestrator_can_write(project_dir, state_path)
 
         # Ensure .workflow directory exists
         state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -328,3 +388,257 @@ class ProjectManager:
             return True
         except IOError:
             return False
+
+    def safe_write_workflow_file(
+        self,
+        project_name: str,
+        relative_path: str,
+        content: str | dict,
+    ) -> bool:
+        """Safely write a file within .workflow/ directory.
+
+        This method enforces boundary checks and ensures the orchestrator
+        only writes to allowed paths.
+
+        Args:
+            project_name: Project name
+            relative_path: Path relative to .workflow/ (e.g., "phases/planning/plan.json")
+            content: Content to write (string or dict to be JSON-encoded)
+
+        Returns:
+            True if successful
+
+        Raises:
+            OrchestratorBoundaryError: If the write would violate boundaries
+        """
+        project_dir = self.get_project(project_name)
+        if not project_dir:
+            return False
+
+        # Construct full path
+        target_path = project_dir / ".workflow" / relative_path
+
+        # Validate boundary
+        ensure_orchestrator_can_write(project_dir, target_path)
+
+        # Ensure parent directory exists
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write content
+        try:
+            if isinstance(content, dict):
+                with open(target_path, "w") as f:
+                    json.dump(content, f, indent=2)
+            else:
+                with open(target_path, "w") as f:
+                    f.write(content)
+            return True
+        except IOError:
+            return False
+
+    def safe_write_project_config(
+        self,
+        project_name: str,
+        config: dict,
+    ) -> bool:
+        """Safely write the .project-config.json file.
+
+        Args:
+            project_name: Project name
+            config: Configuration dict
+
+        Returns:
+            True if successful
+
+        Raises:
+            OrchestratorBoundaryError: If the write would violate boundaries
+        """
+        project_dir = self.get_project(project_name)
+        if not project_dir:
+            return False
+
+        target_path = project_dir / ".project-config.json"
+
+        # Validate boundary
+        ensure_orchestrator_can_write(project_dir, target_path)
+
+        try:
+            with open(target_path, "w") as f:
+                json.dump(config, f, indent=2)
+            return True
+        except IOError:
+            return False
+
+    def spawn_parallel_workers(
+        self,
+        project_name: str,
+        tasks: list[dict],
+        max_workers: int = 3,
+        timeout: int = 600,
+    ) -> list[dict]:
+        """Spawn multiple workers in parallel using git worktrees.
+
+        Each task is executed in an isolated git worktree, allowing multiple
+        workers to operate simultaneously without file conflicts. Changes
+        are merged back sequentially after completion.
+
+        Args:
+            project_name: Project name
+            tasks: List of task dictionaries with prompt and metadata
+            max_workers: Maximum number of parallel workers
+            timeout: Timeout per worker in seconds
+
+        Returns:
+            List of result dictionaries for each task
+
+        Note:
+            This is an experimental feature. The project must be a git
+            repository for worktrees to work.
+        """
+        project_dir = self.get_project(project_name)
+        if not project_dir:
+            return [{"success": False, "error": "Project not found"}]
+
+        try:
+            wt_manager = WorktreeManager(project_dir)
+        except WorktreeError as e:
+            return [{"success": False, "error": str(e)}]
+
+        results = []
+
+        try:
+            # Limit tasks to max_workers
+            tasks_to_run = tasks[:max_workers]
+            worktrees = []
+
+            # Create worktrees for each task
+            for i, task in enumerate(tasks_to_run):
+                try:
+                    task_id = task.get("id", f"task-{i}")
+                    worktree = wt_manager.create_worktree(f"{task_id}")
+                    worktrees.append((worktree, task))
+                except WorktreeError as e:
+                    logger.error(f"Failed to create worktree for task {i}: {e}")
+                    results.append({
+                        "task_id": task.get("id"),
+                        "success": False,
+                        "error": str(e),
+                    })
+
+            # Execute tasks in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {}
+
+                for worktree, task in worktrees:
+                    prompt = task.get("prompt", "")
+                    future = executor.submit(
+                        self._run_worker_in_worktree,
+                        worktree,
+                        prompt,
+                        task.get("id", "unknown"),
+                        timeout,
+                    )
+                    futures[future] = (worktree, task)
+
+                # Collect results
+                for future in concurrent.futures.as_completed(futures):
+                    worktree, task = futures[future]
+                    try:
+                        result = future.result()
+                        result["task_id"] = task.get("id")
+                        results.append(result)
+
+                        # Merge changes if successful
+                        if result.get("success"):
+                            try:
+                                commit_msg = f"Task: {task.get('title', task.get('id', 'unknown'))}"
+                                commit_hash = wt_manager.merge_worktree(worktree, commit_msg)
+                                result["commit_hash"] = commit_hash
+                            except WorktreeError as e:
+                                logger.error(f"Failed to merge worktree: {e}")
+                                result["merge_error"] = str(e)
+
+                    except Exception as e:
+                        logger.error(f"Worker failed: {e}")
+                        results.append({
+                            "task_id": task.get("id"),
+                            "success": False,
+                            "error": str(e),
+                        })
+
+        finally:
+            # Always cleanup worktrees
+            wt_manager.cleanup_worktrees()
+
+        return results
+
+    def _run_worker_in_worktree(
+        self,
+        worktree_path: Path,
+        prompt: str,
+        task_id: str,
+        timeout: int,
+    ) -> dict:
+        """Run a worker Claude instance in a worktree.
+
+        Args:
+            worktree_path: Path to the worktree
+            prompt: Prompt for the worker
+            task_id: Task identifier
+            timeout: Timeout in seconds
+
+        Returns:
+            Result dictionary
+        """
+        # Build command
+        cmd = ["claude", "-p", prompt, "--output-format", "json"]
+
+        # Default tools for implementation
+        default_tools = [
+            "Read", "Write", "Edit",
+            "Bash(npm*)", "Bash(pytest*)", "Bash(python*)",
+            "Bash(ls*)", "Bash(mkdir*)"
+        ]
+        cmd.extend(["--allowedTools", ",".join(default_tools)])
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=str(worktree_path),
+                timeout=timeout
+            )
+
+            # Try to parse JSON output
+            output = result.stdout
+            try:
+                output_json = json.loads(output)
+            except json.JSONDecodeError:
+                output_json = {"raw_output": output}
+
+            return {
+                "success": result.returncode == 0,
+                "output": output_json,
+                "stderr": result.stderr if result.stderr else None,
+                "worktree": str(worktree_path),
+            }
+
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": f"Worker timed out after {timeout} seconds",
+                "worktree": str(worktree_path),
+            }
+        except FileNotFoundError:
+            return {
+                "success": False,
+                "error": "Claude CLI not found",
+                "worktree": str(worktree_path),
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "worktree": str(worktree_path),
+            }

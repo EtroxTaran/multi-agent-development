@@ -32,46 +32,79 @@ Phase 5: COMPLETION --> summary + ready for merge
 
 ## Project Structure
 
-Meta-Architect uses a **nested architecture** where projects live in `projects/<name>/`:
+Meta-Architect uses a **nested architecture** where projects live in `projects/<name>/` (or externally with `--project-path`):
 
 ```
 meta-architect/                    # Orchestrator (outer layer)
-├── CLAUDE.md                      # Orchestrator context
+├── CLAUDE.md                      # Orchestrator context (auto-generated)
 ├── orchestrator/                  # Python orchestration module
+│   ├── utils/
+│   │   ├── boundaries.py          # File boundary enforcement
+│   │   └── worktree.py            # Git worktree for parallel workers
+│   └── project_manager.py         # Project lifecycle management
 ├── scripts/                       # Helper scripts
 ├── shared-rules/                  # Rules synced to all agents
-├── project-templates/             # Templates for new projects
 └── projects/                      # Project containers
     └── my-app/                    # Your project (inner layer)
-        ├── CLAUDE.md              # Worker Claude context
-        ├── GEMINI.md              # Gemini context
+        ├── CLAUDE.md              # Worker Claude context (you provide)
+        ├── GEMINI.md              # Gemini context (you provide)
         ├── PRODUCT.md             # YOUR FEATURE SPEC
-        ├── .cursor/rules          # Cursor rules
-        ├── .workflow/             # Workflow state & outputs
+        ├── .cursor/rules          # Cursor rules (you provide)
+        ├── .workflow/             # Workflow state (orchestrator writes here)
         │   ├── state.json
         │   └── phases/
-        ├── src/                   # Your application code
-        └── tests/                 # Your tests
+        ├── src/                   # Your application code (workers write here)
+        └── tests/                 # Your tests (workers write here)
 ```
+
+### File Boundary Rules
+
+| Path | Orchestrator | Worker |
+|------|--------------|--------|
+| `.workflow/**` | **Write** | Read |
+| `.project-config.json` | **Write** | Read |
+| `src/**` | Read-only | **Write** |
+| `tests/**` | Read-only | **Write** |
+| `CLAUDE.md` | Read-only | Read |
+| `PRODUCT.md` | Read-only | Read |
 
 ---
 
-## Step 1: Create a Project
+## Step 1: Initialize a Project
+
+### Option A: Nested Project (in projects/ directory)
 
 ```bash
 # From meta-architect root directory
-./scripts/init.sh create my-app --type node-api
-
-# Available types: node-api, react-tanstack, java-spring, nx-fullstack
+./scripts/init.sh init my-app
 ```
 
-This creates `projects/my-app/` with all necessary configuration files.
+This creates `projects/my-app/` with `.workflow/` and `.project-config.json`.
+
+### Option B: External Project (any directory)
+
+```bash
+# Point to an existing project
+./scripts/init.sh run --path ~/repos/my-existing-project
+
+# Or via Python
+python -m orchestrator --project-path ~/repos/my-project --start
+```
+
+**Requirements for external projects:**
+- Must have `PRODUCT.md` with feature specification
+- Should have context files (CLAUDE.md, GEMINI.md, .cursor/rules)
+- Should be a git repository (for parallel worker support)
 
 ---
 
-## Step 2: Define Your Feature
+## Step 2: Add Your Files
 
-Edit `projects/my-app/PRODUCT.md` with your feature specification:
+Add these files to your project directory:
+
+### 1. PRODUCT.md (Required)
+
+Your feature specification:
 
 ```markdown
 # Feature Name
@@ -135,17 +168,51 @@ POST /auth/login
 
 **Important**: No placeholders like `[TODO]` or `[TBD]` - these will fail validation!
 
+### 2. CLAUDE.md (Recommended)
+
+Context for worker Claude when implementing code. Include:
+- Coding standards for your project
+- Framework-specific guidelines
+- TDD requirements
+- Any project-specific rules
+
+### 3. GEMINI.md (Recommended)
+
+Context for Gemini's architecture reviews.
+
+### 4. .cursor/rules (Recommended)
+
+Rules for Cursor's code quality and security reviews.
+
 ---
 
 ## Step 3: Run the Workflow
 
+### Standard Execution
+
 ```bash
-# Start the full 5-phase workflow
+# Nested project
 ./scripts/init.sh run my-app
+
+# External project
+./scripts/init.sh run --path ~/repos/my-project
 
 # Or use the slash command in Claude Code
 /orchestrate --project my-app
 ```
+
+### Parallel Workers (Experimental)
+
+For independent tasks, run multiple workers simultaneously:
+
+```bash
+# Run with 3 parallel workers using git worktrees
+./scripts/init.sh run my-app --parallel 3
+```
+
+**Requirements:**
+- Project must be a git repository
+- Tasks must be independent (no shared file modifications)
 
 ---
 
@@ -158,8 +225,8 @@ python -m orchestrator --project my-app --status
 # Or use slash command
 /phase-status --project my-app
 
-# View detailed dashboard
-python -m orchestrator --project my-app --dashboard
+# View logs
+cat projects/my-app/.workflow/coordination.log
 ```
 
 ---
@@ -169,7 +236,7 @@ python -m orchestrator --project my-app --dashboard
 ### Phase 1: Planning
 Claude reads `PRODUCT.md` and creates:
 - `plan.json` - Structured implementation plan
-- `PLAN.md` - Human-readable version
+- Task breakdown with dependencies
 
 ### Phase 2: Validation (Parallel)
 Cursor and Gemini review the plan simultaneously:
@@ -180,9 +247,12 @@ Both must approve (score >= 6.0, no blockers) to proceed.
 
 ### Phase 3: Implementation (TDD)
 Claude implements using Test-Driven Development:
-1. Write failing tests first
-2. Implement code to pass tests
-3. Refactor while keeping tests green
+1. Break feature into tasks
+2. For each task:
+   - Write failing tests first
+   - Implement code to pass tests
+   - Verify task completion
+3. Verify all tasks complete
 
 ### Phase 4: Verification (Parallel)
 Cursor and Gemini review the implementation:
@@ -201,26 +271,37 @@ Generate summary and documentation:
 ### Project Management
 
 ```bash
-# Create new project
-./scripts/init.sh create <name> --type <type>
+# Initialize new project (nested)
+./scripts/init.sh init <name>
 
 # List all projects
+./scripts/init.sh list
+# or
 python -m orchestrator --list-projects
-
-# Sync templates to all projects
-python -m orchestrator --sync-projects
 ```
 
 ### Workflow Control
 
 ```bash
-# Start workflow
+# Start workflow (nested)
+./scripts/init.sh run <name>
+# or
 python -m orchestrator --project <name> --start
+
+# Start workflow (external)
+./scripts/init.sh run --path /path/to/project
+# or
+python -m orchestrator --project-path /path/to/project --start
+
+# Parallel workers
+./scripts/init.sh run <name> --parallel 3
 
 # Resume interrupted workflow
 python -m orchestrator --project <name> --resume
 
 # Check status
+./scripts/init.sh status <name>
+# or
 python -m orchestrator --project <name> --status
 
 # Health check (agent availability)
@@ -228,22 +309,9 @@ python -m orchestrator --project <name> --health
 
 # Reset workflow
 python -m orchestrator --project <name> --reset
-```
 
-### Updates
-
-```bash
-# Check for template updates
-python -m orchestrator --project <name> --check-updates
-
-# Apply updates (with automatic backup)
-python -m orchestrator --project <name> --update
-
-# List backups
-python -m orchestrator --project <name> --list-backups
-
-# Rollback to backup
-python -m orchestrator --project <name> --rollback-backup <backup-id>
+# Rollback to phase
+python -m orchestrator --project <name> --rollback 3
 ```
 
 ---
@@ -254,10 +322,7 @@ python -m orchestrator --project <name> --rollback-backup <backup-id>
 |---------|-------------|
 | `/orchestrate --project <name>` | Start or resume workflow |
 | `/phase-status --project <name>` | Show workflow status |
-| `/create-project <name>` | Create new project |
 | `/list-projects` | List all projects |
-| `/check-updates --project <name>` | Check for updates |
-| `/update-project --project <name>` | Apply updates |
 
 ---
 
@@ -265,19 +330,25 @@ python -m orchestrator --project <name> --rollback-backup <backup-id>
 
 ### CLAUDE.md (Worker Context)
 Instructions for Claude when implementing code in the project.
+**You provide this** - it's specific to your project's coding standards.
 
 ### GEMINI.md
 Instructions for Gemini's architecture reviews.
+**You provide this** - it's specific to your project's architecture.
 
 ### .cursor/rules
 Rules for Cursor's code quality reviews.
+**You provide this** - it's specific to your project's quality standards.
 
 ### .project-config.json
-Project configuration including:
-- Template type
-- Version tracking
-- Update policy
-- Custom settings
+Project configuration (auto-created):
+- Workflow settings
+- Integration configs (e.g., Linear)
+
+### .workflow/
+Workflow state managed by orchestrator:
+- `state.json` - Current workflow state
+- `phases/` - Phase-specific outputs
 
 ---
 
@@ -293,9 +364,23 @@ python -m orchestrator --project my-app --health
 - Check feedback in `.workflow/phases/validation/`
 - Ensure PRODUCT.md has all required sections
 - No `[TODO]` or `[TBD]` placeholders
+- Minimum score threshold: 6.0
 
 ### Agent Not Available
 The workflow can proceed with available agents. Missing agents will be skipped with warnings.
+
+### Orchestrator Boundary Error
+```
+OrchestratorBoundaryError: Orchestrator cannot write to 'src/main.py'.
+```
+The orchestrator tried to write to application code. This is blocked by design.
+Solution: Ensure workers handle code changes, not the orchestrator.
+
+### Worktree Error
+```
+WorktreeError: '/path/to/project' is not a git repository.
+```
+Parallel workers require git. Initialize a git repo or don't use `--parallel`.
 
 ### Context Issues
 ```bash
@@ -311,10 +396,14 @@ python -m orchestrator --project my-app --start
 
 ## Next Steps
 
-1. Create your first project with `./scripts/init.sh create my-app`
-2. Write your feature spec in `PRODUCT.md`
-3. Run `/orchestrate --project my-app`
-4. Watch the agents collaborate through all 5 phases
-5. Review the completed implementation
+1. Initialize your project with `./scripts/init.sh init my-app`
+2. Add your context files (CLAUDE.md, GEMINI.md, .cursor/rules)
+3. Write your feature spec in `PRODUCT.md`
+4. Run `/orchestrate --project my-app`
+5. Watch the agents collaborate through all 5 phases
+6. Review the completed implementation
 
-For detailed architecture documentation, see the main [README.md](../README.md).
+For detailed architecture documentation, see:
+- [CLAUDE.md](../CLAUDE.md) - Full orchestrator documentation
+- [shared-rules/](../shared-rules/) - Agent rules and guardrails
+- [README.md](../README.md) - System overview

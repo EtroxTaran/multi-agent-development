@@ -56,6 +56,21 @@ from .handoff import (
     HandoffGenerator,
     generate_handoff,
 )
+from .boundaries import (
+    OrchestratorBoundaryError,
+    validate_orchestrator_write,
+    ensure_orchestrator_can_write,
+    get_writable_paths_info,
+    is_workflow_path,
+    is_project_config,
+    ORCHESTRATOR_WRITABLE_PATTERNS,
+    ORCHESTRATOR_FORBIDDEN_PATTERNS,
+)
+from .worktree import (
+    WorktreeManager,
+    WorktreeError,
+    WorktreeInfo,
+)
 
 __all__ = [
     # State management
@@ -116,4 +131,17 @@ __all__ = [
     "HandoffBrief",
     "HandoffGenerator",
     "generate_handoff",
+    # File boundaries
+    "OrchestratorBoundaryError",
+    "validate_orchestrator_write",
+    "ensure_orchestrator_can_write",
+    "get_writable_paths_info",
+    "is_workflow_path",
+    "is_project_config",
+    "ORCHESTRATOR_WRITABLE_PATTERNS",
+    "ORCHESTRATOR_FORBIDDEN_PATTERNS",
+    # Git worktrees
+    "WorktreeManager",
+    "WorktreeError",
+    "WorktreeInfo",
 ]

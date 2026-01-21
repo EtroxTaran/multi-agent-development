@@ -544,10 +544,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Project workflow
+  # Project workflow (nested projects in projects/)
   python -m orchestrator --project my-app --start
   python -m orchestrator --project my-app --resume
   python -m orchestrator --project my-app --status
+
+  # External project (any directory)
+  python -m orchestrator --project-path ~/repos/my-project --start
+  python -m orchestrator --project-path /path/to/project --status
 
   # Project management
   python -m orchestrator --list-projects
@@ -565,6 +569,12 @@ Examples:
         "--project", "-p",
         type=str,
         help="Project name (in projects/ directory)",
+    )
+    parser.add_argument(
+        "--project-path",
+        type=str,
+        metavar="PATH",
+        help="Path to external project (instead of projects/<name>)",
     )
     parser.add_argument(
         "--list-projects",
@@ -768,7 +778,18 @@ Examples:
         return
 
     # Determine project directory
-    if args.project:
+    if args.project_path:
+        # External project mode - use absolute path
+        external_path = Path(args.project_path).resolve()
+        if not external_path.exists():
+            print(f"Error: Project path '{args.project_path}' does not exist")
+            sys.exit(1)
+        if not external_path.is_dir():
+            print(f"Error: Project path '{args.project_path}' is not a directory")
+            sys.exit(1)
+        project_dir = external_path
+        print(f"Using external project: {project_dir}")
+    elif args.project:
         project_dir = project_manager.get_project(args.project)
         if not project_dir:
             print(f"Error: Project '{args.project}' not found")

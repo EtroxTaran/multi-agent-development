@@ -152,18 +152,40 @@ list_projects() {
 # Run workflow
 run_workflow() {
     local name="$1"
-    local project_dir="$ROOT_DIR/projects/$name"
+    local project_path="$2"
+    local parallel_workers="$3"
 
-    if [ ! -d "$project_dir" ]; then
-        echo -e "${RED}Error: Project '$name' not found${NC}"
-        echo -e "Available projects:"
-        list_projects
-        exit 1
+    # Build the command arguments
+    local cmd_args=""
+
+    if [ -n "$project_path" ]; then
+        # External project mode
+        if [ ! -d "$project_path" ]; then
+            echo -e "${RED}Error: Project path '$project_path' not found${NC}"
+            exit 1
+        fi
+        echo -e "\n${YELLOW}Running workflow for external project: ${project_path}${NC}"
+        cmd_args="--project-path $project_path"
+    else
+        # Nested project mode
+        local project_dir="$ROOT_DIR/projects/$name"
+        if [ ! -d "$project_dir" ]; then
+            echo -e "${RED}Error: Project '$name' not found${NC}"
+            echo -e "Available projects:"
+            list_projects
+            exit 1
+        fi
+        echo -e "\n${YELLOW}Running workflow for: ${name}${NC}"
+        cmd_args="--project $name"
     fi
 
-    echo -e "\n${YELLOW}Running workflow for: ${name}${NC}"
+    # Add parallel workers if specified
+    if [ -n "$parallel_workers" ]; then
+        echo -e "${BLUE}Parallel workers: ${parallel_workers}${NC}"
+        export PARALLEL_WORKERS="$parallel_workers"
+    fi
 
-    "$ROOT_DIR/.venv/bin/python" -m orchestrator --project "$name" --use-langgraph --start
+    "$ROOT_DIR/.venv/bin/python" -m orchestrator $cmd_args --use-langgraph --start
 }
 
 # Show status
@@ -185,7 +207,13 @@ Commands:
   init <name>     Initialize a new project directory
   list            List all projects
   run <name>      Run workflow for a project
+  run --path <path>        Run workflow for external project
+  run <name> --parallel N  Run with N parallel workers
   status <name>   Show workflow status for a project
+
+Options:
+  --path <path>   Use external project directory instead of projects/<name>
+  --parallel <N>  Enable parallel worker execution with N workers (experimental)
 
 Workflow:
   1. Initialize a project:    ./scripts/init.sh init my-project
@@ -199,6 +227,8 @@ Examples:
   ./scripts/init.sh init my-api
   ./scripts/init.sh list
   ./scripts/init.sh run my-api
+  ./scripts/init.sh run --path ~/repos/my-project
+  ./scripts/init.sh run my-api --parallel 3
   ./scripts/init.sh status my-api
 "
 }
@@ -226,14 +256,44 @@ case "$COMMAND" in
         ;;
     run)
         shift
-        PROJECT_NAME="$1"
-        if [ -z "$PROJECT_NAME" ]; then
-            echo -e "${RED}Error: Project name required${NC}"
+        PROJECT_NAME=""
+        PROJECT_PATH=""
+        PARALLEL_WORKERS=""
+
+        # Parse run arguments
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --path)
+                    shift
+                    PROJECT_PATH="$1"
+                    ;;
+                --parallel)
+                    shift
+                    PARALLEL_WORKERS="$1"
+                    ;;
+                -*)
+                    echo -e "${RED}Error: Unknown option: $1${NC}"
+                    show_help
+                    exit 1
+                    ;;
+                *)
+                    if [ -z "$PROJECT_NAME" ]; then
+                        PROJECT_NAME="$1"
+                    fi
+                    ;;
+            esac
+            shift
+        done
+
+        # Validate arguments
+        if [ -z "$PROJECT_NAME" ] && [ -z "$PROJECT_PATH" ]; then
+            echo -e "${RED}Error: Project name or --path required${NC}"
             show_help
             exit 1
         fi
+
         check_prereqs
-        run_workflow "$PROJECT_NAME"
+        run_workflow "$PROJECT_NAME" "$PROJECT_PATH" "$PARALLEL_WORKERS"
         ;;
     status)
         shift
