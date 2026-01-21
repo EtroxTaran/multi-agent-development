@@ -12,13 +12,19 @@ from .general import (
     implementation_router,
     completion_router,
     human_escalation_router,
-    # New risk mitigation routers
+    # Risk mitigation routers
     product_validation_router,
     pre_implementation_router,
     build_verification_router,
     coverage_check_router,
     security_scan_router,
     approval_gate_router,
+)
+from .task import (
+    task_breakdown_router,
+    select_task_router,
+    implement_task_router,
+    verify_task_router,
 )
 
 __all__ = [
@@ -29,11 +35,16 @@ __all__ = [
     "implementation_router",
     "completion_router",
     "human_escalation_router",
-    # New risk mitigation routers
+    # Risk mitigation routers
     "product_validation_router",
     "pre_implementation_router",
     "build_verification_router",
     "coverage_check_router",
     "security_scan_router",
     "approval_gate_router",
+    # Task loop routers
+    "task_breakdown_router",
+    "select_task_router",
+    "implement_task_router",
+    "verify_task_router",
 ]

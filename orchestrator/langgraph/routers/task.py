@@ -1,0 +1,185 @@
+"""Task loop routers.
+
+Routers for the incremental task execution loop:
+task_breakdown → select_task → implement_task → verify_task → (loop back)
+"""
+
+from typing import Literal
+
+from ..state import (
+    WorkflowState,
+    WorkflowDecision,
+    TaskStatus,
+    get_task_by_id,
+    all_tasks_completed,
+)
+
+
+def task_breakdown_router(
+    state: WorkflowState,
+) -> Literal["select_task", "human_escalation", "__end__"]:
+    """Route after task breakdown.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "select_task": Tasks created, proceed to select first task
+        - "human_escalation": Breakdown failed, need human help
+        - "__end__": No tasks to execute
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        tasks = state.get("tasks", [])
+        if not tasks:
+            return "__end__"  # No tasks created
+        return "select_task"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default: check if tasks exist
+    tasks = state.get("tasks", [])
+    if tasks:
+        return "select_task"
+
+    return "__end__"
+
+
+def select_task_router(
+    state: WorkflowState,
+) -> Literal["implement_task", "build_verification", "human_escalation"]:
+    """Route after task selection.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "implement_task": Task selected, proceed to implementation
+        - "build_verification": All tasks done, proceed to build verification
+        - "human_escalation": No tasks available (deadlock)
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        current_task_id = state.get("current_task_id")
+        if current_task_id:
+            return "implement_task"
+
+        # No task selected but continue - all done
+        if all_tasks_completed(state):
+            return "build_verification"
+
+        # Unexpected state
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    # Check for current task
+    current_task_id = state.get("current_task_id")
+    if current_task_id:
+        return "implement_task"
+
+    # Check if all tasks completed
+    if all_tasks_completed(state):
+        return "build_verification"
+
+    return "human_escalation"
+
+
+def implement_task_router(
+    state: WorkflowState,
+) -> Literal["verify_task", "implement_task", "human_escalation"]:
+    """Route after task implementation.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "verify_task": Implementation done, verify it
+        - "implement_task": Need to retry implementation
+        - "human_escalation": Implementation blocked/failed
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "verify_task"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "implement_task"  # Retry same task
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    # Default to verification if task exists
+    current_task_id = state.get("current_task_id")
+    if current_task_id:
+        return "verify_task"
+
+    return "human_escalation"
+
+
+def verify_task_router(
+    state: WorkflowState,
+) -> Literal["select_task", "implement_task", "human_escalation"]:
+    """Route after task verification (THE LOOP).
+
+    This is the key router for the task loop:
+    - On success: loop back to select_task for next task
+    - On failure with retries left: go to implement_task
+    - On failure with no retries: escalate
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "select_task": LOOP BACK - task done, get next task
+        - "implement_task": Retry - task failed but can retry
+        - "human_escalation": Task failed, need human help
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        # Task verified successfully - LOOP BACK to get next task
+        return "select_task"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        # Verification failed but can retry
+        current_task_id = state.get("current_task_id")
+        if current_task_id:
+            task = get_task_by_id(state, current_task_id)
+            if task:
+                attempts = task.get("attempts", 0)
+                max_attempts = task.get("max_attempts", 3)
+                if attempts < max_attempts:
+                    return "implement_task"
+
+        # No more retries - escalate
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    # Default: check task status
+    current_task_id = state.get("current_task_id")
+    if not current_task_id:
+        # No current task - loop back to select
+        return "select_task"
+
+    task = get_task_by_id(state, current_task_id)
+    if task:
+        if task.get("status") == TaskStatus.COMPLETED:
+            return "select_task"
+        elif task.get("status") == TaskStatus.FAILED:
+            return "human_escalation"
+
+    return "select_task"

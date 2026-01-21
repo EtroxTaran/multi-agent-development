@@ -33,6 +33,12 @@
         "PROJECTS_ROOT": "projects/"
       },
       "description": "Git operations, diff, history, and change tracking"
+    },
+    "mcp-linear": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
+      "description": "Official Linear MCP for issue tracking (optional)",
+      "optional": true
     }
   },
   "toolDescriptions": {

@@ -33,6 +33,11 @@ from .nodes import (
     coverage_check_node,
     security_scan_node,
     approval_gate_node,
+    # Task loop nodes
+    task_breakdown_node,
+    select_next_task_node,
+    implement_task_node,
+    verify_task_node,
 )
 from .routers import (
     prerequisites_router,
@@ -49,6 +54,11 @@ from .routers import (
     coverage_check_router,
     security_scan_router,
     approval_gate_router,
+    # Task loop routers
+    task_breakdown_router,
+    select_task_router,
+    implement_task_router,
+    verify_task_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,11 +76,21 @@ def create_workflow_graph(
     - Human escalation and approval gates
     - Configurable feature flags for optional nodes
 
-    Enhanced workflow path:
+    Enhanced workflow path with task loop:
     ```
     prerequisites → product_validation → planning →
     [cursor_validate || gemini_validate] → validation_fan_in →
-    approval_gate → pre_implementation → implementation → build_verification →
+    approval_gate → pre_implementation → task_breakdown →
+    ┌─────────────────────────────────────────┐
+    │            TASK LOOP                    │
+    │  select_task → implement_task →         │
+    │       ↑         verify_task ────────────┼──┐
+    │       └─────────────────────────────────┘  │
+    │              (loop back)                   │
+    └────────────────────────────────────────────┘
+                        │ (all tasks complete)
+                        ↓
+    build_verification →
     [cursor_review || gemini_review] → verification_fan_in →
     coverage_check → security_scan → completion
     ```
@@ -111,15 +131,31 @@ def create_workflow_graph(
                      └────────┬────────┘
                               │
                      ┌────────▼────────┐
-                     │pre_implementation│  ← NEW: Environment checks
+                     │pre_implementation│  ← Environment checks
                      └────────┬────────┘
                               │
                      ┌────────▼────────┐
-                     │  implementation │
+                     │  task_breakdown │  ← NEW: Break into tasks
                      └────────┬────────┘
                               │
                      ┌────────▼────────┐
-                     │build_verification│  ← NEW: Build check
+                     │   select_task   │  ← TASK LOOP START
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │  implement_task │  ← Single task impl
+                     └────────┬────────┘
+                              │
+                     ┌────────▼────────┐
+                     │   verify_task   │
+                     └────────┬────────┘
+                              │
+                     (loop back to select_task)
+                              │
+                     (when all tasks done)
+                              │
+                     ┌────────▼────────┐
+                     │build_verification│  ← Build check
                      └────────┬────────┘
                               │
               ┌───────────────┼───────────────┐
@@ -182,20 +218,30 @@ def create_workflow_graph(
     # Add all nodes with appropriate retry policies
     # Core workflow nodes
     graph.add_node("prerequisites", prerequisites_node)
-    graph.add_node("product_validation", product_validation_node)  # NEW
+    graph.add_node("product_validation", product_validation_node)
     graph.add_node("planning", planning_node, retry=agent_retry_policy)
     graph.add_node("cursor_validate", cursor_validate_node, retry=agent_retry_policy)
     graph.add_node("gemini_validate", gemini_validate_node, retry=agent_retry_policy)
     graph.add_node("validation_fan_in", validation_fan_in_node)
-    graph.add_node("approval_gate", approval_gate_node)  # NEW
-    graph.add_node("pre_implementation", pre_implementation_node)  # NEW
+    graph.add_node("approval_gate", approval_gate_node)
+    graph.add_node("pre_implementation", pre_implementation_node)
+
+    # Task loop nodes (incremental execution)
+    graph.add_node("task_breakdown", task_breakdown_node)
+    graph.add_node("select_task", select_next_task_node)
+    graph.add_node("implement_task", implement_task_node, retry=implementation_retry_policy)
+    graph.add_node("verify_task", verify_task_node)
+
+    # Legacy implementation node (kept for compatibility)
     graph.add_node("implementation", implementation_node, retry=implementation_retry_policy)
-    graph.add_node("build_verification", build_verification_node)  # NEW
+
+    # Post-implementation nodes
+    graph.add_node("build_verification", build_verification_node)
     graph.add_node("cursor_review", cursor_review_node, retry=agent_retry_policy)
     graph.add_node("gemini_review", gemini_review_node, retry=agent_retry_policy)
     graph.add_node("verification_fan_in", verification_fan_in_node)
-    graph.add_node("coverage_check", coverage_check_node)  # NEW
-    graph.add_node("security_scan", security_scan_node)  # NEW
+    graph.add_node("coverage_check", coverage_check_node)
+    graph.add_node("security_scan", security_scan_node)
     graph.add_node("human_escalation", human_escalation_node)
     graph.add_node("completion", completion_node)
 
@@ -261,18 +307,66 @@ def create_workflow_graph(
         },
     )
 
-    # Pre-implementation → implementation (with conditional routing)
+    # Pre-implementation → task_breakdown (with conditional routing)
     graph.add_conditional_edges(
         "pre_implementation",
         pre_implementation_router,
         {
-            "implementation": "implementation",
+            "implementation": "task_breakdown",  # Changed: go to task_breakdown
             "human_escalation": "human_escalation",
             "__end__": END,
         },
     )
 
-    # Implementation → build_verification
+    # ========== TASK LOOP ==========
+
+    # Task breakdown → select_task
+    graph.add_conditional_edges(
+        "task_breakdown",
+        task_breakdown_router,
+        {
+            "select_task": "select_task",
+            "human_escalation": "human_escalation",
+            "__end__": END,
+        },
+    )
+
+    # Select task → implement_task or build_verification (all done)
+    graph.add_conditional_edges(
+        "select_task",
+        select_task_router,
+        {
+            "implement_task": "implement_task",
+            "build_verification": "build_verification",  # All tasks done
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # Implement task → verify_task
+    graph.add_conditional_edges(
+        "implement_task",
+        implement_task_router,
+        {
+            "verify_task": "verify_task",
+            "implement_task": "implement_task",  # Retry
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # Verify task → LOOP BACK to select_task or retry/escalate
+    graph.add_conditional_edges(
+        "verify_task",
+        verify_task_router,
+        {
+            "select_task": "select_task",  # LOOP BACK - get next task
+            "implement_task": "implement_task",  # Retry same task
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # ========== END TASK LOOP ==========
+
+    # Legacy: Implementation → build_verification (for backward compatibility)
     graph.add_edge("implementation", "build_verification")
 
     # Build verification → parallel verification fan-out

@@ -22,8 +22,28 @@
       "build_verification": true,
       "coverage_check": true,
       "security_scan": true,
-      "approval_gates": false
+      "approval_gates": false,
+      "task_breakdown": true
     },
     "approval_phases": []
+  },
+  "task_execution": {
+    "max_task_attempts": 3,
+    "task_timeout_seconds": 600,
+    "test_timeout_seconds": 120
+  },
+  "integrations": {
+    "linear": {
+      "enabled": false,
+      "team_id": null,
+      "create_project": true,
+      "status_mapping": {
+        "pending": "Backlog",
+        "in_progress": "In Progress",
+        "completed": "Done",
+        "blocked": "Blocked",
+        "failed": "Cancelled"
+      }
+    }
   }
 }
