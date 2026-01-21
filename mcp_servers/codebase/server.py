@@ -399,6 +399,14 @@ async def get_symbols(
         if not lang:
             continue
 
+        # Mapping from singular symbol type to plural dict key
+        type_to_key = {
+            "function": "functions",
+            "class": "classes",
+            "method": "methods",
+            "variable": "variables",
+        }
+
         try:
             content = file.read_text()
             rel_path = str(file.relative_to(project_dir))
@@ -410,7 +418,7 @@ async def get_symbols(
                 for i, line in enumerate(content.split("\n"), 1):
                     match = re.match(pattern, line)
                     if match:
-                        symbols[f"{sym_type}s" if not sym_type.endswith("s") else sym_type].append({
+                        symbols[type_to_key[sym_type]].append({
                             "name": match.group(1),
                             "file": rel_path,
                             "line": i,
@@ -619,18 +627,25 @@ async def get_file_summary(
         # TypeScript/JavaScript patterns
         elif ext in (".ts", ".js", ".tsx", ".jsx"):
             for i, line in enumerate(lines, 1):
+                # Check for imports
                 if re.match(r"^import\s+", line):
                     summary["imports"].append({"line": i, "statement": line.strip()})
+                # Check for class definitions (before generic exports to capture exported classes)
+                class_match = re.match(r"(?:export\s+)?class\s+(\w+)", line)
+                if class_match:
+                    summary["classes"].append({"name": class_match.group(1), "line": i})
+                    if line.strip().startswith("export"):
+                        summary["exports"].append({"line": i, "statement": line.strip()})
+                # Check for function definitions (before generic exports to capture exported functions)
+                elif re.match(r"(?:export\s+)?(?:async\s+)?function\s+(\w+)", line):
+                    func_match = re.match(r"(?:export\s+)?(?:async\s+)?function\s+(\w+)", line)
+                    if func_match:
+                        summary["functions"].append({"name": func_match.group(1), "line": i})
+                        if line.strip().startswith("export"):
+                            summary["exports"].append({"line": i, "statement": line.strip()})
+                # Check for other exports (const, let, var, type, interface, etc.)
                 elif re.match(r"^export\s+", line):
                     summary["exports"].append({"line": i, "statement": line.strip()})
-                elif re.match(r"(?:export\s+)?(?:async\s+)?function\s+(\w+)", line):
-                    match = re.match(r"(?:export\s+)?(?:async\s+)?function\s+(\w+)", line)
-                    if match:
-                        summary["functions"].append({"name": match.group(1), "line": i})
-                elif re.match(r"(?:export\s+)?class\s+(\w+)", line):
-                    match = re.match(r"(?:export\s+)?class\s+(\w+)", line)
-                    if match:
-                        summary["classes"].append({"name": match.group(1), "line": i})
 
         return summary
 
