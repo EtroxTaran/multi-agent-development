@@ -1,8 +1,8 @@
 # Claude-Specific Rules
 
 <!-- AGENT-SPECIFIC: Only applies to Claude -->
-<!-- Version: 4.0 -->
-<!-- Updated: 2026-01-21 - Added file boundaries, external projects, parallel workers -->
+<!-- Version: 5.0 -->
+<!-- Updated: 2026-01-22 - Added autonomous mode for fully automated execution -->
 
 ---
 
@@ -16,12 +16,37 @@
 ```
 
 ### Step 2: User Adds Documentation
-The user should add to `projects/<name>/`:
-- **Documents/** folder with product vision and architecture docs
-- **Context files** (CLAUDE.md, GEMINI.md, .cursor/rules) - pre-researched for this project
-- **PRODUCT.md** with feature specification
 
-PRODUCT.md should have these sections:
+The user should add to `projects/<name>/`:
+
+**Required:**
+- **Docs/** folder with comprehensive documentation
+- **Docs/PRODUCT.md** with feature specification
+
+**Recommended Docs/ Structure:**
+```
+projects/<name>/
+├── Docs/                              <- Primary documentation folder
+│   ├── PRODUCT.md                     <- Feature specification (REQUIRED)
+│   ├── vision/
+│   │   ├── product-vision.md          <- Why we're building this
+│   │   └── target-users.md            <- Who it's for
+│   ├── architecture/
+│   │   ├── overview.md                <- System architecture
+│   │   ├── data-model.md              <- Data structures
+│   │   └── api-design.md              <- API contracts
+│   ├── requirements/
+│   │   ├── functional.md              <- What it should do
+│   │   └── non-functional.md          <- Performance, security, etc.
+│   └── decisions/
+│       └── adr-001-*.md               <- Architecture decision records
+├── CLAUDE.md                          <- Worker coding standards (optional)
+├── GEMINI.md                          <- Gemini context (optional)
+├── .cursor/rules                      <- Cursor context (optional)
+└── src/                               <- Application code
+```
+
+**PRODUCT.md should have these sections:**
 - **Feature Name**: Clear name (5-100 chars)
 - **Summary**: What it does (50-500 chars)
 - **Problem Statement**: Why it's needed (min 100 chars)
@@ -33,6 +58,8 @@ PRODUCT.md should have these sections:
 
 **IMPORTANT**: No placeholders like `[TODO]`, `[TBD]`, or `...` - these will fail validation!
 
+**Flexible Documentation**: The orchestrator adapts to whatever documentation exists. More docs = better context for planning. At minimum, `Docs/PRODUCT.md` is required.
+
 ### Step 3: Run the Workflow
 ```bash
 # Nested project (in projects/ directory)
@@ -43,6 +70,9 @@ PRODUCT.md should have these sections:
 
 # With parallel workers (experimental)
 ./scripts/init.sh run <project-name> --parallel 3
+
+# Fully autonomous mode (no human consultation)
+./scripts/init.sh run <project-name> --autonomous
 ```
 
 Or use the slash command:
@@ -130,11 +160,15 @@ conductor/                     <- OUTER LAYER (You - Orchestrator)
 |-- scripts/                        <- Agent invocation scripts
 +-- projects/                       <- Project containers (nested mode)
     +-- <project-name>/             <- INNER LAYER (Worker Claude)
-        |-- Documents/              <- Product vision, architecture docs
+        |-- Docs/                   <- Primary documentation folder
+        |   |-- PRODUCT.md          <- Feature specification (REQUIRED)
+        |   |-- vision/             <- Product vision docs
+        |   |-- architecture/       <- Architecture docs
+        |   |-- requirements/       <- Requirements docs
+        |   +-- decisions/          <- Architecture Decision Records
         |-- CLAUDE.md               <- Worker context (coding rules)
         |-- GEMINI.md               <- Gemini context
         |-- .cursor/rules           <- Cursor context
-        |-- PRODUCT.md              <- Feature specification
         |-- .workflow/              <- Orchestrator-writable state
         |-- src/                    <- Worker-only: Application code
         +-- tests/                  <- Worker-only: Tests
@@ -162,7 +196,8 @@ python -m orchestrator --project-path ~/repos/my-project --start
 ```
 
 **Requirements for external projects:**
-- Must have `PRODUCT.md` with feature specification
+- Must have `Docs/PRODUCT.md` with feature specification (or `PRODUCT.md` in root as fallback)
+- Should have `Docs/` folder with supporting documentation
 - Should have `.workflow/` directory (created automatically)
 - Should have context files (CLAUDE.md, etc.)
 
@@ -177,14 +212,67 @@ is_external = pm.is_external_project(project_dir)  # True
 
 ---
 
+## Execution Modes
+
+The workflow supports two execution modes:
+
+### Interactive Mode (Default)
+The default mode pauses for human input at critical decision points:
+- When errors need resolution (escalation)
+- At configured approval gates
+- When clarification is needed
+
+```bash
+# Interactive mode (default)
+./scripts/init.sh run my-app
+
+# Via Python
+python -m orchestrator --project my-app --start
+```
+
+### Autonomous Mode
+Run fully autonomously without human consultation. The orchestrator makes all decisions based on best practices:
+
+```bash
+# Autonomous mode
+./scripts/init.sh run my-app --autonomous
+
+# Via Python
+python -m orchestrator --project my-app --start --autonomous
+```
+
+**Autonomous Mode Behavior:**
+- **Escalations**: Automatically retries up to 3 times, then aborts or skips
+- **Approval Gates**: Auto-approved with audit trail
+- **Clarifications**: Proceeds with best-guess implementation
+- **Validation Failures**: Retries, then skips to next phase
+- **Verification Failures**: Retries, then completes with warnings
+
+**When to Use Autonomous Mode:**
+- Well-defined projects with comprehensive Docs/ folder
+- Projects with clear Docs/PRODUCT.md and supporting documentation
+- Projects where you trust the AI to make reasonable decisions
+- Overnight or batch processing runs
+- When you want to see results quickly and fix issues later
+
+**When NOT to Use Autonomous Mode:**
+- New or experimental projects
+- Projects without Docs/ folder (will abort)
+- Projects with ambiguous requirements
+- When you need to verify each step
+- Critical production code changes
+
+---
+
 ## Primary Responsibilities
 
 1. **Manage Projects**: Initialize, list, and track projects
-2. **Read Specifications**: Read `PRODUCT.md` and `Documents/`
-3. **Create Plans**: Write plans to `.workflow/phases/planning/plan.json`
-4. **Coordinate Reviews**: Call Cursor/Gemini for plan/code review
-5. **Spawn Workers**: Spawn worker Claude for implementation
-6. **Resolve Conflicts**: Make final decisions when reviewers disagree
+2. **Discover Documentation**: Recursively read all docs from `Docs/` folder
+3. **Read Specifications**: Read `Docs/PRODUCT.md` and supporting documentation
+4. **Create Plans**: Write plans to `.workflow/phases/planning/plan.json`
+5. **Coordinate Reviews**: Call Cursor/Gemini for plan/code review
+6. **Spawn Workers**: Spawn worker Claude for implementation
+7. **Resolve Conflicts**: Make final decisions when reviewers disagree
 
 ## You Do NOT
 
@@ -199,6 +287,7 @@ is_external = pm.is_external_project(project_dir)  # True
 
 | Phase | Your Role | Files You Write |
 |-------|-----------|-----------------|
+| 0.5 - Discovery | Read all docs from Docs/ | `.workflow/docs-index.json` |
 | 1 - Planning | Create plan.json | `.workflow/phases/planning/plan.json` |
 | 2 - Validation | Coordinate Cursor + Gemini | `.workflow/phases/validation/` |
 | 3 - Implementation | **Spawn worker Claude** | None (worker writes code) |
@@ -391,6 +480,7 @@ Project workflow state is stored in `.workflow/`:
 ```
 .workflow/
 |-- state.json                      <- Current workflow state
+|-- docs-index.json                 <- Index of discovered documentation
 |-- checkpoints.db                  <- LangGraph checkpoints (SQLite)
 +-- phases/
     |-- planning/

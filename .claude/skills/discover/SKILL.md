@@ -1,14 +1,14 @@
 # Discover Skill
 
-Read Documents/ folder, understand the project, and help create PRODUCT.md.
+Read Docs/ folder, understand the project, and help create PRODUCT.md.
 
 ## Overview
 
 This skill guides the discovery phase where you:
-1. Read all documents in the Documents/ folder
+1. Read all documents in the Docs/ folder (recursively)
 2. Understand the project vision and context
 3. Ask clarifying questions
-4. Help the user create a well-structured PRODUCT.md
+4. Help the user create a well-structured Docs/PRODUCT.md
 
 ## Usage
 
@@ -31,13 +31,41 @@ The goal is to build shared understanding before any code is written. By the end
 
 ### Step 1: Find and Read Documents
 
-Look for documentation in these locations:
-- `Documents/` folder (primary)
-- `docs/` folder (alternative)
-- `README.md` (if no Documents folder)
+Look for documentation in these locations (in order of priority):
+
+**Primary (preferred):**
+- `Docs/` folder - Primary documentation folder
+
+**Fallbacks (legacy):**
+- `Documents/` folder - Legacy naming convention
+- `docs/` folder - Lowercase alternative
+- `README.md` - If no docs folder exists
 - Any `.md` files in the root
 
-List all found documents and read each one.
+**Recommended Docs/ Structure:**
+```
+Docs/
+├── PRODUCT.md                 <- Feature specification (create here)
+├── vision/
+│   ├── product-vision.md      <- Why we're building this
+│   └── target-users.md        <- Who it's for
+├── architecture/
+│   ├── overview.md            <- System architecture
+│   ├── data-model.md          <- Data structures
+│   └── api-design.md          <- API contracts
+├── requirements/
+│   ├── functional.md          <- What it should do
+│   └── non-functional.md      <- Performance, security, etc.
+└── decisions/
+    └── adr-001-*.md           <- Architecture decision records
+```
+
+**How to search:**
+```
+Glob: Docs/**/*.md
+```
+
+If Docs/ doesn't exist, check fallback locations. List all found documents and read each one.
 
 ### Step 2: Summarize Understanding
 
@@ -82,9 +110,9 @@ Create or update `CONTEXT.md` with:
 - Constraints confirmed
 - Out-of-scope items
 
-### Step 5: Draft PRODUCT.md
+### Step 5: Draft Docs/PRODUCT.md
 
-When ready, propose a PRODUCT.md draft:
+When ready, propose a Docs/PRODUCT.md draft:
 
 ```markdown
 # Feature Name
@@ -136,9 +164,9 @@ When ready, propose a PRODUCT.md draft:
 
 ### Step 6: Get Approval
 
-Ask: "Should I save this as PRODUCT.md?"
+Ask: "Should I save this as Docs/PRODUCT.md?"
 
-Only save after user confirms.
+Only save after user confirms. Create the Docs/ folder if it doesn't exist.
 
 ## Key Behaviors
 
@@ -159,18 +187,21 @@ Only save after user confirms.
 
 ## Document Locations
 
-Check these paths (in order):
-1. `Documents/` - Primary documentation folder
-2. `docs/` - Alternative documentation folder
-3. `README.md` - Project readme
-4. `./*.md` - Any markdown files in root
+Check these paths (in priority order):
+1. `Docs/` - Primary documentation folder (preferred)
+2. `Documents/` - Legacy documentation folder (fallback)
+3. `docs/` - Lowercase alternative (fallback)
+4. `README.md` - Project readme (minimal fallback)
+5. `./*.md` - Any markdown files in root (last resort)
 
 ## Output Files
 
 | File | Purpose |
 |------|---------|
 | `CONTEXT.md` | Decisions and preferences from discussion |
-| `PRODUCT.md` | Feature specification (after approval) |
+| `Docs/PRODUCT.md` | Feature specification (after approval) |
+
+**Note:** PRODUCT.md should be created inside Docs/ folder, not in project root.
 
 ## State Update
 
@@ -181,16 +212,16 @@ After completing discovery:
 
 ## Transition
 
-When PRODUCT.md is created and approved:
+When Docs/PRODUCT.md is created and approved:
 
 ```
-Discovery complete! PRODUCT.md created.
+Discovery complete! Docs/PRODUCT.md created.
 
 Next steps:
   /plan - Create task breakdown from this specification
 
 Or if you want to review the spec again:
-  Read PRODUCT.md and let me know any changes needed.
+  Read Docs/PRODUCT.md and let me know any changes needed.
 ```
 
 ## Example Session
@@ -202,10 +233,12 @@ Claude: I'll explore your project documentation to understand what we're buildin
 
 Let me check for documents...
 
+Searching: Docs/**/*.md
+
 Found:
-  - Documents/product-vision.md
-  - Documents/technical-spec.md
-  - Documents/api-design.md
+  - Docs/vision/product-vision.md
+  - Docs/architecture/overview.md
+  - Docs/architecture/api-design.md
 
 Reading each document...
 
@@ -221,7 +254,7 @@ Greenfield project. No existing code yet. Using TypeScript + Express + PostgreSQ
 Building the core task CRUD operations with user assignment.
 
 ### Key Constraints
-- REST API design
+- REST API design (from Docs/architecture/api-design.md)
 - Must support bulk operations
 - Auth handled separately (OAuth assumed)
 
@@ -236,15 +269,15 @@ User: Keep flat for MVP. Use labels. No rate limits yet. Web app only for now.
 
 Claude: Got it. Let me capture that in CONTEXT.md...
 
-Based on our discussion, here's a draft PRODUCT.md:
+Based on our discussion, here's a draft Docs/PRODUCT.md:
 
 [Shows draft]
 
-Should I save this as PRODUCT.md?
+Should I save this as Docs/PRODUCT.md?
 
 User: Yes, looks good.
 
-Claude: Created PRODUCT.md
+Claude: Created Docs/PRODUCT.md
 
 Discovery complete! You can now:
   /plan - Create task breakdown from this specification

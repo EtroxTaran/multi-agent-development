@@ -17,9 +17,11 @@ This skill handles Phase 1 (Planning) of the workflow. It spawns a worker Claude
 ## Input Requirements
 
 Before running this skill, ensure:
-- `PRODUCT.md` exists with feature specification
-- `Documents/` folder has product vision (optional)
+- `Docs/PRODUCT.md` exists with feature specification (REQUIRED)
+- `Docs/` folder contains project documentation (vision, architecture, requirements)
 - `CONTEXT.md` has discussion outcomes (optional)
+
+**Note:** If PRODUCT.md is in project root (legacy), it will be used but a warning is logged. Prefer `Docs/PRODUCT.md`.
 
 ## Task Tool Invocation
 
@@ -35,10 +37,35 @@ Task(
   You are a senior software architect creating an implementation plan.
 
   ## Input Files to Read
-  1. PRODUCT.md - Feature specification (REQUIRED)
-  2. Documents/ - Product vision and architecture (if exists)
-  3. CONTEXT.md - Developer preferences from discussion (if exists)
-  4. Existing codebase structure
+
+  **Step 1: Read ALL documentation from Docs/ folder**
+
+  Use Glob to find all docs:
+  ```
+  Glob: Docs/**/*.md
+  ```
+
+  **Priority order:**
+  1. Docs/PRODUCT.md - Feature specification (REQUIRED)
+  2. Docs/vision/*.md - Product vision and goals
+  3. Docs/architecture/*.md - Technical constraints, design patterns
+  4. Docs/requirements/*.md - Functional and non-functional requirements
+  5. Docs/decisions/*.md - Architecture decision records (ADRs)
+
+  **Also check:**
+  - CONTEXT.md - Developer preferences from discussion (if exists)
+  - Existing codebase structure
+
+  **Fallback:** If Docs/PRODUCT.md doesn't exist, check for PRODUCT.md in project root.
+
+  ## Build Context Before Planning
+
+  Before creating the plan, ensure you understand:
+  - **Vision**: Why are we building this? (from Docs/vision/)
+  - **Constraints**: What technical limitations exist? (from Docs/architecture/)
+  - **Requirements**: What must it do? (from Docs/requirements/)
+  - **Past decisions**: What has already been decided? (from Docs/decisions/)
+  - **Success criteria**: How do we know we're done? (from Docs/PRODUCT.md)
 
   ## Output Requirements
 
@@ -120,12 +147,14 @@ Task(
   ## Validation Checklist
 
   Before completing, verify:
-  [ ] All PRODUCT.md requirements covered
+  [ ] All Docs/PRODUCT.md requirements covered
   [ ] All acceptance criteria mapped to tasks
+  [ ] Architecture constraints from Docs/architecture/ respected
   [ ] Task dependencies form a valid DAG
   [ ] No circular dependencies
   [ ] Each task respects size limits
   [ ] Test strategy covers all tasks
+  [ ] Plan aligns with vision from Docs/vision/
   """,
   run_in_background=false
 )
@@ -218,9 +247,15 @@ After Auto-Split (max 3):
 
 ## Error Handling
 
-### Missing PRODUCT.md
-- Cannot proceed without specification
-- Ask user to provide PRODUCT.md
+### Missing Docs/PRODUCT.md
+- Check for PRODUCT.md in project root (legacy fallback)
+- If neither exists, cannot proceed without specification
+- Ask user to provide Docs/PRODUCT.md or run `/discover`
+
+### Missing Docs/ Folder
+- Log warning: "No Docs/ folder found. Planning with limited context."
+- Proceed with just PRODUCT.md if available
+- Recommend user add supporting documentation
 
 ### Task Exceeds Limits
 - Auto-split the task
