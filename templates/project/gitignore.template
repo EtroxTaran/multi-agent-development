@@ -1,8 +1,11 @@
 # =============================================================================
-# Meta-Architect Workflow State
+# Meta-Architect
 # =============================================================================
 # Workflow state is regenerated during each run
 .workflow/
+
+# Symlink to submodule skills (recreated by setup script)
+.claude
 
 # =============================================================================
 # Environment and Secrets

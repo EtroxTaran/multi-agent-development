@@ -336,7 +336,27 @@ else
 fi
 
 # =============================================================================
-# Step 5: Update .gitignore
+# Step 5: Symlink .claude for skills access
+# =============================================================================
+
+info "Setting up Claude skills..."
+
+if [[ -d "$SUBMODULE_PATH/.claude" ]]; then
+    if [[ -L ".claude" ]]; then
+        success "Symlink .claude already exists"
+    elif [[ -d ".claude" ]]; then
+        warn "Directory .claude already exists (not symlinking)"
+        warn "To use /orchestrate, manually symlink: ln -s meta-architect/.claude .claude"
+    else
+        ln -s "$SUBMODULE_PATH/.claude" ".claude"
+        success "Created symlink: .claude -> $SUBMODULE_PATH/.claude"
+    fi
+else
+    warn "meta-architect/.claude not found - skills won't be available"
+fi
+
+# =============================================================================
+# Step 6: Update .gitignore
 # =============================================================================
 
 info "Checking .gitignore..."
@@ -344,10 +364,13 @@ info "Checking .gitignore..."
 GITIGNORE_ADDITIONS=$(cat << 'GITIGNORE_EOF'
 
 # =============================================================================
-# Meta-Architect Workflow State
+# Meta-Architect
 # =============================================================================
 # Workflow state is regenerated during each run
 .workflow/
+
+# Symlink to submodule (don't commit - each clone recreates it)
+.claude
 GITIGNORE_EOF
 )
 
@@ -362,7 +385,7 @@ else
 fi
 
 # =============================================================================
-# Step 6: Create .workflow directory
+# Step 7: Create .workflow directory
 # =============================================================================
 
 info "Setting up workflow directory..."

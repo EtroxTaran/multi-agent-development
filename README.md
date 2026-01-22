@@ -419,6 +419,7 @@ After setup, your project looks like:
 ```
 my-project/                 <- Run Claude HERE (project root)
 ├── meta-architect/         <- Submodule (tools live here)
+├── .claude -> meta-architect/.claude  <- Symlink for /orchestrate
 ├── PRODUCT.md              <- Your feature specification
 ├── CLAUDE.md               <- Your coding rules
 ├── GEMINI.md               <- Gemini context (optional)
