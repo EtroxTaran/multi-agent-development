@@ -44,7 +44,7 @@ check_prereqs() {
         echo -e "  ${GREEN}+${NC} Dependencies installed"
     else
         echo -e "  ${YELLOW}>${NC} Installing dependencies..."
-        "$ROOT_DIR/.venv/bin/pip" install -r "$ROOT_DIR/requirements.txt" -q
+        "$ROOT_DIR/.venv/bin/pip" install -e "$ROOT_DIR" -q
         echo -e "  ${GREEN}+${NC} Dependencies installed"
     fi
 
