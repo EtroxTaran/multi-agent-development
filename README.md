@@ -325,107 +325,147 @@ When agents disagree, the system uses weighted expertise:
 
 ### Prerequisites
 
-- Python 3.10+
-- Git
-- AI CLI tools:
-  - **Claude Code CLI** (`claude`) - Required
-  - **Cursor CLI** (`cursor`) - Optional but recommended
-  - **Gemini CLI** (`gemini`) - Optional but recommended
+- **Python 3.10+**
+- **Git**
+- **uv** (recommended) or pip for dependency management
+
+### AI CLI Tools
+
+| Tool | Required | Installation |
+|------|----------|--------------|
+| **Claude Code CLI** | Yes | `npm install -g @anthropic-ai/claude-code` |
+| **Cursor CLI** | Optional | Install [Cursor IDE](https://cursor.sh), CLI included |
+| **Gemini CLI** | Optional | `npm install -g @google/gemini-cli` |
+
+> **Note**: The workflow can run with just Claude Code. Cursor and Gemini enable the 4-eyes review protocol for higher quality.
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/meta-architect.git
-cd meta-architect
+git clone https://github.com/EtroxTaran/multi-agent-development.git
+cd multi-agent-development
 
-# Create virtual environment (optional)
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# or: .venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -e .
+# Install dependencies (choose one)
+uv sync                    # Recommended: fast, handles virtualenv
+# or
+pip install -e .           # Alternative: manual pip install
 
 # Verify installation
-python -c "from orchestrator import Orchestrator; print('OK')"
+./scripts/init.sh check
+```
+
+### Verify CLI Tools
+
+```bash
+# Check all prerequisites
+./scripts/init.sh check
+
+# Expected output shows which CLIs are available:
+# ✓ claude (required)
+# ✓ cursor-agent (optional)
+# ✓ gemini (optional)
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Create Your Project
+### 1. Initialize Your Project
 
 ```bash
 # From meta-architect root directory
-./scripts/init.sh create my-app --type node-api
-
-# Available types: node-api, react-tanstack, java-spring, nx-fullstack
+./scripts/init.sh init my-app
 ```
 
-This creates `projects/my-app/` with all necessary configuration files.
+This creates `projects/my-app/` with `.workflow/` and `.project-config.json`.
 
-### 2. Define Your Feature
+### 2. Add Your Files
 
-Edit `PRODUCT.md` with your feature specification:
+Add these files to `projects/my-app/`:
+
+```
+projects/my-app/
+├── PRODUCT.md          # Your feature specification (required)
+├── CLAUDE.md           # Worker Claude context (recommended)
+├── GEMINI.md           # Gemini review context (recommended)
+├── .cursor/rules       # Cursor review rules (recommended)
+└── Documents/          # Architecture docs, etc. (optional)
+```
+
+### 3. Write Your Feature Spec
+
+Create `PRODUCT.md` with your feature specification:
 
 ```markdown
-# Product Specification
-
-## Feature Name
+# Feature Name
 User Authentication System
 
 ## Summary
 Implement JWT-based authentication with login, registration, and token refresh.
 
-## Goals
-- Secure user registration with email verification
-- JWT token generation with configurable expiry
-- Token refresh mechanism
-- Password reset flow
+## Problem Statement
+Users need a secure way to authenticate and maintain sessions. The current
+system lacks proper authentication, exposing the application to security risks.
 
-## Technical Requirements
+## Acceptance Criteria
+- [ ] User registration with email validation
+- [ ] Login returns JWT access + refresh tokens
+- [ ] Tokens expire correctly (15min access, 7day refresh)
+
+## Example Inputs/Outputs
+
+### Registration
+POST /auth/register
+Input: { "email": "user@example.com", "password": "SecurePass123!" }
+Output: { "success": true, "userId": "uuid-here" }
+
+### Login
+POST /auth/login
+Input: { "email": "user@example.com", "password": "SecurePass123!" }
+Output: { "accessToken": "eyJ...", "refreshToken": "eyJ..." }
+
+## Technical Constraints
 - Use bcrypt for password hashing
-- Store tokens in HTTP-only cookies
-- Implement rate limiting on auth endpoints
+- JWT signed with RS256 algorithm
 
-## Test Strategy
+## Testing Strategy
 - Unit tests for all auth functions
 - Integration tests for API endpoints
-- Security tests for token validation
+
+## Definition of Done
+- [ ] All acceptance criteria met
+- [ ] Tests passing with 80%+ coverage
+- [ ] No high/critical security issues
+- [ ] Code reviewed
 ```
 
-### 3. Start the Workflow
+> **Important**: No placeholders like `[TODO]` or `[TBD]` - these will fail validation!
+
+### 4. Run the Workflow
 
 ```bash
-cd /path/to/your/project
-claude
+# Run the 5-phase workflow
+./scripts/init.sh run my-app
+
+# Or use the slash command in Claude Code
+/orchestrate --project my-app
 ```
 
-In Claude Code, say:
-```
-Implement the feature from PRODUCT.md
-```
+### 5. Monitor Progress
 
-Or use the skill directly:
-```
-/orchestrate
-```
-
-Claude will automatically execute all 5 phases.
-
-### 4. Monitor Progress
-
-Check status at any time:
 ```bash
-python -m orchestrator --status
+# Check status
+./scripts/init.sh status my-app
+
+# Or in Claude Code
+/phase-status --project my-app
+
+# View logs
+cat projects/my-app/.workflow/coordination.log
 ```
 
-Or in Claude Code:
-```
-/phase-status
-```
+> **For complete documentation**, see [docs/META-ARCHITECT-GUIDE.md](docs/META-ARCHITECT-GUIDE.md)
 
 ---
 
