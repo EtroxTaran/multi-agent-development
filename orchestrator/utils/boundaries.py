@@ -7,8 +7,9 @@ application code (which should only be modified by worker Claude instances).
 Orchestrator-writable paths:
 - .workflow/**     - Workflow state and phase outputs
 - .project-config.json - Project configuration
+- Docs/**          - Documentation (can reorganize/improve)
 
-Everything else (src/, tests/, CLAUDE.md, PRODUCT.md, etc.) is worker-only.
+Everything else (src/, tests/, CLAUDE.md, PRODUCT.md in root, etc.) is worker-only.
 """
 
 import fnmatch
@@ -36,6 +37,8 @@ ORCHESTRATOR_WRITABLE_PATTERNS = [
     ".workflow/**",
     ".workflow",
     ".project-config.json",
+    "Docs/**",
+    "Docs",
 ]
 
 # Patterns for paths that are explicitly forbidden (even if they match above)
@@ -213,7 +216,7 @@ def get_writable_paths_info() -> dict:
         "writable_patterns": ORCHESTRATOR_WRITABLE_PATTERNS.copy(),
         "forbidden_patterns": ORCHESTRATOR_FORBIDDEN_PATTERNS.copy(),
         "description": (
-            "Orchestrator can only write to .workflow/ and .project-config.json. "
+            "Orchestrator can write to .workflow/, .project-config.json, and Docs/. "
             "All other paths (src/, tests/, application code) must be modified by workers."
         ),
     }

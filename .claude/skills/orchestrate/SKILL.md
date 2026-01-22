@@ -156,15 +156,14 @@ If no folder found, check fallback locations. If all missing, apply "Missing Doc
 
 #### Step 2: Read All Markdown Files
 
-Recursively read all `.md` files in the documentation folder:
+Recursively read ALL `.md` files in the documentation folder:
 
-**Priority Order:**
-1. `Docs/PRODUCT.md` - Primary feature specification (REQUIRED)
-2. `Docs/vision/*.md` - Product vision and goals
-3. `Docs/architecture/*.md` - Technical constraints and design
-4. `Docs/requirements/*.md` - Functional and non-functional requirements
-5. `Docs/decisions/*.md` - Architecture decision records (ADRs)
-6. Any other `.md` files in `Docs/`
+**What Gets Read:**
+- `Docs/PRODUCT.md` - Feature specification (REQUIRED, can be anywhere in Docs/)
+- ALL `.md` files in Docs/ and ALL subfolders (any structure)
+
+The structure is completely flexible. The orchestrator adapts to whatever
+documentation exists and however it's organized.
 
 Use Glob to find files:
 ```
@@ -176,11 +175,11 @@ Then read each file with the Read tool.
 #### Step 3: Build Context Summary
 
 After reading all documentation, build a mental model of:
-- **What we're building** (from vision docs)
+- **What we're building** (from any vision/goals documentation)
 - **Why** (from problem statement in PRODUCT.md)
-- **How it should work** (from architecture docs)
-- **Constraints** (from requirements docs)
-- **Past decisions** (from ADRs)
+- **How it should work** (from any architecture/design documentation)
+- **Constraints** (from any requirements/constraints documentation)
+- **Past decisions** (from any decision records/ADRs)
 - **Success criteria** (from acceptance criteria in PRODUCT.md)
 
 #### Step 4: Save Documentation Index
@@ -194,17 +193,14 @@ Save an index of discovered documentation to `.workflow/docs-index.json`:
   "files": [
     {
       "path": "Docs/PRODUCT.md",
-      "type": "specification",
       "summary": "Feature specification for user authentication"
     },
     {
-      "path": "Docs/vision/product-vision.md",
-      "type": "vision",
+      "path": "Docs/goals.md",
       "summary": "High-level product goals and target users"
     },
     {
-      "path": "Docs/architecture/overview.md",
-      "type": "architecture",
+      "path": "Docs/design/system-overview.md",
       "summary": "System architecture and component design"
     }
   ],
@@ -212,6 +208,9 @@ Save an index of discovered documentation to `.workflow/docs-index.json`:
   "has_product_md": true
 }
 ```
+
+Note: The structure shown above is just an example. Docs/ can have ANY folder
+structure - the orchestrator reads all `.md` files regardless of how they're organized.
 
 Update state with `docs_index` reference.
 
@@ -267,19 +266,18 @@ Task(
   **Required:**
   - Docs/PRODUCT.md (feature specification)
 
-  **If they exist (check .workflow/docs-index.json):**
-  - Docs/vision/*.md (product vision, goals)
-  - Docs/architecture/*.md (technical constraints, design patterns)
-  - Docs/requirements/*.md (functional/non-functional requirements)
-  - Docs/decisions/*.md (architecture decision records)
-  - CONTEXT.md (developer preferences from discussion)
+  **Also read (check .workflow/docs-index.json for full list):**
+  - ALL `.md` files in Docs/ and subfolders (any structure)
+  - CONTEXT.md (developer preferences from discussion, if exists)
+
+  The documentation structure is flexible - read everything available.
 
   ## Context Summary
 
   Before planning, verify you understand:
-  - What we're building (from vision docs)
+  - What we're building (from available documentation)
   - Why (from problem statement)
-  - Technical constraints (from architecture docs)
+  - Technical constraints (from available documentation)
   - Success criteria (from acceptance criteria)
 
   ## Output: plan.json

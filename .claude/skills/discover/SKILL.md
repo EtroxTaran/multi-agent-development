@@ -42,28 +42,17 @@ Look for documentation in these locations (in order of priority):
 - `README.md` - If no docs folder exists
 - Any `.md` files in the root
 
-**Recommended Docs/ Structure:**
-```
-Docs/
-├── PRODUCT.md                 <- Feature specification (create here)
-├── vision/
-│   ├── product-vision.md      <- Why we're building this
-│   └── target-users.md        <- Who it's for
-├── architecture/
-│   ├── overview.md            <- System architecture
-│   ├── data-model.md          <- Data structures
-│   └── api-design.md          <- API contracts
-├── requirements/
-│   ├── functional.md          <- What it should do
-│   └── non-functional.md      <- Performance, security, etc.
-└── decisions/
-    └── adr-001-*.md           <- Architecture decision records
-```
+**Flexible Structure:**
+The Docs/ folder can have ANY structure. The only requirement is that `PRODUCT.md`
+exists somewhere in Docs/ (usually at the root). All other documentation can be
+organized however makes sense for the project.
 
 **How to search:**
 ```
 Glob: Docs/**/*.md
 ```
+
+This finds all `.md` files in Docs/ and all subfolders, regardless of structure.
 
 If Docs/ doesn't exist, check fallback locations. List all found documents and read each one.
 
@@ -236,9 +225,9 @@ Let me check for documents...
 Searching: Docs/**/*.md
 
 Found:
-  - Docs/vision/product-vision.md
-  - Docs/architecture/overview.md
-  - Docs/architecture/api-design.md
+  - Docs/product-vision.md
+  - Docs/design/overview.md
+  - Docs/design/api-design.md
 
 Reading each document...
 

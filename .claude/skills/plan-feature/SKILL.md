@@ -45,14 +45,13 @@ Task(
   Glob: Docs/**/*.md
   ```
 
-  **Priority order:**
-  1. Docs/PRODUCT.md - Feature specification (REQUIRED)
-  2. Docs/vision/*.md - Product vision and goals
-  3. Docs/architecture/*.md - Technical constraints, design patterns
-  4. Docs/requirements/*.md - Functional and non-functional requirements
-  5. Docs/decisions/*.md - Architecture decision records (ADRs)
+  This reads ALL `.md` files in Docs/ and all subfolders, regardless of structure.
 
-  **Also check:**
+  **Required:**
+  - Docs/PRODUCT.md - Feature specification (REQUIRED)
+
+  **Also read:**
+  - ALL other `.md` files in Docs/ (any structure)
   - CONTEXT.md - Developer preferences from discussion (if exists)
   - Existing codebase structure
 
@@ -61,10 +60,10 @@ Task(
   ## Build Context Before Planning
 
   Before creating the plan, ensure you understand:
-  - **Vision**: Why are we building this? (from Docs/vision/)
-  - **Constraints**: What technical limitations exist? (from Docs/architecture/)
-  - **Requirements**: What must it do? (from Docs/requirements/)
-  - **Past decisions**: What has already been decided? (from Docs/decisions/)
+  - **Vision**: Why are we building this? (from available documentation)
+  - **Constraints**: What technical limitations exist? (from available documentation)
+  - **Requirements**: What must it do? (from available documentation)
+  - **Past decisions**: What has already been decided? (from available documentation)
   - **Success criteria**: How do we know we're done? (from Docs/PRODUCT.md)
 
   ## Output Requirements
@@ -149,12 +148,12 @@ Task(
   Before completing, verify:
   [ ] All Docs/PRODUCT.md requirements covered
   [ ] All acceptance criteria mapped to tasks
-  [ ] Architecture constraints from Docs/architecture/ respected
+  [ ] Architecture constraints from documentation respected
   [ ] Task dependencies form a valid DAG
   [ ] No circular dependencies
   [ ] Each task respects size limits
   [ ] Test strategy covers all tasks
-  [ ] Plan aligns with vision from Docs/vision/
+  [ ] Plan aligns with project vision from documentation
   """,
   run_in_background=false
 )

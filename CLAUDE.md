@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-22 20:50:31 -->
+<!-- Last synced: 2026-01-22 21:30:24 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Claude Code as lead orchestrator.
@@ -30,26 +30,19 @@ Instructions for Claude Code as lead orchestrator.
 The user should add to `projects/<name>/`:
 
 **Required:**
-- **Docs/** folder with comprehensive documentation
+- **Docs/** folder with documentation (any structure)
 - **Docs/PRODUCT.md** with feature specification
 
-**Recommended Docs/ Structure:**
+**Flexible Docs/ Structure:**
+The Docs/ folder can have ANY structure - flat, nested, however makes sense for your project.
+The only requirement is `PRODUCT.md` exists somewhere in Docs/ (usually at root).
+All `.md` files in Docs/ and subfolders are read automatically.
+
 ```
 projects/<name>/
-├── Docs/                              <- Primary documentation folder
+├── Docs/                              <- Documentation (any structure)
 │   ├── PRODUCT.md                     <- Feature specification (REQUIRED)
-│   ├── vision/
-│   │   ├── product-vision.md          <- Why we're building this
-│   │   └── target-users.md            <- Who it's for
-│   ├── architecture/
-│   │   ├── overview.md                <- System architecture
-│   │   ├── data-model.md              <- Data structures
-│   │   └── api-design.md              <- API contracts
-│   ├── requirements/
-│   │   ├── functional.md              <- What it should do
-│   │   └── non-functional.md          <- Performance, security, etc.
-│   └── decisions/
-│       └── adr-001-*.md               <- Architecture decision records
+│   └── **/*.md                        <- Any other docs (optional)
 ├── CLAUDE.md                          <- Worker coding standards (optional)
 ├── GEMINI.md                          <- Gemini context (optional)
 ├── .cursor/rules                      <- Cursor context (optional)
@@ -118,6 +111,7 @@ The orchestrator has **strict file write boundaries**. This prevents accidental 
 ```
 projects/<name>/.workflow/**        <- Workflow state and phase outputs
 projects/<name>/.project-config.json <- Project configuration
+projects/<name>/Docs/**              <- Documentation (can reorganize/improve)
 ```
 
 ### Orchestrator CANNOT Write To:
@@ -170,12 +164,9 @@ conductor/                     <- OUTER LAYER (You - Orchestrator)
 |-- scripts/                        <- Agent invocation scripts
 +-- projects/                       <- Project containers (nested mode)
     +-- <project-name>/             <- INNER LAYER (Worker Claude)
-        |-- Docs/                   <- Primary documentation folder
+        |-- Docs/                   <- Documentation (any structure)
         |   |-- PRODUCT.md          <- Feature specification (REQUIRED)
-        |   |-- vision/             <- Product vision docs
-        |   |-- architecture/       <- Architecture docs
-        |   |-- requirements/       <- Requirements docs
-        |   +-- decisions/          <- Architecture Decision Records
+        |   +-- **/*.md             <- Any other docs (flexible)
         |-- CLAUDE.md               <- Worker context (coding rules)
         |-- GEMINI.md               <- Gemini context
         |-- .cursor/rules           <- Cursor context
