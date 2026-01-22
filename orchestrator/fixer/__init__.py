@@ -60,11 +60,12 @@ from .known_fixes import (
     KnownFix,
     FixPattern,
 )
-from .agent import FixerAgent
+from .agent import FixerAgent, create_fixer_agent
 
 __all__ = [
     # Main agent
     "FixerAgent",
+    "create_fixer_agent",
     # Circuit breaker
     "CircuitBreaker",
     "CircuitState",
