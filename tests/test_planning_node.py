@@ -349,19 +349,60 @@ We need comprehensive test coverage to ensure reliable operation.
         assert result["phase_status"]["1"].error is not None
 
 
-@pytest.mark.skip(reason="PLANNING_PROMPT moved to SpecialistRunner - tests need update")
-class TestPlanningPrompt:
-    """Tests for the planning prompt template.
+class TestSpecialistRunner:
+    """Tests for SpecialistRunner agent loading.
 
-    NOTE: These tests are skipped because the planning node now uses
-    SpecialistRunner which has its own prompts. Update these tests to
-    test the specialist prompts instead.
+    The planning node now uses SpecialistRunner to load agent configurations
+    from the agents/ directory structure.
     """
 
-    def test_prompt_has_required_sections(self):
-        """Test that PLANNING_PROMPT has all required sections."""
-        pass  # Placeholder - prompt now in SpecialistRunner
+    @pytest.fixture
+    def temp_project_with_agents(self, tmp_path):
+        """Create a temporary project with agent configs."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
 
-    def test_prompt_format_placeholder(self):
-        """Test that prompt can be formatted with product_spec."""
-        pass  # Placeholder - prompt now in SpecialistRunner
+        # Create agents directory with a test agent
+        agents_dir = project_dir / "agents" / "A01-planner"
+        agents_dir.mkdir(parents=True)
+
+        # Create context file
+        context_file = agents_dir / "CLAUDE.md"
+        context_file.write_text("""# Planner Agent
+
+## Role
+You are the planning agent responsible for creating implementation plans.
+
+## Instructions
+1. Read PRODUCT.md
+2. Create a structured plan
+3. Output valid JSON
+""")
+
+        # Create tools file
+        tools_file = agents_dir / "TOOLS.json"
+        tools_file.write_text('["Read", "Write", "Glob"]')
+
+        return project_dir
+
+    def test_specialist_runner_loads_agent_config(self, temp_project_with_agents):
+        """Test that SpecialistRunner can load agent configuration."""
+        from orchestrator.specialists.runner import SpecialistRunner
+
+        runner = SpecialistRunner(temp_project_with_agents)
+        config = runner.get_agent_config("A01")
+
+        assert config["type"] == "claude"
+        assert config["context_file"].exists()
+        assert "planner" in config["name"].lower()
+        assert len(config["tools"]) == 3
+
+    def test_specialist_runner_creates_agent(self, temp_project_with_agents):
+        """Test that SpecialistRunner can create an agent instance."""
+        from orchestrator.specialists.runner import SpecialistRunner
+        from orchestrator.agents.base import BaseAgent
+
+        runner = SpecialistRunner(temp_project_with_agents)
+        agent = runner.create_agent("A01")
+
+        assert isinstance(agent, BaseAgent)

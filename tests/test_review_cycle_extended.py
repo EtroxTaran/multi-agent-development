@@ -230,13 +230,8 @@ class TestCycleLogBounded:
         assert len(cycle_log) <= ReviewCycle.MAX_CYCLE_LOG_ENTRIES
 
 
-@pytest.mark.skip(reason="ConflictResolution interface changed - tests need update")
 class TestConflictDecisionEscalates:
-    """Tests for conflict decision handling.
-
-    NOTE: These tests are skipped because the ConflictResolution class
-    was renamed to ResolutionResult with a different interface.
-    """
+    """Tests for conflict decision handling using ResolutionResult."""
 
     @pytest.fixture
     def mock_dispatcher(self):
@@ -254,7 +249,7 @@ class TestConflictDecisionEscalates:
 
     @pytest.mark.asyncio
     async def test_conflict_decision_escalates(self, review_cycle, mock_dispatcher):
-        """Test that CONFLICT triggers immediate escalation."""
+        """Test that high score divergence triggers escalation."""
         mock_dispatcher.dispatch.return_value = DispatchResult(
             task_id="task-1",
             agent_id="A04",
@@ -263,7 +258,7 @@ class TestConflictDecisionEscalates:
             cli_used="claude",
         )
 
-        # One approves, one rejects with high score divergence
+        # One approves with high score, one rejects with low score (divergence > 3.0)
         mock_dispatcher.dispatch_reviewer.side_effect = [
             DispatchResult(
                 task_id="review-A07",
@@ -281,13 +276,14 @@ class TestConflictDecisionEscalates:
             ),
         ]
 
-        # Mock resolver to return unresolved conflict
+        # Mock resolver to return escalation action
         mock_resolver = MagicMock()
-        mock_resolver.resolve.return_value = ConflictResolution(
-            resolved=False,
-            final_decision="",
-            winning_reviewer="",
-            reasoning="Reviewers disagree and cannot be auto-resolved",
+        mock_resolver.resolve.return_value = ResolutionResult(
+            approved=False,
+            final_score=6.0,
+            decision_reason="High disagreement (Diff: 6.0). Cursor=9.0, Gemini=3.0",
+            blocking_issues=[{"agent": "gemini", "issue": "Major issue"}],
+            action="escalate",
         )
         review_cycle.conflict_resolver = mock_resolver
 
@@ -305,7 +301,7 @@ class TestConflictDecisionEscalates:
         )
 
         assert result.final_status == "escalated"
-        assert "conflict" in result.escalation_reason.lower()
+        assert "disagreement" in result.escalation_reason.lower() or "conflict" in result.escalation_reason.lower()
 
 
 class TestReviewerErrorContinues:

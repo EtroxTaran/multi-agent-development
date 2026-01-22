@@ -206,91 +206,85 @@ class TestReviewCycleResult:
         assert result.iteration_count == 3
 
 
-@pytest.mark.skip(reason="ConflictResolver interface changed - tests need update")
 class TestConflictResolver:
     """Tests for ConflictResolver class.
 
-    NOTE: These tests are skipped because the ConflictResolver interface
-    changed. The new interface uses resolve(cursor_review, gemini_review)
-    instead of resolve(reviews_list). Update these tests to use the new API.
+    The ConflictResolver uses weighted domain expertise to resolve
+    disagreements between Cursor (security) and Gemini (architecture).
     """
 
-    def test_all_approved_no_conflict(self):
-        """Test resolution when all reviewers approve."""
+    def test_all_approved_no_blockers(self):
+        """Test resolution when both reviewers approve with high scores."""
         resolver = ConflictResolver()
 
-        reviews = [
-            {"agent_id": "A07", "approved": True, "score": 8.0},
-            {"agent_id": "A08", "approved": True, "score": 7.5},
-        ]
+        cursor_review = {"approved": True, "score": 8.0, "blocking_issues": []}
+        gemini_review = {"approved": True, "score": 7.5, "blocking_issues": []}
 
-        resolution = resolver.resolve(reviews)
+        resolution = resolver.resolve(cursor_review, gemini_review)
 
-        assert resolution.resolved is True
-        assert resolution.final_decision == "approved"
+        assert resolution.approved is True
+        assert resolution.action == "approve"
+        assert resolution.final_score >= 7.0
 
-    def test_all_rejected_no_conflict(self):
-        """Test resolution when all reviewers reject."""
+    def test_all_rejected_with_blockers(self):
+        """Test resolution when both reviewers have blocking issues."""
         resolver = ConflictResolver()
 
-        reviews = [
-            {"agent_id": "A07", "approved": False, "score": 4.0},
-            {"agent_id": "A08", "approved": False, "score": 5.0},
-        ]
+        cursor_review = {"approved": False, "score": 4.0, "blocking_issues": ["Missing tests"]}
+        gemini_review = {"approved": False, "score": 5.0, "blocking_issues": ["Poor structure"]}
 
-        resolution = resolver.resolve(reviews)
+        resolution = resolver.resolve(cursor_review, gemini_review)
 
-        assert resolution.resolved is True
-        assert resolution.final_decision == "needs_changes"
+        assert resolution.approved is False
+        assert resolution.action == "reject"
+        assert len(resolution.blocking_issues) == 2
 
-    def test_conflict_with_security_priority(self):
-        """Test that security issues take priority in conflicts."""
+    def test_security_authority_veto(self):
+        """Test that security issues from Cursor trigger authority veto."""
         resolver = ConflictResolver()
 
-        reviews = [
-            {
-                "agent_id": "A07",
-                "approved": False,
-                "score": 4.0,
-                "security_findings": [{"severity": "high", "description": "SQL injection"}],
-                "blocking_issues": ["SQL injection"],
-            },
-            {"agent_id": "A08", "approved": True, "score": 8.0, "blocking_issues": []},
-        ]
+        cursor_review = {
+            "approved": False,
+            "score": 4.0,
+            "blocking_issues": ["SQL injection vulnerability found"],
+        }
+        gemini_review = {"approved": True, "score": 8.0, "blocking_issues": []}
 
-        resolution = resolver.resolve(reviews)
+        resolution = resolver.resolve(cursor_review, gemini_review)
 
-        # Security rejection should win
-        assert resolution.final_decision == "needs_changes"
-        assert resolution.winning_reviewer == "A07"
+        # Security authority veto should reject
+        assert resolution.approved is False
+        assert "Authority Veto" in resolution.decision_reason
 
-    def test_detect_approval_mismatch(self):
-        """Test detection of approval mismatch conflict."""
+    def test_architecture_authority_veto(self):
+        """Test that architecture issues from Gemini trigger authority veto."""
         resolver = ConflictResolver()
 
-        reviews = [
-            {"agent_id": "A07", "approved": True, "score": 7.5},
-            {"agent_id": "A08", "approved": False, "score": 5.5},
-        ]
+        cursor_review = {"approved": True, "score": 8.0, "blocking_issues": []}
+        gemini_review = {
+            "approved": False,
+            "score": 5.0,
+            "blocking_issues": ["Architecture pattern violation"],
+        }
 
-        conflicts = resolver.detect_conflicts(reviews)
+        resolution = resolver.resolve(cursor_review, gemini_review)
 
-        # May detect both approval mismatch AND score divergence (2.0 difference)
-        assert len(conflicts) >= 1
-        assert any(c.conflict_type == ConflictType.APPROVAL_MISMATCH for c in conflicts)
+        # Architecture authority veto should reject
+        assert resolution.approved is False
+        assert "Authority Veto" in resolution.decision_reason
 
-    def test_detect_score_divergence(self):
-        """Test detection of score divergence conflict."""
-        resolver = ConflictResolver(score_threshold=2.0)
+    def test_high_score_divergence_escalates(self):
+        """Test that high score divergence (>3.0) triggers escalation."""
+        resolver = ConflictResolver()
 
-        reviews = [
-            {"agent_id": "A07", "approved": True, "score": 9.0},
-            {"agent_id": "A08", "approved": True, "score": 5.0},
-        ]
+        cursor_review = {"approved": True, "score": 9.0, "blocking_issues": []}
+        gemini_review = {"approved": True, "score": 5.0, "blocking_issues": []}
 
-        conflicts = resolver.detect_conflicts(reviews)
+        resolution = resolver.resolve(cursor_review, gemini_review)
 
-        assert any(c.conflict_type == ConflictType.SCORE_DIVERGENCE for c in conflicts)
+        # Should escalate due to disagreement
+        assert resolution.action == "escalate"
+        assert "disagreement" in resolution.decision_reason.lower()
 
 
 class TestReviewCycle:
