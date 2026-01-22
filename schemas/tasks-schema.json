@@ -19,6 +19,7 @@
           },
           "title": {
             "type": "string",
+            "maxLength": 80,
             "description": "Short task title (max 80 chars)"
           },
           "user_story": {
@@ -28,7 +29,8 @@
           "acceptance_criteria": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Acceptance criteria for this task"
+            "maxItems": 5,
+            "description": "Acceptance criteria for this task (max 5 per task for granularity)"
           },
           "dependencies": {
             "type": "array",
@@ -57,12 +59,14 @@
           "files_to_create": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Files to create for this task"
+            "maxItems": 3,
+            "description": "Files to create for this task (max 3 per task for granularity)"
           },
           "files_to_modify": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Existing files to modify"
+            "maxItems": 5,
+            "description": "Existing files to modify (max 5 per task for granularity)"
           },
           "test_files": {
             "type": "array",

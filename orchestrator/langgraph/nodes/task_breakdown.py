@@ -2,11 +2,22 @@
 
 Parses PRODUCT.md acceptance criteria into individual tasks
 with dependencies, priorities, and milestones for incremental execution.
+
+Task granularity is enforced via multi-dimensional complexity assessment:
+- Complexity score (0-13 scale) as primary decision factor
+- File scope, cross-file dependencies, semantic complexity
+- Token budget and time estimates
+- File limits as soft guidance (warnings, not hard failures)
+
+Research shows file counts alone are insufficient - this module implements
+the "Complexity Triangle" principle where tasks must satisfy multiple
+constraints simultaneously.
 """
 
 import json
 import logging
 import re
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -26,6 +37,14 @@ from ..integrations import (
     create_markdown_tracker,
 )
 from ..integrations.board_sync import sync_board
+from ...utils.task_config import (
+    TaskSizeConfig,
+    TaskValidationResult,
+    ComplexityScorer,
+    ComplexityScore,
+    ComplexityLevel,
+    validate_task_complexity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +122,20 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
             task_ids=[t["id"] for t in tasks],
             status=TaskStatus.PENDING,
         )]
+
+    # Validate and auto-split large tasks
+    original_count = len(tasks)
+    tasks = validate_and_split_tasks(tasks, project_dir)
+    if len(tasks) != original_count:
+        # Update milestone task_ids after splitting
+        for milestone in milestones:
+            new_task_ids = []
+            for task_id in milestone.task_ids:
+                # Find all tasks that start with the original ID (including splits)
+                for task in tasks:
+                    if task["id"] == task_id or task["id"].startswith(f"{task_id}-"):
+                        new_task_ids.append(task["id"])
+            milestone.task_ids = new_task_ids
 
     # Assign dependencies based on file relationships
     tasks = _assign_dependencies(tasks)
@@ -512,6 +545,523 @@ def _estimate_complexity(description: str, files: list[str]) -> str:
         return "medium"
 
     return "low"
+
+
+def _validate_task_granularity(
+    task: Task,
+    config: TaskSizeConfig,
+) -> TaskValidationResult:
+    """Validate task using multi-dimensional complexity assessment.
+
+    Uses the Complexity Triangle principle:
+    - File scope (0-5 points)
+    - Cross-file dependencies (0-2 points)
+    - Semantic complexity (0-3 points)
+    - Requirement uncertainty (0-2 points)
+    - Token penalty (0-1 point)
+
+    Total: 0-13 scale, split threshold configurable (default: 5)
+
+    Args:
+        task: Task to validate
+        config: Task size configuration with complexity threshold
+
+    Returns:
+        TaskValidationResult with complexity breakdown and split decision
+    """
+    return validate_task_complexity(task, config)
+
+
+def _group_files_by_directory(files: list[str]) -> dict[str, list[str]]:
+    """Group files by their parent directory for intelligent splitting.
+
+    Args:
+        files: List of file paths
+
+    Returns:
+        Dictionary mapping directory paths to files in that directory
+    """
+    groups: dict[str, list[str]] = defaultdict(list)
+    for file_path in files:
+        parent = str(Path(file_path).parent)
+        groups[parent].append(file_path)
+    return dict(groups)
+
+
+def _auto_split_large_task(
+    task: Task,
+    config: TaskSizeConfig,
+    base_task_num: int,
+    validation_result: Optional[TaskValidationResult] = None,
+) -> list[Task]:
+    """Automatically split a complex task into smaller tasks.
+
+    Uses complexity-aware splitting:
+    1. Analyzes which complexity factors are highest
+    2. Splits along the most impactful dimension first
+    3. Groups related files by directory/semantic boundary
+    4. Distributes acceptance criteria to maintain coherence
+    5. Chains dependencies: T1-a -> T1-b -> T1-c
+
+    Args:
+        task: Task to split
+        config: Task size configuration
+        base_task_num: Base number for generating sub-task IDs
+        validation_result: Optional pre-computed validation result
+
+    Returns:
+        List of smaller tasks with lower complexity scores
+    """
+    original_id = task.get("id", f"T{base_task_num}")
+    files_to_create = task.get("files_to_create", [])
+    files_to_modify = task.get("files_to_modify", [])
+    acceptance_criteria = task.get("acceptance_criteria", [])
+    priority = task.get("priority", "medium")
+    milestone_id = task.get("milestone_id")
+
+    # Get complexity breakdown to inform splitting strategy
+    if validation_result is None:
+        validation_result = _validate_task_granularity(task, config)
+
+    complexity = validation_result.complexity_score
+    split_tasks: list[Task] = []
+
+    # Determine split strategy based on highest complexity component
+    # This creates smarter splits that address the actual complexity
+    split_strategy = _determine_split_strategy(complexity, task)
+
+    if split_strategy == "files":
+        # File-based split: group by directory, reduce file scope
+        split_tasks = _split_by_files(
+            task, config, original_id, files_to_create, files_to_modify,
+            acceptance_criteria, priority, milestone_id
+        )
+    elif split_strategy == "layers":
+        # Architectural split: separate by layer to reduce cross-file deps
+        split_tasks = _split_by_layers(
+            task, config, original_id, files_to_create, files_to_modify,
+            acceptance_criteria, priority, milestone_id
+        )
+    elif split_strategy == "criteria":
+        # Criteria split: separate acceptance criteria to reduce scope
+        split_tasks = _split_by_criteria(
+            task, config, original_id, files_to_create, files_to_modify,
+            acceptance_criteria, priority, milestone_id
+        )
+    else:
+        # Default: balanced split by files
+        split_tasks = _split_by_files(
+            task, config, original_id, files_to_create, files_to_modify,
+            acceptance_criteria, priority, milestone_id
+        )
+
+    # Verify splits actually reduced complexity
+    if split_tasks:
+        for split_task in split_tasks:
+            split_validation = _validate_task_granularity(split_task, config)
+            if split_validation.should_split:
+                logger.warning(
+                    f"Split task {split_task.get('id')} still has high complexity "
+                    f"({split_validation.complexity_score.total:.1f}), may need further splitting"
+                )
+
+    logger.info(
+        f"Split task {original_id} into {len(split_tasks)} sub-tasks using {split_strategy} strategy: "
+        f"{[t.get('id') for t in split_tasks]}"
+    )
+
+    return split_tasks
+
+
+def _determine_split_strategy(
+    complexity: ComplexityScore,
+    task: Task,
+) -> str:
+    """Determine the best split strategy based on complexity breakdown.
+
+    Args:
+        complexity: Complexity score breakdown
+        task: Original task
+
+    Returns:
+        Strategy name: "files", "layers", "criteria", or "balanced"
+    """
+    # Find the dominant complexity factor
+    factors = [
+        ("files", complexity.file_scope),
+        ("layers", complexity.cross_file_deps),
+        ("semantic", complexity.semantic_complexity),
+        ("uncertainty", complexity.requirement_uncertainty),
+    ]
+
+    # Sort by contribution (descending)
+    factors.sort(key=lambda x: x[1], reverse=True)
+    dominant = factors[0][0]
+
+    # Map to split strategy
+    if dominant == "files" and complexity.file_scope >= 2.5:
+        return "files"
+    elif dominant == "layers" and complexity.cross_file_deps >= 1.5:
+        return "layers"
+    elif dominant in ("semantic", "uncertainty"):
+        # High semantic complexity or uncertainty: split by criteria
+        # to create more focused, clearer tasks
+        return "criteria"
+
+    # Default to files if no clear dominant factor
+    files_to_create = task.get("files_to_create", [])
+    files_to_modify = task.get("files_to_modify", [])
+    if len(files_to_create) + len(files_to_modify) > 4:
+        return "files"
+
+    return "balanced"
+
+
+def _split_by_files(
+    task: Task,
+    config: TaskSizeConfig,
+    original_id: str,
+    files_to_create: list[str],
+    files_to_modify: list[str],
+    acceptance_criteria: list[str],
+    priority: str,
+    milestone_id: Optional[str],
+) -> list[Task]:
+    """Split task by grouping files by directory.
+
+    Keeps related files together to maintain semantic coherence.
+    """
+    # Group files by directory
+    create_groups = _group_files_by_directory(files_to_create)
+    modify_groups = _group_files_by_directory(files_to_modify)
+
+    # Target ~3-4 files per split task for optimal complexity
+    target_files_per_task = 4
+    create_batches = _create_batches_from_groups(create_groups, target_files_per_task)
+    modify_batches = _create_batches_from_groups(modify_groups, target_files_per_task)
+
+    # Determine number of split tasks
+    max_batches = max(len(create_batches), len(modify_batches), 1)
+
+    # Distribute acceptance criteria
+    criteria_per_task = _distribute_items(acceptance_criteria, max_batches)
+
+    return _create_split_tasks(
+        task, original_id, create_batches, modify_batches,
+        criteria_per_task, priority, milestone_id
+    )
+
+
+def _split_by_layers(
+    task: Task,
+    config: TaskSizeConfig,
+    original_id: str,
+    files_to_create: list[str],
+    files_to_modify: list[str],
+    acceptance_criteria: list[str],
+    priority: str,
+    milestone_id: Optional[str],
+) -> list[Task]:
+    """Split task by architectural layer to reduce cross-file dependencies.
+
+    Separates data layer, business layer, and presentation layer.
+    """
+    layer_keywords = {
+        "data": ["models", "repositories", "entities", "schemas", "db"],
+        "business": ["services", "core", "domain", "logic", "handlers"],
+        "presentation": ["views", "controllers", "api", "routes", "endpoints"],
+        "infrastructure": ["utils", "config", "helpers", "common"],
+    }
+
+    def classify_file(filepath: str) -> str:
+        """Classify file into architectural layer."""
+        f_lower = filepath.lower()
+        for layer, keywords in layer_keywords.items():
+            if any(kw in f_lower for kw in keywords):
+                return layer
+        return "other"
+
+    # Group all files by layer
+    all_files = files_to_create + files_to_modify
+    layer_files: dict[str, tuple[list[str], list[str]]] = defaultdict(lambda: ([], []))
+
+    for f in files_to_create:
+        layer = classify_file(f)
+        layer_files[layer][0].append(f)
+
+    for f in files_to_modify:
+        layer = classify_file(f)
+        layer_files[layer][1].append(f)
+
+    # Create batches per layer
+    create_batches = []
+    modify_batches = []
+
+    for layer in ["data", "business", "presentation", "infrastructure", "other"]:
+        if layer in layer_files:
+            creates, modifies = layer_files[layer]
+            if creates:
+                create_batches.append(creates)
+            if modifies:
+                modify_batches.append(modifies)
+
+    # Ensure at least one batch
+    if not create_batches and not modify_batches:
+        create_batches = [files_to_create] if files_to_create else []
+        modify_batches = [files_to_modify] if files_to_modify else []
+
+    max_batches = max(len(create_batches), len(modify_batches), 1)
+    criteria_per_task = _distribute_items(acceptance_criteria, max_batches)
+
+    return _create_split_tasks(
+        task, original_id, create_batches, modify_batches,
+        criteria_per_task, priority, milestone_id
+    )
+
+
+def _split_by_criteria(
+    task: Task,
+    config: TaskSizeConfig,
+    original_id: str,
+    files_to_create: list[str],
+    files_to_modify: list[str],
+    acceptance_criteria: list[str],
+    priority: str,
+    milestone_id: Optional[str],
+) -> list[Task]:
+    """Split task by acceptance criteria to create focused sub-tasks.
+
+    Each sub-task gets a subset of criteria and relevant files.
+    Good for high semantic complexity or unclear requirements.
+    """
+    # Target 2-3 criteria per task for clarity
+    target_criteria = 3
+    num_splits = max(1, (len(acceptance_criteria) + target_criteria - 1) // target_criteria)
+
+    criteria_batches = _distribute_items(acceptance_criteria, num_splits)
+
+    # Distribute files evenly (can't always match criteria to files)
+    create_batches = _distribute_items(files_to_create, num_splits)
+    modify_batches = _distribute_items(files_to_modify, num_splits)
+
+    return _create_split_tasks(
+        task, original_id, create_batches, modify_batches,
+        criteria_batches, priority, milestone_id
+    )
+
+
+def _create_split_tasks(
+    original_task: Task,
+    original_id: str,
+    create_batches: list[list[str]],
+    modify_batches: list[list[str]],
+    criteria_batches: list[list[str]],
+    priority: str,
+    milestone_id: Optional[str],
+) -> list[Task]:
+    """Create split task instances from batches.
+
+    Chains dependencies between splits and preserves original dependencies.
+    """
+    split_tasks: list[Task] = []
+    previous_task_id: Optional[str] = None
+    max_batches = max(len(create_batches), len(modify_batches), len(criteria_batches), 1)
+
+    for i in range(max_batches):
+        sub_task_id = f"{original_id}-{chr(ord('a') + i)}"
+
+        task_files_to_create = create_batches[i] if i < len(create_batches) else []
+        task_files_to_modify = modify_batches[i] if i < len(modify_batches) else []
+        task_criteria = criteria_batches[i] if i < len(criteria_batches) else []
+
+        # Generate test files
+        all_files = task_files_to_create + task_files_to_modify
+        test_files = _generate_test_files_for_batch(all_files)
+
+        # Chain dependencies
+        dependencies = []
+        if previous_task_id:
+            dependencies.append(previous_task_id)
+        if i == 0:
+            original_deps = original_task.get("dependencies", [])
+            dependencies.extend(original_deps)
+
+        # Create descriptive title
+        if task_files_to_create or task_files_to_modify:
+            focus_files = (task_files_to_create + task_files_to_modify)[:2]
+            focus_str = ", ".join(Path(f).name for f in focus_files)
+            sub_title = f"{original_task.get('title', 'Task')[:50]} ({focus_str})"
+        else:
+            sub_title = f"{original_task.get('title', 'Task')[:60]} (part {i + 1})"
+
+        sub_task = create_task(
+            task_id=sub_task_id,
+            title=sub_title[:80],
+            user_story=original_task.get("user_story", ""),
+            acceptance_criteria=task_criteria,
+            dependencies=dependencies,
+            priority=priority,
+            milestone_id=milestone_id,
+            estimated_complexity=_recalculate_complexity(
+                task_files_to_create, task_files_to_modify
+            ),
+            files_to_create=task_files_to_create,
+            files_to_modify=task_files_to_modify,
+            test_files=test_files,
+        )
+
+        split_tasks.append(sub_task)
+        previous_task_id = sub_task_id
+
+    return split_tasks
+
+
+def _create_batches_from_groups(
+    groups: dict[str, list[str]],
+    max_per_batch: int,
+) -> list[list[str]]:
+    """Create batches from grouped files, respecting max limit.
+
+    Tries to keep files from the same directory together.
+
+    Args:
+        groups: Dictionary mapping directory to files
+        max_per_batch: Maximum files per batch
+
+    Returns:
+        List of file batches
+    """
+    if not groups:
+        return []
+
+    batches: list[list[str]] = []
+    current_batch: list[str] = []
+
+    for _dir, files in sorted(groups.items()):
+        for file_path in files:
+            if len(current_batch) >= max_per_batch:
+                batches.append(current_batch)
+                current_batch = []
+            current_batch.append(file_path)
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return batches
+
+
+def _distribute_items(items: list[str], num_batches: int) -> list[list[str]]:
+    """Distribute items evenly across batches.
+
+    Args:
+        items: Items to distribute
+        num_batches: Number of batches
+
+    Returns:
+        List of item batches
+    """
+    if not items or num_batches < 1:
+        return [[]] * num_batches if num_batches > 0 else []
+
+    batches: list[list[str]] = [[] for _ in range(num_batches)]
+    for i, item in enumerate(items):
+        batches[i % num_batches].append(item)
+
+    return batches
+
+
+def _generate_test_files_for_batch(files: list[str]) -> list[str]:
+    """Generate test file paths for a batch of source files.
+
+    Args:
+        files: Source files
+
+    Returns:
+        List of test file paths
+    """
+    test_files = []
+    for file_path in files:
+        path = Path(file_path)
+        if "test" in path.name.lower():
+            continue
+
+        ext = path.suffix
+        name = path.stem
+
+        if ext in (".py",):
+            test_files.append(str(path.parent / f"test_{name}.py"))
+        elif ext in (".ts", ".tsx", ".js", ".jsx"):
+            test_files.append(str(path.parent / f"{name}.test{ext}"))
+        elif ext in (".go",):
+            test_files.append(str(path.parent / f"{name}_test.go"))
+        elif ext in (".rs",):
+            test_files.append(str(path.parent / f"{name}_test.rs"))
+
+    return test_files
+
+
+def _recalculate_complexity(
+    files_to_create: list[str],
+    files_to_modify: list[str],
+) -> str:
+    """Recalculate complexity based on file counts.
+
+    Args:
+        files_to_create: Files to create
+        files_to_modify: Files to modify
+
+    Returns:
+        Complexity string
+    """
+    total = len(files_to_create) + len(files_to_modify)
+    if total > 5:
+        return "high"
+    elif total > 2:
+        return "medium"
+    return "low"
+
+
+def validate_and_split_tasks(
+    tasks: list[Task],
+    project_dir: Path,
+) -> list[Task]:
+    """Validate all tasks and split any that exceed limits.
+
+    This is the main entry point for task granularity enforcement.
+    Called after initial task extraction.
+
+    Args:
+        tasks: List of tasks to validate
+        project_dir: Project directory for loading config
+
+    Returns:
+        List of tasks with large tasks split
+    """
+    config = TaskSizeConfig.from_project_config(project_dir)
+
+    if not config.auto_split_enabled:
+        logger.info("Auto-split disabled, skipping task validation")
+        return tasks
+
+    result_tasks: list[Task] = []
+    task_counter = len(tasks) + 1  # For generating new task IDs
+
+    for task in tasks:
+        validation = _validate_task_granularity(task, config)
+
+        if validation.is_valid:
+            result_tasks.append(task)
+        else:
+            logger.warning(validation.recommendation)
+            split_tasks = _auto_split_large_task(task, config, task_counter)
+            result_tasks.extend(split_tasks)
+            task_counter += len(split_tasks)
+
+    logger.info(
+        f"Task validation complete: {len(tasks)} -> {len(result_tasks)} tasks"
+    )
+
+    return result_tasks
 
 
 def _assign_dependencies(tasks: list[Task]) -> list[Task]:

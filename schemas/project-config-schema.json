@@ -93,6 +93,46 @@
       },
       "additionalProperties": false
     },
+    "task_size_limits": {
+      "type": "object",
+      "description": "Task granularity limits (tasks exceeding limits are auto-split)",
+      "properties": {
+        "max_files_to_create": {
+          "type": "integer",
+          "description": "Maximum files a single task can create",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 3
+        },
+        "max_files_to_modify": {
+          "type": "integer",
+          "description": "Maximum files a single task can modify",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 5
+        },
+        "max_criteria_per_task": {
+          "type": "integer",
+          "description": "Maximum acceptance criteria per task",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 5
+        },
+        "max_estimated_tokens": {
+          "type": "integer",
+          "description": "Maximum estimated context tokens per task",
+          "minimum": 1000,
+          "maximum": 200000,
+          "default": 50000
+        },
+        "auto_split": {
+          "type": "boolean",
+          "description": "Automatically split tasks exceeding limits",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
     "workflow": {
       "type": "object",
       "description": "Workflow behavior settings",

@@ -85,6 +85,23 @@ from .checkpoint import (
     create_checkpoint_manager,
     quick_checkpoint,
 )
+from .task_config import (
+    TaskSizeConfig,
+    TaskValidationResult,
+    ComplexityLevel,
+    ComplexityScore,
+    ComplexityScorer,
+    validate_task_complexity,
+    DEFAULT_MAX_FILES_TO_CREATE,
+    DEFAULT_MAX_FILES_TO_MODIFY,
+    DEFAULT_MAX_ACCEPTANCE_CRITERIA,
+    DEFAULT_MAX_ESTIMATED_TOKENS,
+    DEFAULT_AUTO_SPLIT_ENABLED,
+    DEFAULT_COMPLEXITY_THRESHOLD,
+    DEFAULT_MAX_INPUT_TOKENS,
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_MAX_TIME_MINUTES,
+)
 
 __all__ = [
     # State management
@@ -170,4 +187,20 @@ __all__ = [
     "CheckpointManager",
     "create_checkpoint_manager",
     "quick_checkpoint",
+    # Task size configuration and complexity scoring
+    "TaskSizeConfig",
+    "TaskValidationResult",
+    "ComplexityLevel",
+    "ComplexityScore",
+    "ComplexityScorer",
+    "validate_task_complexity",
+    "DEFAULT_MAX_FILES_TO_CREATE",
+    "DEFAULT_MAX_FILES_TO_MODIFY",
+    "DEFAULT_MAX_ACCEPTANCE_CRITERIA",
+    "DEFAULT_MAX_ESTIMATED_TOKENS",
+    "DEFAULT_AUTO_SPLIT_ENABLED",
+    "DEFAULT_COMPLEXITY_THRESHOLD",
+    "DEFAULT_MAX_INPUT_TOKENS",
+    "DEFAULT_MAX_OUTPUT_TOKENS",
+    "DEFAULT_MAX_TIME_MINUTES",
 ]

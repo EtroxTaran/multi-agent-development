@@ -67,8 +67,14 @@ async def planning_node(state: WorkflowState) -> dict[str, Any]:
 
     product_spec = product_file.read_text()
 
-    # Build simple prompt (instructions are in A01-planner/CLAUDE.md)
-    prompt = f"PRODUCT SPECIFICATION:\n{product_spec}"
+    # Build prompt with task granularity reminder (detailed instructions are in A01-planner/CLAUDE.md)
+    prompt = f"""PRODUCT SPECIFICATION:
+{product_spec}
+
+TASK GRANULARITY REMINDER:
+- Each task: max 3 files to create, max 5 files to modify, max 5 acceptance criteria
+- Tasks should be completable in <10 minutes
+- Prefer many small tasks over few large tasks"""
 
     action_logger.log_agent_invoke("A01-planner", "Generating implementation plan", phase=1)
 
