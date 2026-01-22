@@ -1,0 +1,221 @@
+# Quick Start Guide
+
+Welcome to your project with **meta-architect** - a multi-agent AI development system.
+
+## What You Have
+
+Your project now includes:
+
+```
+your-project/
+├── meta-architect/          # AI orchestration tools (submodule)
+├── Documents/               # Put your project docs here
+├── CLAUDE.md                # Claude's context (edit this!)
+├── QUICKSTART.md            # This guide
+└── .claude/                 # AI skills (symlinked)
+```
+
+## How It Works
+
+**Claude is your Tech Lead** with access to specialized AI agents:
+
+| Agent | Role | What It Does |
+|-------|------|--------------|
+| **Claude** | Tech Lead | Coordinates everything, implements code |
+| **Cursor** | Security Expert | Reviews for vulnerabilities, code quality |
+| **Gemini** | Architect | Reviews design, scalability, patterns |
+
+## Getting Started (3 Steps)
+
+### Step 1: Add Your Documentation
+
+Put your project context in `Documents/`:
+
+```
+Documents/
+├── product-vision.md     # What you're building
+├── architecture.md       # Technical decisions
+└── requirements.md       # Detailed requirements
+```
+
+Or if you already know what you want, skip to Step 2.
+
+### Step 2: Start Claude
+
+```bash
+claude
+```
+
+### Step 3: Use Skills
+
+Tell Claude what you want to build, or use these commands:
+
+| Command | What It Does |
+|---------|--------------|
+| `/discover` | Claude reads your docs, helps create a spec |
+| `/plan` | Creates a task breakdown for you to approve |
+| `/task T1` | Implements one task at a time |
+| `/status` | Shows progress |
+
+## Recommended Workflow
+
+### For New Features
+
+```
+1. Add docs to Documents/
+2. Run: claude
+3. Use: /discover
+   → Claude reads docs, asks questions, creates PRODUCT.md
+
+4. Use: /plan
+   → Claude creates tasks, you approve
+
+5. Use: /task T1
+   → Claude implements with tests
+
+6. Repeat: /task T2, T3, etc.
+
+7. Use: /status
+   → See your progress
+```
+
+### If You Already Have a Spec
+
+```
+1. Create PRODUCT.md with your feature spec
+2. Run: claude
+3. Use: /plan
+4. Approve the plan
+5. Use: /task T1 to start
+```
+
+## PRODUCT.md Format
+
+If creating manually, include:
+
+```markdown
+# Feature Name
+
+## Summary
+What it does (50-500 chars)
+
+## Problem Statement
+Why it's needed (min 100 chars)
+
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+
+## Example Inputs/Outputs
+
+### Example 1
+Input: ...
+Output: ...
+
+## Technical Constraints
+- Performance requirements
+- Security requirements
+- Compatibility requirements
+
+## Definition of Done
+- [ ] All criteria met
+- [ ] Tests passing
+- [ ] Code reviewed
+- [ ] No security issues
+```
+
+## Customize Claude's Context
+
+Edit `CLAUDE.md` to tell Claude about your project:
+
+- Your tech stack (language, framework, database)
+- Coding standards (naming, patterns)
+- File structure
+- Testing preferences
+
+The more context you provide, the better Claude performs.
+
+## Available Commands Reference
+
+### Human-Guided (Recommended)
+
+| Command | Purpose |
+|---------|---------|
+| `/discover` | Read docs, create PRODUCT.md together |
+| `/plan` | Create task breakdown, get your approval |
+| `/task <id>` | Implement one task with TDD |
+| `/status` | Check progress |
+
+### Automated
+
+| Command | Purpose |
+|---------|---------|
+| `/orchestrate` | Run full automated workflow |
+| `/validate` | Run security + architecture review on plan |
+| `/verify` | Run code review after implementation |
+
+### Utility
+
+| Command | Purpose |
+|---------|---------|
+| `/resolve-conflict` | When Cursor and Gemini disagree |
+| `/phase-status` | Detailed phase information |
+
+## Tips
+
+### 1. Start Small
+
+Break big features into small tasks. Claude works best with focused work:
+- Each task: max 5 new files
+- Clear acceptance criteria
+- Independent when possible
+
+### 2. Let Claude Ask Questions
+
+Claude will ask when uncertain. Answer to improve results.
+
+### 3. Review Plans Before Implementing
+
+When Claude shows a plan, review it:
+- Are tasks the right size?
+- Is the order correct?
+- Missing anything?
+
+### 4. Check Progress Often
+
+Use `/status` to see where you are. It helps Claude too.
+
+### 5. Provide Good Context
+
+The `CLAUDE.md` file is critical. Good context = better code.
+
+## Troubleshooting
+
+### "Claude doesn't understand my project"
+
+→ Add more detail to `CLAUDE.md` and `Documents/`
+
+### "Tasks are too big"
+
+→ Ask Claude to split them, or use `/plan` again
+
+### "Something went wrong mid-workflow"
+
+→ Use `/status` to see state, then continue from there
+
+### "Want to start over"
+
+→ Delete `.workflow/` folder and start fresh
+
+## Learn More
+
+- Full documentation: `meta-architect/docs/`
+- Skills details: `meta-architect/.claude/skills/`
+- Shared rules: `meta-architect/shared-rules/`
+
+## Need Help?
+
+Just ask Claude! It knows this system and can guide you.
+
+Or say: "What can you help me with?"
