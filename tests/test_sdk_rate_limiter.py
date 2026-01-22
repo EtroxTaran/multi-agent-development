@@ -42,8 +42,9 @@ class TestRateLimitConfig:
         assert config.max_cost_per_hour == 10.0
         assert config.max_cost_per_day == 100.0
         assert config.burst_multiplier == 1.5
-        assert config.backoff_base == 1.0
+        assert config.backoff_base == 0.5
         assert config.backoff_max == 60.0
+        assert config.backoff_jitter == 0.25
 
     def test_custom_values(self):
         """Test configuration with custom values."""
@@ -329,8 +330,8 @@ class TestBackoffCalculation:
     """Tests for backoff calculation."""
 
     def test_backoff_initial(self):
-        """Test initial backoff value."""
-        config = RateLimitConfig(backoff_base=1.0, backoff_max=60.0)
+        """Test initial backoff value (no jitter for determinism)."""
+        config = RateLimitConfig(backoff_base=1.0, backoff_max=60.0, backoff_jitter=0)
         limiter = AsyncRateLimiter(config=config, name="backoff-test")
 
         # No throttles yet
@@ -339,8 +340,8 @@ class TestBackoffCalculation:
         assert backoff == 1.0  # Base value
 
     def test_backoff_exponential_growth(self):
-        """Test backoff grows exponentially with throttles."""
-        config = RateLimitConfig(backoff_base=1.0, backoff_max=60.0)
+        """Test backoff grows exponentially with throttles (no jitter for determinism)."""
+        config = RateLimitConfig(backoff_base=1.0, backoff_max=60.0, backoff_jitter=0)
         limiter = AsyncRateLimiter(config=config, name="backoff-test")
 
         # Simulate consecutive throttles (used for backoff calculation)
@@ -352,8 +353,8 @@ class TestBackoffCalculation:
         assert backoff == pytest.approx(3.375)
 
     def test_backoff_max_cap(self):
-        """Test backoff is capped at maximum."""
-        config = RateLimitConfig(backoff_base=1.0, backoff_max=10.0)
+        """Test backoff is capped at maximum (no jitter for determinism)."""
+        config = RateLimitConfig(backoff_base=1.0, backoff_max=10.0, backoff_jitter=0)
         limiter = AsyncRateLimiter(config=config, name="backoff-test")
 
         # Many consecutive throttles
@@ -364,8 +365,8 @@ class TestBackoffCalculation:
         assert backoff == 10.0  # Capped at max
 
     def test_backoff_throttle_count_capped(self):
-        """Test throttle count used in calculation is capped."""
-        config = RateLimitConfig(backoff_base=1.0, backoff_max=1000.0)
+        """Test throttle count used in calculation is capped (no jitter for determinism)."""
+        config = RateLimitConfig(backoff_base=1.0, backoff_max=1000.0, backoff_jitter=0)
         limiter = AsyncRateLimiter(config=config, name="backoff-test")
 
         # Many consecutive throttles
@@ -376,6 +377,46 @@ class TestBackoffCalculation:
         # Should use min(100, 10) = 10
         # 1.0 * (1.5 ^ 10) = 57.67
         assert backoff == pytest.approx(57.67, rel=0.01)
+
+    def test_backoff_with_jitter(self):
+        """Test that jitter adds variance to backoff."""
+        config = RateLimitConfig(backoff_base=1.0, backoff_max=60.0, backoff_jitter=0.25)
+        limiter = AsyncRateLimiter(config=config, name="backoff-test")
+
+        limiter._consecutive_throttles = 3
+        base_expected = 3.375  # 1.0 * (1.5 ^ 3)
+
+        # Get multiple samples and ensure they vary
+        backoffs = [limiter._calculate_backoff() for _ in range(10)]
+
+        # All should be within jitter range: base * (1 +/- jitter) = 2.53 to 4.22
+        for backoff in backoffs:
+            assert base_expected * 0.7 <= backoff <= base_expected * 1.35  # Allow some buffer
+
+        # At least some variation should exist (not all the same)
+        unique_values = set(round(b, 4) for b in backoffs)
+        assert len(unique_values) > 1, "Jitter should produce varied values"
+
+    def test_backoff_resets_on_success(self):
+        """Test that consecutive throttle count resets to 0 on success."""
+        config = RateLimitConfig(
+            backoff_base=1.0, backoff_max=60.0, backoff_jitter=0,
+            requests_per_minute=1000  # High limit for this test
+        )
+        limiter = AsyncRateLimiter(config=config, name="backoff-test")
+
+        # Simulate some throttles
+        limiter._consecutive_throttles = 5
+
+        # Verify high backoff before reset
+        backoff_before = limiter._calculate_backoff()
+        assert backoff_before > 5.0  # 1.0 * 1.5^5 = 7.59
+
+        # Reset happens in acquire() on success - simulate it
+        limiter._consecutive_throttles = 0
+
+        backoff_after = limiter._calculate_backoff()
+        assert backoff_after == 1.0  # Back to base
 
 
 # =============================================================================

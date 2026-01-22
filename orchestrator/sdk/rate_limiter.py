@@ -5,10 +5,14 @@ Supports per-minute/hour request limits, token limits, and cost limits.
 """
 
 import asyncio
+import logging
+import random
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,8 +26,9 @@ class RateLimitConfig:
     max_cost_per_hour: float = 10.0
     max_cost_per_day: float = 100.0
     burst_multiplier: float = 1.5
-    backoff_base: float = 1.0
+    backoff_base: float = 0.5  # Start at 0.5s for quicker initial recovery
     backoff_max: float = 60.0
+    backoff_jitter: float = 0.25  # Add up to 25% jitter to prevent thundering herd
 
 
 @dataclass
@@ -231,15 +236,39 @@ class AsyncRateLimiter:
         return True, ""
 
     def _calculate_backoff(self) -> float:
-        """Calculate backoff time based on consecutive throttle count.
+        """Calculate backoff time with exponential increase and jitter.
 
         Uses consecutive throttles (reset on success) instead of cumulative
-        to avoid excessive backoff after recovery.
+        to avoid excessive backoff after recovery. Adds jitter to prevent
+        thundering herd when multiple coroutines are throttled simultaneously.
+
+        Backoff progression (with 0.5s base, before jitter):
+          - 0 consecutive: 0.5s
+          - 1 consecutive: 0.75s
+          - 2 consecutive: 1.125s
+          - 5 consecutive: 3.8s
+          - 10 consecutive: 28.8s (capped at backoff_max)
+
+        Returns:
+            Backoff time in seconds with jitter applied
         """
         # Cap the exponent to prevent excessive backoff
         throttle_count = min(self._consecutive_throttles, 10)
-        backoff = self.config.backoff_base * (1.5 ** throttle_count)
-        return min(backoff, self.config.backoff_max)
+        base_backoff = self.config.backoff_base * (1.5 ** throttle_count)
+        capped_backoff = min(base_backoff, self.config.backoff_max)
+
+        # Add jitter to prevent synchronized retries
+        jitter_range = capped_backoff * self.config.backoff_jitter
+        jitter = random.uniform(-jitter_range, jitter_range)
+        final_backoff = max(0.1, capped_backoff + jitter)  # Minimum 100ms
+
+        if throttle_count > 0:
+            logger.debug(
+                f"Rate limit backoff: {final_backoff:.2f}s "
+                f"(consecutive throttles: {throttle_count})"
+            )
+
+        return final_backoff
 
     async def acquire(
         self,
@@ -286,9 +315,10 @@ class AsyncRateLimiter:
                 self.stats.throttled_requests += 1
                 self._consecutive_throttles += 1
 
-            # Sleep outside lock to allow other coroutines to proceed
-            # Use short sleep for responsiveness
-            await asyncio.sleep(0.05)
+            # Sleep outside lock with exponential backoff
+            # Uses consecutive throttle count (resets on success) for responsive recovery
+            backoff_time = self._calculate_backoff()
+            await asyncio.sleep(backoff_time)
 
     async def record_usage(self, tokens: int = 0, cost: float = 0.0) -> None:
         """
