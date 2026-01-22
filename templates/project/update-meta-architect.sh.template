@@ -1,0 +1,68 @@
+#!/bin/bash
+# =============================================================================
+# Update Meta-Architect Submodule
+# =============================================================================
+# This script updates the meta-architect submodule to the latest version.
+#
+# Usage:
+#   ./update-meta-architect.sh
+#
+# After running, commit the update:
+#   git commit -m "Update meta-architect submodule"
+#
+# =============================================================================
+
+set -e
+
+# Change to the script's directory (project root)
+cd "$(dirname "$0")"
+
+# Check if meta-architect submodule exists
+if [[ ! -d "meta-architect" ]]; then
+    echo "Error: meta-architect submodule not found"
+    echo ""
+    echo "To add the submodule, run:"
+    echo "  git submodule add https://github.com/EtroxTaran/multi-agent-development.git meta-architect"
+    exit 1
+fi
+
+# Check if it's a git repository
+if [[ ! -d ".git" ]]; then
+    echo "Error: Not a git repository"
+    exit 1
+fi
+
+echo "Updating meta-architect submodule..."
+echo ""
+
+# Navigate to submodule and update
+cd meta-architect
+
+# Fetch latest changes
+git fetch origin
+
+# Switch to main branch
+git checkout main
+
+# Pull latest
+git pull origin main
+
+# Return to project root
+cd ..
+
+# Stage the submodule update
+git add meta-architect
+
+echo ""
+echo "============================================================================="
+echo "Meta-architect submodule updated successfully!"
+echo "============================================================================="
+echo ""
+echo "Changes staged. To complete the update, run:"
+echo ""
+echo "  git commit -m \"Update meta-architect submodule\""
+echo ""
+echo "Or discard the update with:"
+echo ""
+echo "  git checkout meta-architect"
+echo ""

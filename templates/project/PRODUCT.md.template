@@ -1,0 +1,58 @@
+# Feature Name
+[Your feature name here - 5-100 characters]
+
+## Summary
+[Brief description of what this feature does - 50-500 characters]
+
+## Problem Statement
+[Why this feature is needed. Explain the current pain points or gaps that this feature addresses. Minimum 100 characters required.]
+
+## Acceptance Criteria
+- [ ] Criterion 1 - [Specific, measurable requirement]
+- [ ] Criterion 2 - [Specific, measurable requirement]
+- [ ] Criterion 3 - [Specific, measurable requirement]
+
+## Example Inputs/Outputs
+
+### Example 1: [Scenario Name]
+```json
+// Input
+{
+  "field": "value"
+}
+
+// Output
+{
+  "result": "expected value"
+}
+```
+
+### Example 2: [Scenario Name]
+```json
+// Input
+{
+  "field": "different value"
+}
+
+// Output
+{
+  "result": "different expected value"
+}
+```
+
+## Technical Constraints
+- [Performance requirement, e.g., "Response time < 200ms"]
+- [Security requirement, e.g., "All data must be encrypted at rest"]
+- [Compatibility requirement, e.g., "Must support Node.js 18+"]
+
+## Testing Strategy
+- Unit tests for [specific components]
+- Integration tests for [API endpoints/workflows]
+- [Any other testing approaches]
+
+## Definition of Done
+- [ ] All acceptance criteria met
+- [ ] Tests passing with adequate coverage
+- [ ] Code reviewed by Cursor and Gemini
+- [ ] Documentation updated
+- [ ] No high/critical security issues

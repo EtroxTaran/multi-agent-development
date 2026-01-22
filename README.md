@@ -12,7 +12,8 @@ A **production-ready multi-agent orchestration system** that coordinates Claude 
 - [The 5-Phase Workflow](#the-5-phase-workflow)
 - [Agent Specializations](#agent-specializations)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
+- [Setting Up a New Project](#setting-up-a-new-project-recommended)
+- [Quick Start (Nested Mode)](#quick-start-nested-mode)
 - [Project Structure](#project-structure)
 - [Configuration](#configuration)
 - [Approval & Conflict Resolution](#approval--conflict-resolution)
@@ -369,7 +370,84 @@ pip install -e .           # Alternative: manual pip install
 
 ---
 
-## Quick Start
+## Setting Up a New Project (Recommended)
+
+The recommended way to use meta-architect is as a **git submodule** in your project. This keeps meta-architect updateable and your project independent.
+
+### Quick Setup
+
+```bash
+# In your project directory (new or existing)
+mkdir my-awesome-app && cd my-awesome-app
+
+# Run the setup script
+curl -sL https://raw.githubusercontent.com/EtroxTaran/multi-agent-development/main/scripts/setup-project.sh | bash
+```
+
+This will:
+1. Initialize a git repo (if needed)
+2. Add meta-architect as a submodule
+3. Create starter templates (PRODUCT.md, CLAUDE.md, etc.)
+4. Create convenience scripts (run-workflow.sh, update-meta-architect.sh)
+
+### Manual Setup
+
+```bash
+# 1. Initialize your project
+mkdir my-project && cd my-project
+git init
+
+# 2. Add meta-architect as submodule
+git submodule add https://github.com/EtroxTaran/multi-agent-development.git meta-architect
+
+# 3. Copy templates
+cp meta-architect/templates/project/PRODUCT.md.template PRODUCT.md
+cp meta-architect/templates/project/CLAUDE.md.template CLAUDE.md
+
+# 4. Edit your files
+# - PRODUCT.md: Your feature specification
+# - CLAUDE.md: Your coding standards
+```
+
+### Project Structure
+
+After setup, your project looks like:
+
+```
+my-project/                 <- Run Claude HERE (project root)
+├── meta-architect/         <- Submodule (tools live here)
+├── PRODUCT.md              <- Your feature specification
+├── CLAUDE.md               <- Your coding rules
+├── GEMINI.md               <- Gemini context (optional)
+├── .cursor/rules           <- Cursor rules (optional)
+├── run-workflow.sh         <- Convenience script
+├── update-meta-architect.sh <- Update submodule
+├── src/                    <- Your application code
+└── tests/                  <- Your tests
+```
+
+### Where to Run Claude
+
+**Always run Claude from your PROJECT ROOT**, not from the meta-architect folder:
+
+```bash
+cd my-project    # Your project root
+claude           # Start Claude here
+/orchestrate     # Run the workflow
+```
+
+### Update Meta-Architect
+
+```bash
+./update-meta-architect.sh
+git commit -m "Update meta-architect"
+```
+
+---
+
+## Quick Start (Nested Mode)
+
+For testing or if you prefer working within the meta-architect directory:
 
 ### 1. Initialize Your Project
 

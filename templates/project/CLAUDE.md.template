@@ -1,0 +1,65 @@
+# Project Context for Claude
+
+## Project Overview
+[Brief description of what this project does and its purpose]
+
+## Tech Stack
+- **Language**: [e.g., TypeScript, Python, Go]
+- **Framework**: [e.g., Next.js, FastAPI, Express]
+- **Testing**: [e.g., Jest, Pytest, Vitest]
+- **Database**: [e.g., PostgreSQL, MongoDB, SQLite]
+- **Other**: [Any other relevant technologies]
+
+## Coding Standards
+
+### Style
+- [e.g., Use 2-space indentation]
+- [e.g., Prefer named exports over default exports]
+- [e.g., Use async/await over raw promises]
+
+### Naming Conventions
+- **Files**: [e.g., kebab-case for files]
+- **Functions**: [e.g., camelCase for functions]
+- **Classes**: [e.g., PascalCase for classes]
+- **Constants**: [e.g., UPPER_SNAKE_CASE for constants]
+
+### Patterns
+- [e.g., Repository pattern for data access]
+- [e.g., Service layer for business logic]
+- [e.g., DTOs for API contracts]
+
+## File Structure
+```
+src/
+  components/     # UI components
+  services/       # Business logic
+  models/         # Data models
+  utils/          # Utility functions
+tests/
+  unit/           # Unit tests
+  integration/    # Integration tests
+```
+
+## TDD Requirements
+- Write failing tests FIRST before implementation
+- One test file per source file
+- Follow Arrange-Act-Assert pattern
+- Aim for high coverage on business logic
+
+## Error Handling
+- [e.g., Use custom error classes]
+- [e.g., Always include error codes]
+- [e.g., Log errors with context]
+
+## Important Notes
+- [Project-specific gotchas or warnings]
+- [External API limitations]
+- [Performance considerations]
+
+## Dependencies to Prefer
+- [e.g., Use date-fns for date manipulation]
+- [e.g., Use zod for validation]
+
+## Dependencies to Avoid
+- [e.g., Don't add lodash - use native methods]
+- [e.g., Don't add moment.js - deprecated]

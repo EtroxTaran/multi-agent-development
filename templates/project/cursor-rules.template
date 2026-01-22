@@ -1,0 +1,62 @@
+# Cursor Rules for Code Review
+
+## Project Overview
+[Brief description of what this project does]
+
+## Security Standards
+
+### Authentication & Authorization
+- All endpoints must require authentication unless explicitly public
+- Use principle of least privilege
+- Validate JWT tokens on every request
+
+### Input Validation
+- Validate all user input at API boundaries
+- Use parameterized queries for database operations
+- Sanitize output to prevent XSS
+
+### Sensitive Data
+- Never log passwords, tokens, or PII
+- Use environment variables for secrets
+- Encrypt sensitive data at rest
+
+## Code Quality Standards
+
+### Error Handling
+- All async operations must have error handling
+- Use typed errors with meaningful messages
+- Don't swallow errors silently
+
+### Testing Requirements
+- All new code must have tests
+- Minimum 80% coverage on business logic
+- Include edge cases and error scenarios
+
+### Performance
+- Database queries must be optimized
+- Avoid N+1 query patterns
+- Use pagination for list endpoints
+
+## Review Checklist
+When reviewing code, verify:
+- [ ] No hardcoded credentials or secrets
+- [ ] Proper error handling
+- [ ] Input validation present
+- [ ] Tests cover happy path and edge cases
+- [ ] No SQL injection vulnerabilities
+- [ ] No XSS vulnerabilities
+- [ ] Logging doesn't expose sensitive data
+
+## File Organization
+- One component/class per file
+- Group related files in directories
+- Follow existing naming conventions
+
+## Patterns to Follow
+- [e.g., Repository pattern for data access]
+- [e.g., Factory pattern for object creation]
+
+## Anti-patterns to Avoid
+- [e.g., God objects/classes]
+- [e.g., Circular dependencies]
+- [e.g., Magic numbers/strings]

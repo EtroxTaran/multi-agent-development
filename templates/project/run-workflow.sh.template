@@ -1,0 +1,42 @@
+#!/bin/bash
+# =============================================================================
+# Run Meta-Architect Workflow
+# =============================================================================
+# This script runs the meta-architect workflow on this project.
+#
+# Usage:
+#   ./run-workflow.sh
+#
+# =============================================================================
+
+set -e
+
+# Change to the script's directory (project root)
+cd "$(dirname "$0")"
+
+# Check if meta-architect submodule exists
+if [[ ! -d "meta-architect" ]]; then
+    echo "Error: meta-architect submodule not found"
+    echo ""
+    echo "To fix this, run:"
+    echo "  git submodule update --init --recursive"
+    echo ""
+    echo "Or re-run the setup script:"
+    echo "  curl -sL https://raw.githubusercontent.com/EtroxTaran/multi-agent-development/main/scripts/setup-project.sh | bash"
+    exit 1
+fi
+
+# Check if PRODUCT.md exists
+if [[ ! -f "PRODUCT.md" ]]; then
+    echo "Error: PRODUCT.md not found"
+    echo ""
+    echo "Create a PRODUCT.md file with your feature specification."
+    echo "See meta-architect/templates/project/PRODUCT.md.template for an example."
+    exit 1
+fi
+
+# Run the workflow
+echo "Starting meta-architect workflow..."
+echo ""
+
+./meta-architect/scripts/init.sh run --path "$(pwd)"

@@ -1,0 +1,58 @@
+# Project Context for Gemini
+
+## Project Overview
+[Brief description of what this project does and its purpose]
+
+## Architecture
+
+### System Type
+[e.g., Monolith, Microservices, Serverless, Modular Monolith]
+
+### Key Components
+- **[Component 1]**: [Description and responsibility]
+- **[Component 2]**: [Description and responsibility]
+- **[Component 3]**: [Description and responsibility]
+
+### Data Flow
+```
+[User Request] -> [API Layer] -> [Service Layer] -> [Data Layer]
+                      |               |
+                      v               v
+               [Validation]    [Business Rules]
+```
+
+## Design Principles
+- [e.g., SOLID principles]
+- [e.g., Domain-Driven Design]
+- [e.g., Clean Architecture]
+
+## Scalability Considerations
+- [e.g., Horizontal scaling via load balancer]
+- [e.g., Database read replicas for queries]
+- [e.g., Caching strategy for frequently accessed data]
+
+## Performance Requirements
+- **Response Time**: [e.g., < 200ms for API calls]
+- **Throughput**: [e.g., 1000 requests/second]
+- **Availability**: [e.g., 99.9% uptime]
+
+## Security Architecture
+- **Authentication**: [e.g., JWT, OAuth 2.0]
+- **Authorization**: [e.g., RBAC, ABAC]
+- **Data Protection**: [e.g., Encryption at rest/transit]
+
+## Integration Points
+- **[External API 1]**: [Purpose and SLA]
+- **[External API 2]**: [Purpose and SLA]
+
+## Technical Debt to Avoid
+- [e.g., Don't introduce circular dependencies]
+- [e.g., Avoid N+1 queries]
+- [e.g., Don't bypass the service layer]
+
+## Review Focus Areas
+When reviewing code, pay special attention to:
+1. Architectural consistency with existing patterns
+2. Scalability implications of new code
+3. Performance characteristics
+4. Proper separation of concerns

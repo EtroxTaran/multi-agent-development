@@ -7,7 +7,64 @@
 
 ## Overview
 
-Meta-Architect coordinates **Claude Code, Cursor, and Gemini CLI** through a **5-phase workflow** using LangGraph for orchestration. All agents share context through files in a nested project structure.
+Meta-Architect coordinates **Claude Code, Cursor, and Gemini CLI** through a **5-phase workflow** using LangGraph for orchestration. All agents share context through files.
+
+**Two ways to use Meta-Architect:**
+1. **Submodule Setup (Recommended)** - Meta-architect as a git submodule in your project
+2. **Nested Mode** - Projects inside meta-architect's `projects/` directory
+
+---
+
+## Submodule Setup (Recommended)
+
+The best way to use meta-architect is as a **git submodule** in your own project.
+
+### Quick Setup
+
+```bash
+# In your project directory (new or existing)
+mkdir my-awesome-app && cd my-awesome-app
+
+# Run the setup script
+curl -sL https://raw.githubusercontent.com/EtroxTaran/multi-agent-development/main/scripts/setup-project.sh | bash
+```
+
+### What It Creates
+
+```
+my-project/                 <- Run Claude HERE (project root)
+├── meta-architect/         <- Submodule (tools)
+├── PRODUCT.md              <- Your feature spec (EDIT THIS)
+├── CLAUDE.md               <- Your coding rules
+├── run-workflow.sh         <- Convenience script
+├── update-meta-architect.sh <- Update submodule
+├── src/                    <- Your code (you create)
+└── tests/                  <- Your tests (you create)
+```
+
+### Running the Workflow
+
+```bash
+cd my-project    # Your project root
+claude           # Start Claude here
+/orchestrate     # Run the workflow
+```
+
+Or use the convenience script:
+```bash
+./run-workflow.sh
+```
+
+### Updating Meta-Architect
+
+```bash
+./update-meta-architect.sh
+git commit -m "Update meta-architect"
+```
+
+---
+
+## Workflow Overview
 
 ```
 PRODUCT.md (Your Feature Spec)
@@ -30,9 +87,13 @@ Phase 5: COMPLETION --> summary + ready for merge
 
 ---
 
-## Project Structure
+## Nested Mode (Alternative)
 
-Meta-Architect uses a **nested architecture** where projects live in `projects/<name>/` (or externally with `--project-path`):
+If you prefer to work within the meta-architect directory itself, you can use nested mode.
+
+## Project Structure (Nested Mode)
+
+In nested mode, projects live in `projects/<name>/` within meta-architect:
 
 ```
 meta-architect/                    # Orchestrator (outer layer)
@@ -70,7 +131,7 @@ meta-architect/                    # Orchestrator (outer layer)
 
 ---
 
-## Step 1: Initialize a Project
+## Step 1: Initialize a Project (Nested Mode)
 
 ### Option A: Nested Project (in projects/ directory)
 

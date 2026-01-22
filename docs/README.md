@@ -10,11 +10,31 @@ This index provides a complete map of all documentation in the project.
 
 | I want to... | Go to |
 |--------------|-------|
+| **Set up a new project** | [Setup Script](#setup-script) |
 | **Get started quickly** | [Quick Start Guide](quick-start.md) |
 | **Understand everything** | [META-ARCHITECT-GUIDE.md](META-ARCHITECT-GUIDE.md) |
 | **See system status** | [SYSTEM-STATUS.md](SYSTEM-STATUS.md) |
 | **Learn the architecture** | [SPECIALIST-AGENTS-DESIGN.md](SPECIALIST-AGENTS-DESIGN.md) |
 | **Debug an issue** | [Troubleshooting](#troubleshooting) |
+
+---
+
+## Setup Script
+
+The easiest way to start a new project with meta-architect is using the setup script:
+
+```bash
+# In your project directory (new or existing)
+curl -sL https://raw.githubusercontent.com/EtroxTaran/multi-agent-development/main/scripts/setup-project.sh | bash
+```
+
+This script:
+- Initializes git (if needed)
+- Adds meta-architect as a submodule
+- Creates starter templates (PRODUCT.md, CLAUDE.md, etc.)
+- Creates convenience scripts
+
+**See**: [scripts/setup-project.sh](../scripts/setup-project.sh)
 
 ---
 
@@ -120,6 +140,20 @@ Slash commands for Claude Code:
 ---
 
 ## Templates (`templates/`)
+
+### Project Templates (for submodule setup)
+
+| Template | Purpose |
+|----------|---------|
+| [templates/project/PRODUCT.md.template](../templates/project/PRODUCT.md.template) | Feature specification template |
+| [templates/project/CLAUDE.md.template](../templates/project/CLAUDE.md.template) | Claude coding context template |
+| [templates/project/GEMINI.md.template](../templates/project/GEMINI.md.template) | Gemini architecture context template |
+| [templates/project/cursor-rules.template](../templates/project/cursor-rules.template) | Cursor code review rules template |
+| [templates/project/gitignore.template](../templates/project/gitignore.template) | Project .gitignore template |
+| [templates/project/run-workflow.sh.template](../templates/project/run-workflow.sh.template) | Workflow runner script |
+| [templates/project/update-meta-architect.sh.template](../templates/project/update-meta-architect.sh.template) | Submodule update script |
+
+### Kanban Board Templates
 
 | Template | Purpose |
 |----------|---------|
