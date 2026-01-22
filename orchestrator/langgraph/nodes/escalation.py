@@ -1,7 +1,8 @@
 """Escalation node for human-in-the-loop.
 
 Pauses the workflow and waits for human intervention when
-automated resolution fails.
+automated resolution fails. In autonomous mode (afk), makes
+best-practice decisions automatically without human input.
 """
 
 import json
@@ -17,11 +18,157 @@ from ..state import WorkflowState, PhaseStatus
 logger = logging.getLogger(__name__)
 
 
+# Maximum retries before automatic abort in autonomous mode
+AUTONOMOUS_MAX_RETRIES = 3
+
+
+def _make_autonomous_decision(
+    state: WorkflowState,
+    issue_summary: str,
+    error_type: str,
+    escalation: dict,
+) -> dict[str, Any]:
+    """Make an automatic decision in autonomous mode.
+
+    In autonomous mode, the orchestrator makes decisions based on
+    best practices instead of waiting for human input.
+
+    Args:
+        state: Current workflow state
+        issue_summary: Summary of the issue
+        error_type: Type of error encountered
+        escalation: Full escalation context
+
+    Returns:
+        State updates with automatic decision
+    """
+    current_phase = state.get("current_phase", 0)
+    iteration_count = state.get("iteration_count", 0)
+
+    logger.info(f"[AUTONOMOUS] Making automatic decision for: {issue_summary}")
+
+    # Check if we've exceeded max retries in this phase
+    phase_status = state.get("phase_status", {})
+    current_phase_state = phase_status.get(str(current_phase))
+    phase_retry_count = 0
+    if current_phase_state and hasattr(current_phase_state, "retry_count"):
+        phase_retry_count = current_phase_state.retry_count
+
+    # Decision logic based on error type
+    if error_type == "planning_error":
+        if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
+            logger.info(f"[AUTONOMOUS] Retrying planning (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+            return {
+                "next_decision": "retry",
+                "updated_at": datetime.now().isoformat(),
+            }
+        else:
+            logger.warning("[AUTONOMOUS] Planning failed after max retries, aborting")
+            return {
+                "next_decision": "abort",
+                "errors": [{
+                    "type": "autonomous_abort",
+                    "message": f"Planning failed after {AUTONOMOUS_MAX_RETRIES} attempts in autonomous mode",
+                    "timestamp": datetime.now().isoformat(),
+                }],
+            }
+
+    elif error_type == "validation_failed":
+        if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
+            logger.info(f"[AUTONOMOUS] Retrying validation (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+            return {
+                "next_decision": "retry",
+                "updated_at": datetime.now().isoformat(),
+            }
+        else:
+            # Skip validation and continue to implementation
+            logger.warning("[AUTONOMOUS] Validation failed after max retries, skipping to implementation")
+            return {
+                "current_phase": 3,  # Skip to implementation
+                "next_decision": "continue",
+                "review_skipped": True,
+                "review_skipped_reason": f"Autonomous mode: validation failed after {AUTONOMOUS_MAX_RETRIES} attempts",
+                "updated_at": datetime.now().isoformat(),
+            }
+
+    elif error_type == "implementation_error":
+        # Check for clarification requests
+        clarifications = escalation.get("clarifications", [])
+        if clarifications:
+            # In autonomous mode, proceed with best-guess implementation
+            logger.info("[AUTONOMOUS] Clarification needed but proceeding with best-guess implementation")
+            return {
+                "next_decision": "retry",
+                "updated_at": datetime.now().isoformat(),
+            }
+        else:
+            if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
+                logger.info(f"[AUTONOMOUS] Retrying implementation (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+                return {
+                    "next_decision": "retry",
+                    "updated_at": datetime.now().isoformat(),
+                }
+            else:
+                logger.warning("[AUTONOMOUS] Implementation failed after max retries, aborting")
+                return {
+                    "next_decision": "abort",
+                    "errors": [{
+                        "type": "autonomous_abort",
+                        "message": f"Implementation failed after {AUTONOMOUS_MAX_RETRIES} attempts in autonomous mode",
+                        "timestamp": datetime.now().isoformat(),
+                    }],
+                }
+
+    elif error_type == "verification_failed":
+        if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
+            logger.info(f"[AUTONOMOUS] Retrying verification (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+            return {
+                "next_decision": "retry",
+                "updated_at": datetime.now().isoformat(),
+            }
+        else:
+            # Skip verification and complete (not recommended but autonomous mode)
+            logger.warning("[AUTONOMOUS] Verification failed after max retries, completing with warnings")
+            return {
+                "current_phase": 5,  # Skip to completion
+                "next_decision": "continue",
+                "review_skipped": True,
+                "review_skipped_reason": f"Autonomous mode: verification failed after {AUTONOMOUS_MAX_RETRIES} attempts",
+                "updated_at": datetime.now().isoformat(),
+            }
+
+    else:
+        # Unknown error type - default to retry once, then abort
+        if phase_retry_count < 1:
+            logger.info("[AUTONOMOUS] Unknown error, attempting retry")
+            return {
+                "next_decision": "retry",
+                "updated_at": datetime.now().isoformat(),
+            }
+        else:
+            logger.warning("[AUTONOMOUS] Unknown error persists, aborting")
+            return {
+                "next_decision": "abort",
+                "errors": [{
+                    "type": "autonomous_abort",
+                    "message": f"Unknown error in autonomous mode: {issue_summary}",
+                    "timestamp": datetime.now().isoformat(),
+                }],
+            }
+
+
 async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
     """Escalate to human for intervention.
 
     Uses LangGraph's interrupt() to pause execution and wait
     for human input to resolve the issue.
+
+    Note: In most cases, errors are first routed to the fixer_triage node
+    before reaching this node. This node handles cases where:
+    1. The fixer is disabled
+    2. The fixer circuit breaker is open
+    3. The fixer could not fix the error
+    4. The error type is not auto-fixable
 
     Args:
         state: Current workflow state
@@ -30,6 +177,10 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         State updates after human intervention
     """
     logger.warning(f"Escalating to human: {state['project_name']}")
+
+    # Check if this escalation came from the fixer
+    current_fix = state.get("current_fix_attempt")
+    fixer_attempted = current_fix is not None and current_fix.get("result") is not None
 
     project_dir = Path(state["project_dir"])
     errors = state.get("errors", [])
@@ -45,7 +196,15 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         },
         "recent_errors": errors[-5:] if errors else [],
         "timestamp": datetime.now().isoformat(),
+        "fixer_attempted": fixer_attempted,
+        "fixer_enabled": state.get("fixer_enabled", True),
+        "fixer_circuit_breaker_open": state.get("fixer_circuit_breaker_open", False),
     }
+
+    # Add fixer context if available
+    if fixer_attempted and current_fix:
+        escalation["fixer_diagnosis"] = current_fix.get("diagnosis", {})
+        escalation["fixer_result"] = current_fix.get("result", {})
 
     # Determine the issue type
     issue_summary = "Unknown issue"
@@ -129,7 +288,21 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
 
     logger.info(f"Escalation saved to: {escalation_file}")
 
-    # Use LangGraph interrupt to pause for human input
+    # Check execution mode
+    execution_mode = state.get("execution_mode", "hitl")
+
+    if execution_mode == "afk":
+        # Autonomous mode - make automatic decision without human input
+        logger.info("[AUTONOMOUS] Making automatic escalation decision")
+
+        # Determine error type
+        error_type = "unknown"
+        if errors:
+            error_type = errors[-1].get("type", "unknown")
+
+        return _make_autonomous_decision(state, issue_summary, error_type, escalation)
+
+    # Interactive mode (hitl) - Use LangGraph interrupt to pause for human input
     # The human can:
     # 1. Modify state and resume
     # 2. Skip to a specific phase

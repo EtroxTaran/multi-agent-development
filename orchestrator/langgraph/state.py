@@ -198,7 +198,7 @@ class AgentFeedback:
 
 def _merge_feedback(
     existing: Optional[dict[str, AgentFeedback]],
-    new: dict[str, AgentFeedback],
+    new: Optional[dict[str, AgentFeedback]],
 ) -> dict[str, AgentFeedback]:
     """Reducer for merging feedback from parallel agents.
 
@@ -209,6 +209,8 @@ def _merge_feedback(
     Returns:
         Merged feedback dict
     """
+    if new is None:
+        return existing or {}
     if existing is None:
         return new
     return {**existing, **new}
@@ -486,6 +488,13 @@ class WorkflowState(TypedDict, total=False):
 
         # Session management
         last_handoff: Path to last handoff brief
+
+        # Fixer agent state
+        fixer_enabled: Whether fixer is enabled (default True)
+        fixer_attempts: Number of fix attempts this session
+        fixer_circuit_breaker_open: Whether circuit breaker is open
+        current_fix_attempt: Current fix attempt details
+        fix_history: History of fix attempts (append-only)
     """
 
     # Project identification
@@ -549,21 +558,34 @@ class WorkflowState(TypedDict, total=False):
     # Session management
     last_handoff: Optional[str]
 
+    # Fixer agent state
+    fixer_enabled: bool
+    fixer_attempts: int
+    fixer_circuit_breaker_open: bool
+    current_fix_attempt: Optional[dict]
+    fix_history: Annotated[list[dict], operator.add]
+
 
 def create_initial_state(
     project_dir: str,
     project_name: str,
+    execution_mode: str = "hitl",
 ) -> WorkflowState:
     """Create initial workflow state.
 
     Args:
         project_dir: Project directory path
         project_name: Project name
+        execution_mode: Execution mode - "hitl" (human-in-the-loop, default) or "afk" (autonomous)
 
     Returns:
         Initial WorkflowState
     """
     now = datetime.now().isoformat()
+
+    # Validate execution_mode
+    if execution_mode not in ("hitl", "afk"):
+        execution_mode = "hitl"  # Default to interactive mode
 
     return WorkflowState(
         project_dir=project_dir,
@@ -608,11 +630,19 @@ def create_initial_state(
         research_findings=None,
         research_errors=None,
         # Execution mode (Ralph Wiggum pattern)
-        execution_mode="afk",  # Default to autonomous mode
+        # "hitl" = human-in-the-loop (pauses for human input)
+        # "afk" = away-from-keyboard (fully autonomous, no pauses)
+        execution_mode=execution_mode,
         # Token/cost tracking
         token_usage=None,
         # Session management
         last_handoff=None,
+        # Fixer agent state
+        fixer_enabled=True,  # Fixer is ON by default
+        fixer_attempts=0,
+        fixer_circuit_breaker_open=False,
+        current_fix_attempt=None,
+        fix_history=[],
     )
 
 

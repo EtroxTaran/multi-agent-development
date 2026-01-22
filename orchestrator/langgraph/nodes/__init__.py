@@ -35,6 +35,14 @@ from .research_phase import research_phase_node
 # Handoff node (GSD pattern)
 from .generate_handoff import generate_handoff_node
 
+# Fixer nodes (self-healing)
+from .fixer_triage import fixer_triage_node
+from .fixer_diagnose import fixer_diagnose_node
+from .fixer_validate import fixer_validate_node
+from .fixer_apply import fixer_apply_node
+from .fixer_verify import fixer_verify_node
+from .error_dispatch import error_dispatch_node
+
 __all__ = [
     "prerequisites_node",
     "planning_node",
@@ -69,4 +77,12 @@ __all__ = [
     "research_phase_node",
     # Handoff node (GSD pattern)
     "generate_handoff_node",
+    # Fixer nodes (self-healing)
+    "fixer_triage_node",
+    "fixer_diagnose_node",
+    "fixer_validate_node",
+    "fixer_apply_node",
+    "fixer_verify_node",
+    # Error dispatch node
+    "error_dispatch_node",
 ]

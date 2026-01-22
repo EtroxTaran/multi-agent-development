@@ -33,6 +33,15 @@ from .task import (
 )
 from .write_tests import write_tests_router
 from .fix_bug import fix_bug_router
+from .fixer import (
+    fixer_triage_router,
+    fixer_diagnose_router,
+    fixer_validate_router,
+    fixer_apply_router,
+    fixer_verify_router,
+    should_use_fixer_router,
+)
+from ..nodes.error_dispatch import error_dispatch_router
 
 __all__ = [
     "validation_router",
@@ -61,4 +70,13 @@ __all__ = [
     "verify_tasks_parallel_router",
     "write_tests_router",
     "fix_bug_router",
+    # Fixer routers (self-healing)
+    "fixer_triage_router",
+    "fixer_diagnose_router",
+    "fixer_validate_router",
+    "fixer_apply_router",
+    "fixer_verify_router",
+    "should_use_fixer_router",
+    # Error dispatch
+    "error_dispatch_router",
 ]

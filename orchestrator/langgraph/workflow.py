@@ -16,6 +16,13 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command, RetryPolicy
 
+# Try to import AsyncSqliteSaver for persistent checkpoints
+try:
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+    ASYNC_SQLITE_AVAILABLE = True
+except ImportError:
+    ASYNC_SQLITE_AVAILABLE = False
+
 from .state import WorkflowState, create_initial_state
 from .nodes import (
     prerequisites_node,
@@ -51,6 +58,14 @@ from .nodes import (
     research_phase_node,
     # Handoff node (GSD pattern)
     generate_handoff_node,
+    # Fixer nodes (self-healing)
+    fixer_triage_node,
+    fixer_diagnose_node,
+    fixer_validate_node,
+    fixer_apply_node,
+    fixer_verify_node,
+    # Error dispatch node
+    error_dispatch_node,
 )
 from .routers import (
     prerequisites_router,
@@ -79,6 +94,15 @@ from .routers import (
     # Discussion and Research routers (GSD pattern)
     discuss_router,
     research_router,
+    # Fixer routers (self-healing)
+    fixer_triage_router,
+    fixer_diagnose_router,
+    fixer_validate_router,
+    fixer_apply_router,
+    fixer_verify_router,
+    should_use_fixer_router,
+    # Error dispatch router
+    error_dispatch_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -276,6 +300,16 @@ def create_workflow_graph(
     graph.add_node("human_escalation", human_escalation_node)
     graph.add_node("completion", completion_node)
 
+    # Error dispatch node (routes to fixer or human escalation)
+    graph.add_node("error_dispatch", error_dispatch_node)
+
+    # Fixer nodes (self-healing)
+    graph.add_node("fixer_triage", fixer_triage_node)
+    graph.add_node("fixer_diagnose", fixer_diagnose_node)
+    graph.add_node("fixer_validate", fixer_validate_node)
+    graph.add_node("fixer_apply", fixer_apply_node)
+    graph.add_node("fixer_verify", fixer_verify_node)
+
     # Handoff node (GSD pattern) - generates session brief before END
     graph.add_node("generate_handoff", generate_handoff_node)
 
@@ -293,7 +327,7 @@ def create_workflow_graph(
         prerequisites_router,
         {
             "planning": "discuss",  # Changed: go to discuss phase first (GSD pattern)
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -304,7 +338,7 @@ def create_workflow_graph(
         discuss_router,
         {
             "discuss_complete": "research",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "discuss_retry": "discuss",
         },
     )
@@ -315,7 +349,7 @@ def create_workflow_graph(
         research_router,
         {
             "research_complete": "product_validation",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "research_retry": "research",
         },
     )
@@ -326,7 +360,7 @@ def create_workflow_graph(
         product_validation_router,
         {
             "planning": "planning",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -346,7 +380,7 @@ def create_workflow_graph(
         {
             "implementation": "approval_gate",  # Changed: go to approval_gate first
             "planning": "planning",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -358,7 +392,7 @@ def create_workflow_graph(
         {
             "pre_implementation": "pre_implementation",
             "planning": "planning",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -369,7 +403,7 @@ def create_workflow_graph(
         pre_implementation_router,
         {
             "implementation": "task_breakdown",  # Changed: go to task_breakdown
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -382,7 +416,7 @@ def create_workflow_graph(
         task_breakdown_router,
         {
             "select_task": "select_task",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -395,7 +429,7 @@ def create_workflow_graph(
             "implement_task": "write_tests", # Go to write_tests first
             "implement_tasks_parallel": "implement_tasks_parallel",
             "build_verification": "build_verification",  # All tasks done
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -405,7 +439,7 @@ def create_workflow_graph(
         write_tests_router,
         {
             "implement_task": "implement_task",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -416,7 +450,7 @@ def create_workflow_graph(
         {
             "verify_task": "verify_task",
             "implement_task": "implement_task",  # Retry
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -427,7 +461,7 @@ def create_workflow_graph(
         {
             "verify_tasks_parallel": "verify_tasks_parallel",
             "implement_tasks_parallel": "implement_tasks_parallel",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -438,7 +472,7 @@ def create_workflow_graph(
         {
             "select_task": "select_task",  # LOOP BACK - get next task
             "implement_task": "fix_bug",  # Retry via Bug Fixer
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -449,7 +483,7 @@ def create_workflow_graph(
         {
             "select_task": "select_task",  # LOOP BACK - get next batch
             "implement_tasks_parallel": "implement_tasks_parallel",  # Retry batch
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -459,7 +493,7 @@ def create_workflow_graph(
         fix_bug_router,
         {
             "verify_task": "verify_task",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
 
@@ -485,7 +519,7 @@ def create_workflow_graph(
         {
             "completion": "coverage_check",  # Changed: go to coverage_check first
             "implementation": "implementation",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -497,7 +531,7 @@ def create_workflow_graph(
         {
             "security_scan": "security_scan",
             "implementation": "implementation",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -509,7 +543,7 @@ def create_workflow_graph(
         {
             "completion": "completion",
             "implementation": "implementation",
-            "human_escalation": "human_escalation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
@@ -530,6 +564,78 @@ def create_workflow_graph(
         },
     )
 
+    # ========== ERROR DISPATCH ==========
+    # Error dispatch intercepts errors and routes to fixer or human escalation
+    graph.add_conditional_edges(
+        "error_dispatch",
+        error_dispatch_router,
+        {
+            "fixer_triage": "fixer_triage",
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # ========== FIXER FLOW ==========
+    # Fixer intercepts errors before human escalation
+    # Flow: fixer_triage → fixer_diagnose → [fixer_validate] → fixer_apply → fixer_verify
+
+    # Fixer triage → diagnose or escalate
+    graph.add_conditional_edges(
+        "fixer_triage",
+        fixer_triage_router,
+        {
+            "fixer_diagnose": "fixer_diagnose",
+            "human_escalation": "human_escalation",
+            "skip_fixer": "human_escalation",  # Skip goes to human
+        },
+    )
+
+    # Fixer diagnose → validate, apply, or escalate
+    graph.add_conditional_edges(
+        "fixer_diagnose",
+        fixer_diagnose_router,
+        {
+            "fixer_validate": "fixer_validate",
+            "fixer_apply": "fixer_apply",
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # Fixer validate → apply or escalate
+    graph.add_conditional_edges(
+        "fixer_validate",
+        fixer_validate_router,
+        {
+            "fixer_apply": "fixer_apply",
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # Fixer apply → verify or escalate
+    graph.add_conditional_edges(
+        "fixer_apply",
+        fixer_apply_router,
+        {
+            "fixer_verify": "fixer_verify",
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # Fixer verify → resume workflow or escalate
+    # Note: resume_workflow returns to the node that would have been
+    # executed after the error, determined by current_phase
+    graph.add_conditional_edges(
+        "fixer_verify",
+        fixer_verify_router,
+        {
+            # Resume goes back to select_task to continue the workflow
+            "resume_workflow": "select_task",
+            "human_escalation": "human_escalation",
+        },
+    )
+
+    # ========== END FIXER FLOW ==========
+
     # Compile the graph
     compiled = graph.compile(checkpointer=checkpointer)
 
@@ -541,14 +647,16 @@ class WorkflowRunner:
     """Runner for executing LangGraph workflows.
 
     Handles workflow execution with checkpointing, resume,
-    and state management.
+    and state management. Use as an async context manager:
+
+        async with WorkflowRunner(project_dir) as runner:
+            await runner.run()
 
     Checkpointing Options:
-    - MemorySaver (default): Fast but loses state on restart
-    - AsyncSqliteSaver: Persistent checkpoints in SQLite (requires aiosqlite)
-    - PostgresSaver: Production-grade (requires psycopg)
+    - MemorySaver: Fast but loses state on restart (LANGGRAPH_CHECKPOINTER=memory)
+    - AsyncSqliteSaver: Persistent checkpoints in SQLite (default)
 
-    Set LANGGRAPH_CHECKPOINTER=sqlite for persistent checkpoints.
+    Set LANGGRAPH_CHECKPOINTER=memory for in-memory (testing) mode.
     """
 
     def __init__(
@@ -575,10 +683,20 @@ class WorkflowRunner:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         # Check environment for checkpointer preference
-        # Default to SQLite for persistence (change from "memory" to "sqlite")
-        checkpointer_type = os.environ.get("LANGGRAPH_CHECKPOINTER", "sqlite")
-        if checkpointer_type == "memory":
-            # Explicit memory mode - fast but non-persistent (for testing only)
+        # Default to SQLite for persistence
+        self.checkpointer_type = os.environ.get("LANGGRAPH_CHECKPOINTER", "sqlite")
+
+        # Graph will be created in __aenter__
+        self.graph = None
+        self.checkpointer = None
+        self._checkpointer_context = None
+
+        # Thread/run configuration
+        self.thread_id = f"workflow-{self.project_name}"
+
+    async def __aenter__(self) -> "WorkflowRunner":
+        """Enter async context, creating checkpointer and graph."""
+        if self.checkpointer_type == "memory":
             self.checkpointer = MemorySaver()
             logger.warning(
                 "Using MemorySaver - state will be lost on restart. "
@@ -586,52 +704,28 @@ class WorkflowRunner:
                 "Set LANGGRAPH_CHECKPOINTER=sqlite for persistence."
             )
         else:
-            # Default: SQLite persistence
-            self.checkpointer = self._create_sqlite_checkpointer()
-
-        # Create the graph
-        self.graph = create_workflow_graph(checkpointer=self.checkpointer)
-
-        # Thread/run configuration
-        self.thread_id = f"workflow-{self.project_name}"
-
-    def _create_sqlite_checkpointer(self) -> Any:
-        """Create SqliteSaver for persistent checkpoints.
-
-        Uses synchronous SqliteSaver which works with both sync and async
-        LangGraph operations. The async version requires context manager usage
-        which is incompatible with the graph compilation flow.
-
-        Returns:
-            SqliteSaver instance
-
-        Raises:
-            RuntimeError: If SQLite checkpointer cannot be created
-        """
-        try:
-            from langgraph.checkpoint.sqlite import SqliteSaver
-            import sqlite3
-
+            # SQLite persistence with async support
+            if not ASYNC_SQLITE_AVAILABLE:
+                raise RuntimeError(
+                    "AsyncSqliteSaver required but not available. "
+                    "Install with: pip install aiosqlite langgraph-checkpoint-sqlite"
+                )
             db_path = self.checkpoint_dir / "checkpoints.db"
-            # Ensure checkpoint directory exists
-            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            self._checkpointer_context = AsyncSqliteSaver.from_conn_string(str(db_path))
+            self.checkpointer = await self._checkpointer_context.__aenter__()
+            logger.info(f"Using AsyncSqliteSaver: {db_path}")
 
-            # Create SQLite connection and checkpointer
-            conn = sqlite3.connect(str(db_path), check_same_thread=False)
-            checkpointer = SqliteSaver(conn)
-            logger.info(f"Using SqliteSaver: {db_path}")
-            return checkpointer
+        self.graph = create_workflow_graph(checkpointer=self.checkpointer)
+        return self
 
-        except ImportError as e:
-            raise RuntimeError(
-                "SQLite checkpointer required but not available. "
-                "Install with: pip install langgraph-checkpoint-sqlite"
-            ) from e
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to create SQLite checkpointer: {e}. "
-                "Check that the checkpoint directory is writable."
-            ) from e
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit async context, closing checkpointer if needed."""
+        if self._checkpointer_context is not None:
+            await self._checkpointer_context.__aexit__(exc_type, exc_val, exc_tb)
+            self._checkpointer_context = None
+        self.checkpointer = None
+        self.graph = None
+        return False
 
     async def run(
         self,
@@ -641,19 +735,36 @@ class WorkflowRunner:
     ) -> dict[str, Any]:
         """Run the workflow from the beginning.
 
+        Must be called within async context manager:
+            async with WorkflowRunner(project_dir) as runner:
+                await runner.run()
+
         Args:
             initial_state: Optional initial state (creates default if not provided)
-            config: Optional LangGraph config
+            config: Optional LangGraph config (may contain execution_mode: "hitl" or "afk")
             progress_callback: Optional callback for progress updates
 
         Returns:
             Final workflow state
         """
+        if self.graph is None:
+            raise RuntimeError(
+                "WorkflowRunner must be used as async context manager: "
+                "async with WorkflowRunner(project_dir) as runner: await runner.run()"
+            )
+
+        # Extract execution_mode from config if provided
+        execution_mode = config.get("execution_mode", "hitl") if config else "hitl"
+
         if initial_state is None:
             initial_state = create_initial_state(
                 project_dir=str(self.project_dir),
                 project_name=self.project_name,
+                execution_mode=execution_mode,
             )
+        elif config and "execution_mode" in config:
+            # Update existing state with new execution_mode
+            initial_state["execution_mode"] = execution_mode
 
         run_config = {
             "configurable": {
@@ -666,9 +777,8 @@ class WorkflowRunner:
         logger.info(f"Starting workflow for project: {self.project_name}")
 
         if progress_callback:
-            # Use streaming to capture node events
             result = await self._run_with_callbacks(
-                initial_state, run_config, progress_callback
+                self.graph, initial_state, run_config, progress_callback
             )
         else:
             result = await self.graph.ainvoke(initial_state, config=run_config)
@@ -678,6 +788,7 @@ class WorkflowRunner:
 
     async def _run_with_callbacks(
         self,
+        graph: Any,
         initial_state: WorkflowState,
         run_config: dict,
         callback: "ProgressCallback",
@@ -685,6 +796,7 @@ class WorkflowRunner:
         """Run workflow with progress callbacks using event streaming.
 
         Args:
+            graph: Compiled workflow graph
             initial_state: Initial workflow state
             run_config: LangGraph run configuration
             callback: Progress callback handler
@@ -696,7 +808,7 @@ class WorkflowRunner:
         current_node = None
 
         # Use astream_events for detailed event tracking
-        async for event in self.graph.astream_events(
+        async for event in graph.astream_events(
             initial_state,
             config=run_config,
             version="v2",
@@ -737,14 +849,22 @@ class WorkflowRunner:
     ) -> dict[str, Any]:
         """Resume the workflow from the last checkpoint.
 
+        Must be called within async context manager.
+
         Args:
             human_response: Optional response for human escalation
-            config: Optional LangGraph config
+            config: Optional LangGraph config (may contain execution_mode: "hitl" or "afk")
             progress_callback: Optional callback for progress updates
 
         Returns:
             Final workflow state
         """
+        if self.graph is None:
+            raise RuntimeError(
+                "WorkflowRunner must be used as async context manager: "
+                "async with WorkflowRunner(project_dir) as runner: await runner.resume()"
+            )
+
         run_config = {
             "configurable": {
                 "thread_id": self.thread_id,
@@ -753,10 +873,27 @@ class WorkflowRunner:
         if config:
             run_config.update(config)
 
+        # If execution_mode is specified in config, include it in human_response
+        # so it can be used to update the state when resuming
+        execution_mode = config.get("execution_mode") if config else None
+
         logger.info(f"Resuming workflow for project: {self.project_name}")
+        if execution_mode:
+            logger.info(f"Execution mode: {execution_mode}")
 
         # Get current state from checkpoint
         state_snapshot = await self.graph.aget_state(run_config)
+
+        # Update execution_mode in the state if a new one was provided
+        if execution_mode and state_snapshot.values:
+            current_values = dict(state_snapshot.values)
+            if current_values.get("execution_mode") != execution_mode:
+                logger.info(f"Updating execution mode from {current_values.get('execution_mode')} to {execution_mode}")
+                await self.graph.aupdate_state(
+                    run_config,
+                    {"execution_mode": execution_mode},
+                )
+                state_snapshot = await self.graph.aget_state(run_config)
 
         if state_snapshot.next:
             # Workflow is paused (likely at human escalation)
@@ -828,9 +965,16 @@ class WorkflowRunner:
     async def get_state(self) -> Optional[WorkflowState]:
         """Get the current workflow state.
 
+        Must be called within async context manager.
+
         Returns:
             Current state or None if no checkpoint exists
         """
+        if self.graph is None:
+            raise RuntimeError(
+                "WorkflowRunner must be used as async context manager"
+            )
+
         run_config = {
             "configurable": {
                 "thread_id": self.thread_id,
@@ -876,8 +1020,40 @@ class WorkflowRunner:
 
         return history
 
+    async def get_pending_interrupt_async(self) -> Optional[dict]:
+        """Check if workflow is paused for human input (async version).
+
+        Must be called within async context manager.
+
+        Returns:
+            Interrupt details if paused, None otherwise
+        """
+        if self.graph is None:
+            raise RuntimeError(
+                "WorkflowRunner must be used as async context manager"
+            )
+
+        run_config = {
+            "configurable": {
+                "thread_id": self.thread_id,
+            },
+        }
+        state_snapshot = await self.graph.aget_state(run_config)
+
+        if state_snapshot.next:
+            # Workflow is paused
+            return {
+                "paused_at": list(state_snapshot.next),
+                "state": state_snapshot.values,
+            }
+        return None
+
     def get_pending_interrupt(self) -> Optional[dict]:
-        """Check if workflow is paused for human input.
+        """Check if workflow is paused for human input (sync wrapper).
+
+        Note: This creates a temporary async context and should only
+        be used outside of async code. Use get_pending_interrupt_async
+        inside async code.
 
         Returns:
             Interrupt details if paused, None otherwise
@@ -885,20 +1061,8 @@ class WorkflowRunner:
         import asyncio
 
         async def _get():
-            run_config = {
-                "configurable": {
-                    "thread_id": self.thread_id,
-                },
-            }
-            state_snapshot = await self.graph.aget_state(run_config)
-
-            if state_snapshot.next:
-                # Workflow is paused
-                return {
-                    "paused_at": list(state_snapshot.next),
-                    "state": state_snapshot.values,
-                }
-            return None
+            async with WorkflowRunner(self.project_dir) as runner:
+                return await runner.get_pending_interrupt_async()
 
         return asyncio.run(_get())
 
@@ -934,8 +1098,8 @@ async def run_workflow(
     Returns:
         Final workflow state
     """
-    runner = WorkflowRunner(project_dir)
-    return await runner.run(initial_state)
+    async with WorkflowRunner(project_dir) as runner:
+        return await runner.run(initial_state)
 
 
 async def resume_workflow(
@@ -951,5 +1115,5 @@ async def resume_workflow(
     Returns:
         Final workflow state
     """
-    runner = WorkflowRunner(project_dir)
-    return await runner.resume(human_response)
+    async with WorkflowRunner(project_dir) as runner:
+        return await runner.resume(human_response)
