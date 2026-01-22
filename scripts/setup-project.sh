@@ -398,6 +398,32 @@ else
 fi
 
 # =============================================================================
+# Step 8: Create Documents directory
+# =============================================================================
+
+info "Setting up Documents directory..."
+
+if [[ ! -d "Documents" ]]; then
+    mkdir -p "Documents"
+    # Create a placeholder README
+    cat > "Documents/README.md" << 'DOCS_README_EOF'
+# Project Documents
+
+Add your project documentation here:
+
+- **product-vision.md** - What you're building and why
+- **architecture.md** - Technical design decisions
+- **api-spec.md** - API contracts (if applicable)
+- **requirements.md** - Detailed requirements
+
+Claude will read these during `/discover` to understand your project.
+DOCS_README_EOF
+    success "Created: Documents/"
+else
+    warn "Directory already exists: Documents/"
+fi
+
+# =============================================================================
 # Complete!
 # =============================================================================
 
@@ -409,25 +435,33 @@ echo ""
 echo "Project structure:"
 echo "  $(pwd)/"
 echo "  ├── meta-architect/      <- Submodule (tools)"
-echo "  ├── PRODUCT.md           <- Your feature spec (EDIT THIS)"
-echo "  ├── CLAUDE.md            <- Coding rules for Claude"
-echo "  ├── run-workflow.sh      <- Run the workflow"
-echo "  └── update-meta-architect.sh <- Update the submodule"
+echo "  ├── Documents/           <- Add your project docs here"
+echo "  ├── PRODUCT.md           <- Feature spec (created via /discover)"
+echo "  ├── CLAUDE.md            <- Project context + coding rules"
+echo "  └── .claude/             <- Skills (symlinked)"
+echo ""
+echo "Claude is your Tech Lead with access to Cursor and Gemini agents."
 echo ""
 echo "Next steps:"
-echo "  1. Edit PRODUCT.md with your feature specification"
-echo "  2. Edit CLAUDE.md with your project's coding standards"
-echo "  3. Run Claude from THIS directory (project root):"
+echo "  1. Add your documents to Documents/"
+echo "  2. Run Claude from this directory:"
 echo ""
 echo -e "     ${BLUE}claude${NC}"
 echo ""
-echo "  4. Use the /orchestrate command to start the workflow:"
+echo "  3. Start with discovery:"
 echo ""
-echo -e "     ${BLUE}/orchestrate${NC}"
+echo -e "     ${BLUE}/discover${NC}    <- Read docs, create PRODUCT.md"
 echo ""
-echo "  Or run directly:"
+echo "Available skills:"
+echo -e "  ${BLUE}/discover${NC}     Read Documents/, understand project, create PRODUCT.md"
+echo -e "  ${BLUE}/plan${NC}         Create task breakdown from PRODUCT.md"
+echo -e "  ${BLUE}/task T1${NC}      Implement a specific task"
+echo -e "  ${BLUE}/status${NC}       Show workflow progress"
+echo -e "  ${BLUE}/orchestrate${NC}  Run full automated workflow (when ready)"
 echo ""
-echo -e "     ${BLUE}./run-workflow.sh${NC}"
+echo "Or if you already have PRODUCT.md:"
+echo -e "  ${BLUE}/plan${NC}         Create task breakdown"
+echo -e "  ${BLUE}/task T1${NC}      Implement first task"
 echo ""
 echo "Documentation: meta-architect/docs/quick-start.md"
 echo "============================================================================="
