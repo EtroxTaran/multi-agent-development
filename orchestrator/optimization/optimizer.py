@@ -6,7 +6,6 @@ different optimization strategies.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -99,6 +98,7 @@ class PromptOptimizer:
     def eval_repo(self):
         if self._eval_repo is None:
             from ..db.repositories import get_evaluation_repository
+
             self._eval_repo = get_evaluation_repository(self.project_name)
         return self._eval_repo
 
@@ -106,6 +106,7 @@ class PromptOptimizer:
     def prompt_repo(self):
         if self._prompt_repo is None:
             from ..db.repositories import get_prompt_version_repository
+
             self._prompt_repo = get_prompt_version_repository(self.project_name)
         return self._prompt_repo
 
@@ -113,6 +114,7 @@ class PromptOptimizer:
     def golden_repo(self):
         if self._golden_repo is None:
             from ..db.repositories import get_golden_example_repository
+
             self._golden_repo = get_golden_example_repository(self.project_name)
         return self._golden_repo
 
@@ -120,6 +122,7 @@ class PromptOptimizer:
     def history_repo(self):
         if self._history_repo is None:
             from ..db.repositories import get_optimization_history_repository
+
             self._history_repo = get_optimization_history_repository(self.project_name)
         return self._history_repo
 
@@ -127,6 +130,7 @@ class PromptOptimizer:
     def opro(self):
         if self._opro is None:
             from .opro import OPROOptimizer
+
             self._opro = OPROOptimizer(
                 project_dir=str(self.project_dir),
                 project_name=self.project_name,
@@ -137,6 +141,7 @@ class PromptOptimizer:
     def bootstrap(self):
         if self._bootstrap is None:
             from .bootstrap import BootstrapOptimizer
+
             self._bootstrap = BootstrapOptimizer(
                 project_dir=str(self.project_dir),
                 project_name=self.project_name,
@@ -171,9 +176,7 @@ class PromptOptimizer:
             )
 
         # Get current prompt version
-        current_version = await self.prompt_repo.get_production_version(
-            agent, template_name
-        )
+        current_version = await self.prompt_repo.get_production_version(agent, template_name)
         if not current_version:
             return OptimizationResult(
                 success=False,
@@ -191,9 +194,7 @@ class PromptOptimizer:
                 agent, template_name, current_version, evaluations
             )
         elif method == "bootstrap":
-            result = await self._optimize_with_bootstrap(
-                agent, template_name, current_version
-            )
+            result = await self._optimize_with_bootstrap(agent, template_name, current_version)
         else:
             return OptimizationResult(
                 success=False,
@@ -338,7 +339,11 @@ class PromptOptimizer:
                 golden_examples = await self.golden_repo.get_by_template(
                     agent, template_name, limit=10
                 )
-                current_score = sum(g["score"] for g in golden_examples) / len(golden_examples) if golden_examples else 5.0
+                current_score = (
+                    sum(g["score"] for g in golden_examples) / len(golden_examples)
+                    if golden_examples
+                    else 5.0
+                )
 
                 improvement = (validation_score or 0) - current_score
 
@@ -418,10 +423,9 @@ class PromptOptimizer:
             if len(golden_examples) < holdout_count:
                 # Fall back to recent high-scoring evaluations
                 evaluations = await self.eval_repo.get_by_agent(agent, limit=50)
-                golden_examples = [
-                    e for e in evaluations
-                    if e.get("overall_score", 0) >= 8.0
-                ][:holdout_count]
+                golden_examples = [e for e in evaluations if e.get("overall_score", 0) >= 8.0][
+                    :holdout_count
+                ]
 
             if not golden_examples:
                 # No holdout data, use heuristic validation

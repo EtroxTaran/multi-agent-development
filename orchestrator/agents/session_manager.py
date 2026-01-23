@@ -16,12 +16,11 @@ import json
 import logging
 import os
 import re
-import subprocess
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -371,9 +370,9 @@ class SessionManager:
         # "Session: abc123"
         # "session_id": "abc123"
         patterns = [
-            r'[Ss]ession[:\s]+([a-f0-9-]+)',
+            r"[Ss]ession[:\s]+([a-f0-9-]+)",
             r'"session_id"\s*:\s*"([^"]+)"',
-            r'session_id=([a-f0-9-]+)',
+            r"session_id=([a-f0-9-]+)",
         ]
 
         for pattern in patterns:
@@ -398,7 +397,8 @@ class SessionManager:
         # Get list of expired task IDs under lock
         with self._lock:
             expired = [
-                task_id for task_id, session in self._sessions.items()
+                task_id
+                for task_id, session in self._sessions.items()
                 if self._is_expired(session) or not session.is_active
             ]
 

@@ -1,3 +1,12 @@
+---
+name: skills
+description: List and categorize all available skills in the Conductor system.
+version: 1.1.0
+tags: [discovery, skills, workflow]
+owner: orchestration
+status: active
+---
+
 # Skills Discovery Skill
 
 List all available skills in the Conductor system.
@@ -8,17 +17,27 @@ List all available skills in the Conductor system.
 /skills
 ```
 
-## Purpose
+## Overview
 
-Help users and Claude discover what capabilities are available.
+Help users and Claude discover what capabilities are available, grouped by workflow phase.
 
-## Output
+## Prerequisites
+
+- None beyond access to the repository and skill docs.
+
+## Outputs
 
 Displays:
 - All available commands organized by category
 - Brief descriptions of each
 - Recommended workflow order
 - Links to detailed documentation
+
+## Workflow Steps
+
+1. Read available skill directories in `.claude/skills`.
+2. Group commands into workflow categories.
+3. Present command, purpose, and related documentation paths.
 
 ## Categories
 
@@ -48,3 +67,19 @@ Support commands:
 - `/list-projects` - Project listing
 - `/sync-rules` - Rule synchronization
 - `/add-lesson` - Add lessons learned
+
+## Error Handling
+
+- If skill docs are missing or unreadable, report which paths failed and return partial results.
+
+## Examples
+
+```
+/skills
+```
+
+## Related Skills
+
+- `/discover` - Create or discover project documentation
+- `/plan` - Create a task breakdown
+- `/orchestrate` - Full workflow execution

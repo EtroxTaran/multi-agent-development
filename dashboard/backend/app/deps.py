@@ -3,23 +3,22 @@
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import AsyncGenerator, Optional
 
 from fastapi import Depends, HTTPException, Query
 
-from .config import Settings, get_settings
+from .config import get_settings
 
 # Add orchestrator to path
 _settings = get_settings()
 sys.path.insert(0, str(_settings.conductor_root))
 
-from orchestrator.project_manager import ProjectManager
-from orchestrator.orchestrator import Orchestrator
-from orchestrator.storage.audit_adapter import AuditStorageAdapter, get_audit_storage
 from orchestrator.agents.budget import BudgetManager
+from orchestrator.orchestrator import Orchestrator
+from orchestrator.project_manager import ProjectManager
+from orchestrator.storage.audit_adapter import AuditStorageAdapter, get_audit_storage
 
 
-@lru_cache()
+@lru_cache
 def get_project_manager() -> ProjectManager:
     """Get ProjectManager singleton.
 

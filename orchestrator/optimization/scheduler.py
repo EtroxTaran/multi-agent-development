@@ -8,9 +8,9 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Optional
 
-from .optimizer import PromptOptimizer, OptimizationResult
+from .optimizer import OptimizationResult, PromptOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,7 @@ class OptimizationScheduler:
 
         # Get all agents that have evaluations
         from ..db.repositories import get_evaluation_repository
+
         eval_repo = get_evaluation_repository(self.project_name)
 
         # Check statistics
@@ -228,11 +229,13 @@ class OptimizationScheduler:
 
             except Exception as e:
                 logger.error(f"Optimization error for {key}: {e}")
-                results.append(OptimizationResult(
-                    success=False,
-                    method="unknown",
-                    error=str(e),
-                ))
+                results.append(
+                    OptimizationResult(
+                        success=False,
+                        method="unknown",
+                        error=str(e),
+                    )
+                )
 
             finally:
                 self._running.discard(key)

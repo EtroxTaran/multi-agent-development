@@ -6,17 +6,14 @@ Provides a unified interface for all observability features.
 import asyncio
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
 from .config import get_config
-from .metrics import get_metrics_registry, MetricsRegistry
-from .tracing import get_tracing_manager, TracingManager
-from .webhooks import (
-    get_webhook_dispatcher,
-    WebhookDispatcher,
-    WebhookEventType,
-)
+from .metrics import MetricsRegistry, get_metrics_registry
+from .tracing import TracingManager, get_tracing_manager
+from .webhooks import WebhookDispatcher, WebhookEventType, get_webhook_dispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +200,7 @@ class ObservabilityManager:
 
         try:
             yield
-        except Exception as e:
+        except Exception:
             status = "failure"
             if self.metrics:
                 self.metrics.record_error("error", phase)

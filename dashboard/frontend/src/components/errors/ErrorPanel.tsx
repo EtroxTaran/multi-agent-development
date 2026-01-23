@@ -2,9 +2,9 @@
  * Error panel component
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Clock } from 'lucide-react';
-import { agentsApi } from '@/lib/api';
+import { useQuery } from "@tanstack/react-query";
+import { AlertCircle, Clock } from "lucide-react";
+import { agentsApi } from "@/lib/api";
 import {
   Badge,
   Card,
@@ -13,9 +13,9 @@ import {
   CardHeader,
   CardTitle,
   ScrollArea,
-} from '@/components/ui';
-import { formatDate, getAgentName } from '@/lib/utils';
-import type { AuditEntry } from '@/types';
+} from "@/components/ui";
+import { formatDate, getAgentName } from "@/lib/utils";
+import type { AuditEntry } from "@/types";
 
 interface ErrorPanelProps {
   projectName: string;
@@ -41,7 +41,7 @@ function ErrorCard({ entry }: { entry: AuditEntry }) {
           <div className="flex items-center space-x-2">
             <span className="text-muted-foreground">Status:</span>
             <Badge
-              variant={entry.status === 'timeout' ? 'warning' : 'destructive'}
+              variant={entry.status === "timeout" ? "warning" : "destructive"}
             >
               {entry.status}
             </Badge>
@@ -72,14 +72,16 @@ function ErrorCard({ entry }: { entry: AuditEntry }) {
 
 export function ErrorPanel({ projectName }: ErrorPanelProps) {
   const { data: failedData } = useQuery({
-    queryKey: ['audit', 'errors', projectName, 'failed'],
-    queryFn: () => agentsApi.getAudit(projectName, { status: 'failed', limit: 50 }),
+    queryKey: ["audit", "errors", projectName, "failed"],
+    queryFn: () =>
+      agentsApi.getAudit(projectName, { status: "failed", limit: 50 }),
     refetchInterval: 10000,
   });
 
   const { data: timeoutData } = useQuery({
-    queryKey: ['audit', 'errors', projectName, 'timeout'],
-    queryFn: () => agentsApi.getAudit(projectName, { status: 'timeout', limit: 50 }),
+    queryKey: ["audit", "errors", projectName, "timeout"],
+    queryFn: () =>
+      agentsApi.getAudit(projectName, { status: "timeout", limit: 50 }),
     refetchInterval: 10000,
   });
 
@@ -104,7 +106,9 @@ export function ErrorPanel({ projectName }: ErrorPanelProps) {
             <CardDescription>Total Errors</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600">{allErrors.length}</div>
+            <div className="text-3xl font-bold text-red-600">
+              {allErrors.length}
+            </div>
           </CardContent>
         </Card>
 

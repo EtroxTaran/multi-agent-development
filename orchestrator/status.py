@@ -5,13 +5,12 @@ including phase progress, task status, recent actions, and errors.
 """
 
 import json
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .utils.action_log import ActionLog, get_action_log
-from .utils.error_aggregator import ErrorAggregator, ErrorSeverity, get_error_aggregator
+from .utils.action_log import get_action_log
+from .utils.error_aggregator import ErrorSeverity, get_error_aggregator
 from .utils.handoff import HandoffGenerator
 
 
@@ -98,11 +97,16 @@ class StatusDashboard:
                     "phase_status": state_data.phase_status,
                     "iteration_count": state_data.iteration_count,
                     "execution_mode": state_data.execution_mode,
-                    "created_at": state_data.created_at.isoformat() if state_data.created_at else None,
-                    "updated_at": state_data.updated_at.isoformat() if state_data.updated_at else None,
+                    "created_at": state_data.created_at.isoformat()
+                    if state_data.created_at
+                    else None,
+                    "updated_at": state_data.updated_at.isoformat()
+                    if state_data.updated_at
+                    else None,
                 }
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Storage adapter failed: {e}")
 
         return None
@@ -114,10 +118,12 @@ class StatusDashboard:
 
             repo = get_task_repository(self.project_dir.name)
             from .storage.async_utils import run_async
+
             tasks = run_async(repo.list_tasks())
-            return [t.to_dict() if hasattr(t, 'to_dict') else t for t in tasks] if tasks else []
+            return [t.to_dict() if hasattr(t, "to_dict") else t for t in tasks] if tasks else []
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).debug(f"Failed to load tasks: {e}")
             return []
 
@@ -158,11 +164,25 @@ class StatusDashboard:
             status = f"Phase {phase} - {phase_name}"
 
         # Build header
-        lines.append(self._box_line(Colors.BOX_TOP_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_TOP_RIGHT))
-        lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                    self._color(f"PROJECT: {project}", Colors.BOLD + Colors.CYAN)))
-        lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                    self._color(f"STATUS: {status}", Colors.BOLD + Colors.WHITE)))
+        lines.append(
+            self._box_line(Colors.BOX_TOP_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_TOP_RIGHT)
+        )
+        lines.append(
+            self._box_line(
+                Colors.BOX_VERTICAL,
+                " ",
+                Colors.BOX_VERTICAL,
+                self._color(f"PROJECT: {project}", Colors.BOLD + Colors.CYAN),
+            )
+        )
+        lines.append(
+            self._box_line(
+                Colors.BOX_VERTICAL,
+                " ",
+                Colors.BOX_VERTICAL,
+                self._color(f"STATUS: {status}", Colors.BOLD + Colors.WHITE),
+            )
+        )
 
         return lines
 
@@ -171,8 +191,11 @@ class StatusDashboard:
         lines = []
 
         lines.append(self._box_line(Colors.BOX_T_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_T_RIGHT))
-        lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                    self._color("PHASES:", Colors.BOLD)))
+        lines.append(
+            self._box_line(
+                Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL, self._color("PHASES:", Colors.BOLD)
+            )
+        )
 
         phases = state.get("phases", {})
         phase_info = [
@@ -249,12 +272,24 @@ class StatusDashboard:
         actions = self.action_log.get_recent(limit)
 
         lines.append(self._box_line(Colors.BOX_T_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_T_RIGHT))
-        lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                    self._color(f"RECENT ACTIONS (last {limit}):", Colors.BOLD)))
+        lines.append(
+            self._box_line(
+                Colors.BOX_VERTICAL,
+                " ",
+                Colors.BOX_VERTICAL,
+                self._color(f"RECENT ACTIONS (last {limit}):", Colors.BOLD),
+            )
+        )
 
         if not actions:
-            lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                        self._color("No actions recorded yet", Colors.DIM)))
+            lines.append(
+                self._box_line(
+                    Colors.BOX_VERTICAL,
+                    " ",
+                    Colors.BOX_VERTICAL,
+                    self._color("No actions recorded yet", Colors.DIM),
+                )
+            )
         else:
             for action in actions:
                 timestamp = datetime.fromisoformat(action.timestamp).strftime("%H:%M:%S")
@@ -300,12 +335,24 @@ class StatusDashboard:
         lines.append(self._box_line(Colors.BOX_T_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_T_RIGHT))
 
         if error_count == 0:
-            lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                        self._color("ERRORS: None ✓", Colors.GREEN + Colors.BOLD)))
+            lines.append(
+                self._box_line(
+                    Colors.BOX_VERTICAL,
+                    " ",
+                    Colors.BOX_VERTICAL,
+                    self._color("ERRORS: None ✓", Colors.GREEN + Colors.BOLD),
+                )
+            )
         else:
             header = f"ERRORS ({error_count} unresolved):"
-            lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                        self._color(header, Colors.RED + Colors.BOLD)))
+            lines.append(
+                self._box_line(
+                    Colors.BOX_VERTICAL,
+                    " ",
+                    Colors.BOX_VERTICAL,
+                    self._color(header, Colors.RED + Colors.BOLD),
+                )
+            )
 
             for error in errors[:3]:  # Show max 3 errors
                 # Severity icon
@@ -348,14 +395,22 @@ class StatusDashboard:
         brief = handoff_gen.generate()
 
         lines.append(self._box_line(Colors.BOX_T_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_T_RIGHT))
-        lines.append(self._box_line(Colors.BOX_VERTICAL, " ", Colors.BOX_VERTICAL,
-                                    self._color("NEXT:", Colors.BOLD) + f" {brief.next_action[:self.width - 12]}"))
+        lines.append(
+            self._box_line(
+                Colors.BOX_VERTICAL,
+                " ",
+                Colors.BOX_VERTICAL,
+                self._color("NEXT:", Colors.BOLD) + f" {brief.next_action[:self.width - 12]}",
+            )
+        )
 
         return lines
 
     def _render_footer(self) -> list[str]:
         """Render dashboard footer."""
-        return [self._box_line(Colors.BOX_BOTTOM_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_BOTTOM_RIGHT)]
+        return [
+            self._box_line(Colors.BOX_BOTTOM_LEFT, Colors.BOX_HORIZONTAL, Colors.BOX_BOTTOM_RIGHT)
+        ]
 
     def render(self, output: bool = True) -> str:
         """Render the full dashboard.

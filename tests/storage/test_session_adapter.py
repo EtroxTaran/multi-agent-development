@@ -1,15 +1,13 @@
 """Tests for session storage adapter."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.storage.session_adapter import (
-    SessionStorageAdapter,
-    get_session_storage,
-)
+import pytest
+
 from orchestrator.storage.base import SessionData
+from orchestrator.storage.session_adapter import SessionStorageAdapter, get_session_storage
 
 
 @pytest.fixture
@@ -94,9 +92,7 @@ class TestSessionStorageAdapter:
         mock_session.invocation_count = 0
         mock_session.total_cost_usd = 0.0
 
-        mock_session_repository.get_active_session = AsyncMock(
-            return_value=mock_session
-        )
+        mock_session_repository.get_active_session = AsyncMock(return_value=mock_session)
 
         with patch(
             "orchestrator.db.repositories.sessions.get_session_repository",
@@ -126,9 +122,7 @@ class TestSessionStorageAdapter:
         mock_session.agent = "claude"
         mock_session.status = "active"
 
-        mock_session_repository.get_active_session = AsyncMock(
-            return_value=mock_session
-        )
+        mock_session_repository.get_active_session = AsyncMock(return_value=mock_session)
 
         with patch(
             "orchestrator.db.repositories.sessions.get_session_repository",
@@ -161,9 +155,7 @@ class TestSessionStorageAdapter:
             assert session is not None
             assert session.task_id == "T1"
 
-    def test_get_or_create_session_returns_existing(
-        self, temp_project, mock_session_repository
-    ):
+    def test_get_or_create_session_returns_existing(self, temp_project, mock_session_repository):
         """Test get_or_create_session returns existing session."""
         # Set up mock to return existing session
         mock_session = MagicMock()
@@ -177,9 +169,7 @@ class TestSessionStorageAdapter:
         mock_session.invocation_count = 0
         mock_session.total_cost_usd = 0.0
 
-        mock_session_repository.get_active_session = AsyncMock(
-            return_value=mock_session
-        )
+        mock_session_repository.get_active_session = AsyncMock(return_value=mock_session)
 
         with patch(
             "orchestrator.db.repositories.sessions.get_session_repository",
@@ -197,9 +187,7 @@ class TestSessionStorageAdapter:
         mock_session = MagicMock()
         mock_session.id = "test-session-id"
         mock_session.task_id = "T1"
-        mock_session_repository.get_active_session = AsyncMock(
-            return_value=mock_session
-        )
+        mock_session_repository.get_active_session = AsyncMock(return_value=mock_session)
 
         with patch(
             "orchestrator.db.repositories.sessions.get_session_repository",
@@ -218,9 +206,7 @@ class TestSessionStorageAdapter:
         mock_session = MagicMock()
         mock_session.id = "test-session-id"
         mock_session.task_id = "T1"
-        mock_session_repository.get_active_session = AsyncMock(
-            return_value=mock_session
-        )
+        mock_session_repository.get_active_session = AsyncMock(return_value=mock_session)
 
         with patch(
             "orchestrator.db.repositories.sessions.get_session_repository",
@@ -229,9 +215,7 @@ class TestSessionStorageAdapter:
             adapter = SessionStorageAdapter(temp_project)
             # Touch should not raise
             adapter.touch_session("T1")
-            mock_session_repository.touch_session.assert_called_once_with(
-                "test-session-id"
-            )
+            mock_session_repository.touch_session.assert_called_once_with("test-session-id")
 
     def test_record_invocation(self, temp_project, mock_session_repository):
         """Test recording an invocation."""
@@ -239,9 +223,7 @@ class TestSessionStorageAdapter:
         mock_session = MagicMock()
         mock_session.id = "test-session-id"
         mock_session.task_id = "T1"
-        mock_session_repository.get_active_session = AsyncMock(
-            return_value=mock_session
-        )
+        mock_session_repository.get_active_session = AsyncMock(return_value=mock_session)
 
         with patch(
             "orchestrator.db.repositories.sessions.get_session_repository",

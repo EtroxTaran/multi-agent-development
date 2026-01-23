@@ -6,12 +6,12 @@ and approval information during HITL workflow pauses.
 
 from typing import Optional
 
+from rich.box import ROUNDED
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.markdown import Markdown
-from rich.box import ROUNDED
 
 
 class InterruptDisplay:
@@ -55,12 +55,14 @@ class InterruptDisplay:
         header_text.append(f"Phase {phase}", style="bold cyan")
 
         self.console.print()
-        self.console.print(Panel(
-            header_text,
-            box=ROUNDED,
-            border_style="red",
-            padding=(0, 2),
-        ))
+        self.console.print(
+            Panel(
+                header_text,
+                box=ROUNDED,
+                border_style="red",
+                padding=(0, 2),
+            )
+        )
 
         # Display issue summary
         issue_content = Text()
@@ -73,11 +75,13 @@ class InterruptDisplay:
         issue_content.append("Retry Attempts: ", style="bold dim")
         issue_content.append(f"{retry_count}/{max_retries}", style="dim")
 
-        self.console.print(Panel(
-            issue_content,
-            title="[bold]Issue Summary[/bold]",
-            border_style="yellow",
-        ))
+        self.console.print(
+            Panel(
+                issue_content,
+                title="[bold]Issue Summary[/bold]",
+                border_style="yellow",
+            )
+        )
 
         # Display suggested actions if provided
         suggested_actions = data.get("suggested_actions", [])
@@ -97,11 +101,13 @@ class InterruptDisplay:
                 else:
                     action_table.add_row(str(i), str(action), "")
 
-            self.console.print(Panel(
-                action_table,
-                title="[bold]Suggested Actions[/bold]",
-                border_style="blue",
-            ))
+            self.console.print(
+                Panel(
+                    action_table,
+                    title="[bold]Suggested Actions[/bold]",
+                    border_style="blue",
+                )
+            )
 
         # Display clarification questions if present
         clarifications = data.get("clarifications", [])
@@ -134,14 +140,17 @@ class InterruptDisplay:
             for key, value in context.items():
                 if isinstance(value, (list, dict)):
                     import json
+
                     value = json.dumps(value, indent=2)[:100] + "..."
                 context_table.add_row(key, str(value)[:100])
 
-            self.console.print(Panel(
-                context_table,
-                title="[bold]Additional Context[/bold]",
-                border_style="dim",
-            ))
+            self.console.print(
+                Panel(
+                    context_table,
+                    title="[bold]Additional Context[/bold]",
+                    border_style="dim",
+                )
+            )
 
     def display_approval(self, data: dict) -> None:
         """Display an approval gate with context summary.
@@ -168,12 +177,14 @@ class InterruptDisplay:
         header_text.append(f"Phase {phase}", style="bold cyan")
 
         self.console.print()
-        self.console.print(Panel(
-            header_text,
-            box=ROUNDED,
-            border_style="yellow",
-            padding=(0, 2),
-        ))
+        self.console.print(
+            Panel(
+                header_text,
+                box=ROUNDED,
+                border_style="yellow",
+                padding=(0, 2),
+            )
+        )
 
         # Display approval summary
         summary_content = Text()
@@ -182,11 +193,13 @@ class InterruptDisplay:
         summary_content.append("\n\n")
         summary_content.append(summary)
 
-        self.console.print(Panel(
-            summary_content,
-            title="[bold]Summary[/bold]",
-            border_style="cyan",
-        ))
+        self.console.print(
+            Panel(
+                summary_content,
+                title="[bold]Summary[/bold]",
+                border_style="cyan",
+            )
+        )
 
         # Display scores if available
         scores = data.get("scores", {})
@@ -204,18 +217,22 @@ class InterruptDisplay:
                     score_val = score
                     status = "passed" if float(score) >= 6.0 else "failed"
 
-                status_style = "green" if status == "passed" else "red" if status == "failed" else "yellow"
+                status_style = (
+                    "green" if status == "passed" else "red" if status == "failed" else "yellow"
+                )
                 score_table.add_row(
                     agent.title(),
                     str(score_val),
                     f"[{status_style}]{status}[/{status_style}]",
                 )
 
-            self.console.print(Panel(
-                score_table,
-                title="[bold]Validation Scores[/bold]",
-                border_style="blue",
-            ))
+            self.console.print(
+                Panel(
+                    score_table,
+                    title="[bold]Validation Scores[/bold]",
+                    border_style="blue",
+                )
+            )
 
         # Display files changed if available
         files_changed = data.get("files_changed", [])
@@ -224,21 +241,25 @@ class InterruptDisplay:
             if len(files_changed) > 10:
                 files_list += f"\n  ... and {len(files_changed) - 10} more"
 
-            self.console.print(Panel(
-                files_list,
-                title=f"[bold]Files Changed ({len(files_changed)})[/bold]",
-                border_style="dim",
-            ))
+            self.console.print(
+                Panel(
+                    files_list,
+                    title=f"[bold]Files Changed ({len(files_changed)})[/bold]",
+                    border_style="dim",
+                )
+            )
 
         # Display details if available
         details = data.get("details", {})
         if details:
             if isinstance(details, str):
-                self.console.print(Panel(
-                    Markdown(details),
-                    title="[bold]Details[/bold]",
-                    border_style="dim",
-                ))
+                self.console.print(
+                    Panel(
+                        Markdown(details),
+                        title="[bold]Details[/bold]",
+                        border_style="dim",
+                    )
+                )
             elif isinstance(details, dict):
                 detail_table = Table(show_header=False, box=None)
                 detail_table.add_column("Key", style="bold dim")
@@ -247,11 +268,13 @@ class InterruptDisplay:
                 for key, value in details.items():
                     detail_table.add_row(key, str(value)[:100])
 
-                self.console.print(Panel(
-                    detail_table,
-                    title="[bold]Details[/bold]",
-                    border_style="dim",
-                ))
+                self.console.print(
+                    Panel(
+                        detail_table,
+                        title="[bold]Details[/bold]",
+                        border_style="dim",
+                    )
+                )
 
     def display_separator(self) -> None:
         """Display a visual separator line."""

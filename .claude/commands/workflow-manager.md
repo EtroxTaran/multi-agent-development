@@ -1,0 +1,1 @@
+../skills/workflow-manager/SKILL.md

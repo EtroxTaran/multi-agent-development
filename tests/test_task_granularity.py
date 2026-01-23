@@ -11,38 +11,35 @@ Run with: uv run pytest tests/test_task_granularity.py -v
 """
 
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from orchestrator.utils.task_config import (
-    TaskSizeConfig,
-    TaskValidationResult,
-    ComplexityScore,
-    ComplexityScorer,
-    ComplexityLevel,
-    validate_task_complexity,
-    DEFAULT_MAX_FILES_TO_CREATE,
-    DEFAULT_MAX_FILES_TO_MODIFY,
-    DEFAULT_MAX_ACCEPTANCE_CRITERIA,
-    DEFAULT_COMPLEXITY_THRESHOLD,
-    DEFAULT_MAX_INPUT_TOKENS,
-)
+import pytest
+
 from orchestrator.langgraph.nodes.task_breakdown import (
-    _validate_task_granularity,
     _auto_split_large_task,
-    _group_files_by_directory,
     _create_batches_from_groups,
-    _distribute_items,
     _determine_split_strategy,
+    _distribute_items,
+    _group_files_by_directory,
     validate_and_split_tasks,
 )
 from orchestrator.langgraph.state import create_task
-
+from orchestrator.utils.task_config import (
+    DEFAULT_COMPLEXITY_THRESHOLD,
+    DEFAULT_MAX_ACCEPTANCE_CRITERIA,
+    DEFAULT_MAX_FILES_TO_CREATE,
+    DEFAULT_MAX_FILES_TO_MODIFY,
+    DEFAULT_MAX_INPUT_TOKENS,
+    ComplexityLevel,
+    ComplexityScore,
+    ComplexityScorer,
+    TaskSizeConfig,
+    validate_task_complexity,
+)
 
 # =============================================================================
 # Test TaskSizeConfig
 # =============================================================================
+
 
 class TestTaskSizeConfig:
     """Test TaskSizeConfig loading and defaults."""
@@ -149,6 +146,7 @@ class TestTaskSizeConfig:
 # Test ComplexityScore
 # =============================================================================
 
+
 class TestComplexityScore:
     """Test ComplexityScore calculations."""
 
@@ -201,6 +199,7 @@ class TestComplexityScore:
 # =============================================================================
 # Test ComplexityScorer
 # =============================================================================
+
 
 class TestComplexityScorer:
     """Test ComplexityScorer multi-dimensional assessment."""
@@ -368,6 +367,7 @@ class TestComplexityScorer:
 # Test Task Validation
 # =============================================================================
 
+
 class TestTaskValidation:
     """Test task granularity validation using complexity scoring."""
 
@@ -469,6 +469,7 @@ class TestTaskValidation:
 # Test Split Strategy Selection
 # =============================================================================
 
+
 class TestSplitStrategySelection:
     """Test automatic split strategy selection."""
 
@@ -524,6 +525,7 @@ class TestSplitStrategySelection:
 # =============================================================================
 # Test Auto-Split Helpers
 # =============================================================================
+
 
 class TestAutoSplitHelpers:
     """Test helper functions for auto-split."""
@@ -585,6 +587,7 @@ class TestAutoSplitHelpers:
 # Test Auto-Split Logic
 # =============================================================================
 
+
 class TestAutoSplit:
     """Test auto-split functionality."""
 
@@ -609,9 +612,8 @@ class TestAutoSplit:
 
         # Each split task should have fewer files
         for split_task in split_tasks:
-            files_count = (
-                len(split_task.get("files_to_create", []))
-                + len(split_task.get("files_to_modify", []))
+            files_count = len(split_task.get("files_to_create", [])) + len(
+                split_task.get("files_to_modify", [])
             )
             assert files_count < 6
 
@@ -711,6 +713,7 @@ class TestAutoSplit:
 # Test validate_and_split_tasks Integration
 # =============================================================================
 
+
 class TestValidateAndSplitTasks:
     """Test the main validate_and_split_tasks function."""
 
@@ -752,8 +755,14 @@ class TestValidateAndSplitTasks:
                 acceptance_criteria=["C1", "C2", "C3"],
                 dependencies=[],
                 files_to_create=[
-                    "a.py", "b.py", "c.py", "d.py", "e.py",
-                    "f.py", "g.py", "h.py",
+                    "a.py",
+                    "b.py",
+                    "c.py",
+                    "d.py",
+                    "e.py",
+                    "f.py",
+                    "g.py",
+                    "h.py",
                 ],
                 files_to_modify=[],
             ),
@@ -791,8 +800,14 @@ class TestValidateAndSplitTasks:
                 acceptance_criteria=["C1", "C2", "C3"],
                 dependencies=["T1"],
                 files_to_create=[
-                    "b.py", "c.py", "d.py", "e.py",
-                    "f.py", "g.py", "h.py", "i.py",
+                    "b.py",
+                    "c.py",
+                    "d.py",
+                    "e.py",
+                    "f.py",
+                    "g.py",
+                    "h.py",
+                    "i.py",
                 ],
                 files_to_modify=[],
             ),
@@ -823,8 +838,16 @@ class TestValidateAndSplitTasks:
                 acceptance_criteria=["C1"],
                 dependencies=[],
                 files_to_create=[
-                    "a.py", "b.py", "c.py", "d.py", "e.py",
-                    "f.py", "g.py", "h.py", "i.py", "j.py",
+                    "a.py",
+                    "b.py",
+                    "c.py",
+                    "d.py",
+                    "e.py",
+                    "f.py",
+                    "g.py",
+                    "h.py",
+                    "i.py",
+                    "j.py",
                 ],
                 files_to_modify=[],
             ),

@@ -4,14 +4,13 @@ Central source of truth for AI model versions across the system.
 Updated for January 2026 standards.
 """
 
-from typing import List
 
 # --- Claude Models ---
 CLAUDE_OPUS = "claude-4-5-opus"
 CLAUDE_SONNET = "claude-4-5-sonnet"
 CLAUDE_HAIKU = "claude-4-5-haiku"
 
-CLAUDE_MODELS: List[str] = [
+CLAUDE_MODELS: list[str] = [
     CLAUDE_SONNET,
     CLAUDE_OPUS,
     CLAUDE_HAIKU,
@@ -27,7 +26,7 @@ DEFAULT_CLAUDE_MODEL = CLAUDE_SONNET
 GEMINI_FLASH = "gemini-3-flash"
 GEMINI_PRO = "gemini-3-pro"
 
-GEMINI_MODELS: List[str] = [
+GEMINI_MODELS: list[str] = [
     GEMINI_FLASH,
     GEMINI_PRO,
     # Backward compatibility
@@ -35,7 +34,7 @@ GEMINI_MODELS: List[str] = [
     "gemini-2.0-pro",
 ]
 
-DEFAULT_GEMINI_MODEL = GEMINI_FLASH
+DEFAULT_GEMINI_MODEL = GEMINI_PRO
 DEFAULT_ARCHITECT_MODEL = GEMINI_PRO
 
 
@@ -44,19 +43,20 @@ CURSOR_CODEX = "gpt-5.2-codex"
 CURSOR_COMPOSER = "composer-v2"
 CURSOR_GPT4O = "gpt-4o"
 
-CURSOR_MODELS: List[str] = [
+CURSOR_MODELS: list[str] = [
     CURSOR_CODEX,
     CURSOR_COMPOSER,
     CURSOR_GPT4O,
     # Backward compatibility
     "codex-5.2",
     "composer",
+    "auto",
 ]
 
 DEFAULT_CURSOR_MODEL = CURSOR_CODEX
 
 
-def get_model_list(agent_type: str) -> List[str]:
+def get_model_list(agent_type: str) -> list[str]:
     """Get available models for a specific agent type."""
     if agent_type.lower() == "claude":
         return CLAUDE_MODELS
@@ -80,13 +80,13 @@ def get_default_model(agent_type: str) -> str:
 
 # --- Dynamic Role Dispatch ---
 
-from enum import Enum
 from dataclasses import dataclass
-from typing import Dict
+from enum import Enum
 
 
 class TaskType(str, Enum):
     """Inferred task type for role dispatch."""
+
     ARCHITECTURE = "architecture"
     SECURITY = "security"
     OPTIMIZATION = "optimization"
@@ -96,6 +96,7 @@ class TaskType(str, Enum):
 @dataclass
 class RoleAssignment:
     """Agent and model assignment for a task type."""
+
     primary_agent: str  # "cursor" | "gemini" | "claude"
     model: str
     cursor_weight: float = 0.6  # For ConflictResolver
@@ -103,16 +104,20 @@ class RoleAssignment:
 
 
 # Role dispatch rules mapping task types to optimal agents/weights
-ROLE_DISPATCH_RULES: Dict[TaskType, RoleAssignment] = {
-    TaskType.ARCHITECTURE: RoleAssignment("gemini", GEMINI_PRO, cursor_weight=0.3, gemini_weight=0.7),
+ROLE_DISPATCH_RULES: dict[TaskType, RoleAssignment] = {
+    TaskType.ARCHITECTURE: RoleAssignment(
+        "gemini", GEMINI_PRO, cursor_weight=0.3, gemini_weight=0.7
+    ),
     TaskType.SECURITY: RoleAssignment("cursor", CURSOR_CODEX, cursor_weight=0.8, gemini_weight=0.2),
-    TaskType.OPTIMIZATION: RoleAssignment("claude", CLAUDE_OPUS, cursor_weight=0.5, gemini_weight=0.5),
+    TaskType.OPTIMIZATION: RoleAssignment(
+        "claude", CLAUDE_OPUS, cursor_weight=0.5, gemini_weight=0.5
+    ),
     TaskType.GENERAL: RoleAssignment("cursor", CURSOR_CODEX, cursor_weight=0.6, gemini_weight=0.4),
 }
 
 
 # Patterns for inferring task type from task properties
-TASK_TYPE_PATTERNS: Dict[TaskType, Dict[str, List[str]]] = {
+TASK_TYPE_PATTERNS: dict[TaskType, dict[str, list[str]]] = {
     TaskType.SECURITY: {
         "file_patterns": ["security", "auth", "crypto", "permission"],
         "keywords": ["vulnerability", "owasp", "xss", "csrf", "injection", "authentication"],
@@ -141,17 +146,19 @@ def infer_task_type(task: dict) -> TaskType:
         Inferred TaskType enum value
     """
     # Build searchable text from task properties
-    text = " ".join([
-        task.get("title", ""),
-        task.get("user_story", ""),
-        " ".join(task.get("acceptance_criteria", [])),
-    ]).lower()
+    text = " ".join(
+        [
+            task.get("title", ""),
+            task.get("user_story", ""),
+            " ".join(task.get("acceptance_criteria", [])),
+        ]
+    ).lower()
 
     files = task.get("files_to_create", []) + task.get("files_to_modify", [])
     files_str = " ".join(files).lower()
 
     # Score each task type
-    scores: Dict[TaskType, int] = {tt: 0 for tt in TaskType if tt != TaskType.GENERAL}
+    scores: dict[TaskType, int] = {tt: 0 for tt in TaskType if tt != TaskType.GENERAL}
 
     for task_type, patterns in TASK_TYPE_PATTERNS.items():
         # File pattern matches (weighted higher)

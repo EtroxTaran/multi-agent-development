@@ -29,10 +29,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from orchestrator.dispatch import AgentDispatcher, DispatchResult, Task
-from orchestrator.registry import get_agent, get_agent_reviewers, AgentConfig
+from orchestrator.registry import get_agent, get_agent_reviewers
 from orchestrator.review.resolver import ConflictResolver, ResolutionResult
 
 logger = logging.getLogger(__name__)
@@ -56,10 +56,10 @@ class ReviewFeedback:
     cli_used: str
     approved: bool
     score: float
-    blocking_issues: List[str] = field(default_factory=list)
-    suggestions: List[str] = field(default_factory=list)
-    security_findings: List[Dict[str, Any]] = field(default_factory=list)
-    raw_output: Dict[str, Any] = field(default_factory=dict)
+    blocking_issues: list[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
+    security_findings: list[dict[str, Any]] = field(default_factory=list)
+    raw_output: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
     @classmethod
@@ -85,7 +85,7 @@ class ReviewIteration:
 
     iteration_number: int
     work_result: DispatchResult
-    reviews: List[ReviewFeedback]
+    reviews: list[ReviewFeedback]
     decision: ReviewDecision
     resolution: Optional[ResolutionResult] = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
@@ -101,7 +101,7 @@ class ReviewIteration:
         return any(r.approved for r in self.reviews)
 
     @property
-    def blocking_issues(self) -> List[str]:
+    def blocking_issues(self) -> list[str]:
         """Get all blocking issues from all reviewers."""
         issues = []
         for review in self.reviews:
@@ -109,14 +109,14 @@ class ReviewIteration:
         return issues
 
     @property
-    def all_suggestions(self) -> List[str]:
+    def all_suggestions(self) -> list[str]:
         """Get all suggestions from all reviewers."""
         suggestions = []
         for review in self.reviews:
             suggestions.extend(review.suggestions)
         return suggestions
 
-    def get_feedback_for_agent(self) -> List[Dict[str, Any]]:
+    def get_feedback_for_agent(self) -> list[dict[str, Any]]:
         """Format feedback for the working agent's next iteration."""
         return [
             {
@@ -137,7 +137,7 @@ class ReviewCycleResult:
     task_id: str
     working_agent_id: str
     final_status: str  # "approved", "rejected", "escalated", "error"
-    iterations: List[ReviewIteration]
+    iterations: list[ReviewIteration]
     final_output: Optional[DispatchResult] = None
     escalation_reason: Optional[str] = None
     total_execution_time_seconds: float = 0.0
@@ -158,7 +158,7 @@ class ReviewCycleResult:
         """Whether human intervention was required."""
         return self.final_status == "escalated"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_id": self.task_id,
@@ -196,7 +196,7 @@ class ReviewCycle:
         self.dispatcher = dispatcher
         self.project_dir = Path(project_dir)
         self.conflict_resolver = conflict_resolver or ConflictResolver()
-        self._cycle_log: List[Dict[str, Any]] = []
+        self._cycle_log: list[dict[str, Any]] = []
 
     async def run(
         self,
@@ -204,7 +204,7 @@ class ReviewCycle:
         task: Task,
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         approval_score: float = DEFAULT_APPROVAL_SCORE,
-        custom_reviewers: Optional[List[str]] = None,
+        custom_reviewers: Optional[list[str]] = None,
     ) -> ReviewCycleResult:
         """Run the complete review cycle.
 
@@ -224,7 +224,7 @@ class ReviewCycle:
             ReviewCycleResult with complete cycle information
         """
         start_time = datetime.utcnow()
-        iterations: List[ReviewIteration] = []
+        iterations: list[ReviewIteration] = []
         working_agent = get_agent(working_agent_id)
 
         # Get reviewers
@@ -273,13 +273,11 @@ class ReviewCycle:
                     final_status="error",
                     iterations=iterations,
                     escalation_reason=f"Working agent error: {str(e)}",
-                    total_execution_time_seconds=(
-                        datetime.utcnow() - start_time
-                    ).total_seconds(),
+                    total_execution_time_seconds=(datetime.utcnow() - start_time).total_seconds(),
                 )
 
             if work_result.status == "failed":
-                logger.warning(f"Working agent returned failed status")
+                logger.warning("Working agent returned failed status")
                 # Still send to review in case it's partially useful
                 if not work_result.output:
                     return ReviewCycleResult(
@@ -328,9 +326,7 @@ class ReviewCycle:
                     final_status="approved",
                     iterations=iterations,
                     final_output=final_output,
-                    total_execution_time_seconds=(
-                        datetime.utcnow() - start_time
-                    ).total_seconds(),
+                    total_execution_time_seconds=(datetime.utcnow() - start_time).total_seconds(),
                 )
 
             # Step 4b: Handle unresolved conflict - escalate immediately
@@ -343,9 +339,7 @@ class ReviewCycle:
                     iterations=iterations,
                     final_output=final_output,
                     escalation_reason="Unresolved reviewer conflict - reviewers disagree and weighted resolution failed",
-                    total_execution_time_seconds=(
-                        datetime.utcnow() - start_time
-                    ).total_seconds(),
+                    total_execution_time_seconds=(datetime.utcnow() - start_time).total_seconds(),
                 )
 
             # Step 5: Prepare feedback for next iteration
@@ -376,18 +370,16 @@ class ReviewCycle:
             iterations=iterations,
             final_output=final_output,
             escalation_reason=f"Max iterations ({max_iterations}) exceeded without approval",
-            total_execution_time_seconds=(
-                datetime.utcnow() - start_time
-            ).total_seconds(),
+            total_execution_time_seconds=(datetime.utcnow() - start_time).total_seconds(),
         )
 
     async def _run_parallel_reviews(
         self,
-        reviewer_ids: List[str],
+        reviewer_ids: list[str],
         work_result: DispatchResult,
         original_task: Task,
         iteration: int,
-    ) -> List[ReviewFeedback]:
+    ) -> list[ReviewFeedback]:
         """Run reviews in parallel by all reviewers.
 
         Args:
@@ -447,9 +439,9 @@ class ReviewCycle:
 
     def _determine_decision(
         self,
-        reviews: List[ReviewFeedback],
+        reviews: list[ReviewFeedback],
         approval_score: float,
-    ) -> Tuple[ReviewDecision, Optional[ResolutionResult]]:
+    ) -> tuple[ReviewDecision, Optional[ResolutionResult]]:
         """Determine the overall decision from reviews.
 
         Args:
@@ -483,8 +475,12 @@ class ReviewCycle:
             for r in reviews
         }
         # Map A07 to cursor (security), A08 to gemini (architecture)
-        cursor_review = review_dicts.get("A07") or review_dicts.get("cursor") or list(review_dicts.values())[0]
-        gemini_review = review_dicts.get("A08") or review_dicts.get("gemini") or list(review_dicts.values())[-1]
+        cursor_review = (
+            review_dicts.get("A07") or review_dicts.get("cursor") or list(review_dicts.values())[0]
+        )
+        gemini_review = (
+            review_dicts.get("A08") or review_dicts.get("gemini") or list(review_dicts.values())[-1]
+        )
         resolution = self.conflict_resolver.resolve(cursor_review, gemini_review)
 
         # Check resolution action: "approve", "reject", or "escalate"
@@ -515,11 +511,11 @@ class ReviewCycle:
 
         # Enforce bounded growth - keep only the last N entries
         if len(self._cycle_log) > self.MAX_CYCLE_LOG_ENTRIES:
-            self._cycle_log = self._cycle_log[-self.MAX_CYCLE_LOG_ENTRIES:]
+            self._cycle_log = self._cycle_log[-self.MAX_CYCLE_LOG_ENTRIES :]
 
         logger.debug(f"Iteration {iteration.iteration_number}: {log_entry}")
 
-    def get_cycle_log(self) -> List[Dict[str, Any]]:
+    def get_cycle_log(self) -> list[dict[str, Any]]:
         """Get the cycle log for debugging/audit."""
         return self._cycle_log.copy()
 

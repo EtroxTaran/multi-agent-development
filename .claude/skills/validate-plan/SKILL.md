@@ -1,3 +1,12 @@
+---
+name: validate-plan
+description: Run Phase 2 validation with Cursor and Gemini in parallel.
+version: 1.1.0
+tags: [validation, plan, review]
+owner: orchestration
+status: active
+---
+
 # Validate Plan Skill
 
 Run Phase 2 validation with Cursor and Gemini in parallel.
@@ -13,21 +22,19 @@ Both agents must approve before proceeding to implementation.
 ## Prerequisites
 
 - Phase 1 (Planning) completed
-- `.workflow/phases/planning/plan.json` exists
+- Plan available in `phase_outputs` (type=plan)
 - Cursor and Gemini CLIs available
 
 ## Execution Steps
 
-### 1. Prepare Validation Directory
+### 1. Prepare Validation Storage
 
-```bash
-mkdir -p .workflow/phases/validation
-```
+Ensure validation outputs will be stored in `phase_outputs` and `logs` (no local directories).
 
 ### 2. Read the Plan
 
 ```
-Read .workflow/phases/planning/plan.json
+Read plan from `phase_outputs` (type=plan)
 ```
 
 ### 3. Run Agents in Parallel
@@ -40,7 +47,7 @@ cursor-agent --print --output-format json "
 # Plan Validation - Security & Code Quality Review
 
 ## Plan to Review
-$(cat .workflow/phases/planning/plan.json)
+Read: plan JSON provided in this prompt (from phase_outputs export)
 
 ## Your Focus Areas
 1. **Security Analysis**
@@ -76,7 +83,7 @@ Return JSON:
   \"blocking_issues\": [],
   \"strengths\": []
 }
-" > .workflow/phases/validation/cursor-feedback.json
+" > cursor-feedback.json
 ```
 
 **Gemini Validation**:
@@ -85,7 +92,7 @@ gemini --yolo "
 # Plan Validation - Architecture & Scalability Review
 
 ## Plan to Review
-$(cat .workflow/phases/planning/plan.json)
+Read: plan JSON provided in this prompt (from phase_outputs export)
 
 ## Your Focus Areas
 1. **Architecture Review**
@@ -126,14 +133,14 @@ Return JSON in a code block:
   \"strengths\": []
 }
 \`\`\`
-" > .workflow/phases/validation/gemini-feedback.json
+" > gemini-feedback.json
 ```
 
 ### 4. Parse Results
 
 Read both feedback files:
-- `.workflow/phases/validation/cursor-feedback.json`
-- `.workflow/phases/validation/gemini-feedback.json`
+- `phase_outputs` entry `cursor_feedback`
+- `phase_outputs` entry `gemini_feedback`
 
 For Gemini, extract JSON from markdown code block if needed.
 
@@ -162,7 +169,7 @@ Use `/resolve-conflict` skill for complex disagreements.
 
 ### 7. Create Consolidated Feedback
 
-Write `.workflow/phases/validation/consolidated-feedback.json`:
+Write consolidated output to `phase_outputs` (type=validation_consolidated):
 
 ```json
 {
@@ -221,13 +228,13 @@ Return to planning with feedback to address concerns.
 - After 3 failed validations: Escalate to human
 - Each retry should address previous concerns
 
-## Output Files
+## Outputs
 
-| File | Purpose |
-|------|---------|
-| `cursor-feedback.json` | Raw Cursor response |
-| `gemini-feedback.json` | Raw Gemini response |
-| `consolidated-feedback.json` | Merged evaluation |
+| Output Type | Purpose |
+|-------------|---------|
+| `cursor_feedback` | Raw Cursor response |
+| `gemini_feedback` | Raw Gemini response |
+| `validation_consolidated` | Merged evaluation |
 
 ## Error Handling
 

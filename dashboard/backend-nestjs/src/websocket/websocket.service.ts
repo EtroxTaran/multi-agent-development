@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { WebSocket } from 'ws';
-import { WebSocketEventType } from '../common/enums';
+import { Injectable, Logger } from "@nestjs/common";
+import { WebSocket } from "ws";
+import { WebSocketEventType } from "../common/enums";
 
 interface WebSocketMessage {
   type: WebSocketEventType;

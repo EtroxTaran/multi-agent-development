@@ -1,22 +1,19 @@
 """Tests for the deployment controller."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from orchestrator.db.repositories.prompts import OptimizationMethod, PromptStatus
 from orchestrator.optimization.deployer import (
+    DeploymentConfig,
     DeploymentController,
     DeploymentResult,
-    DeploymentConfig,
 )
 from orchestrator.optimization.scheduler import (
     OptimizationScheduler,
-    SchedulerConfig,
     OptimizationTrigger,
-)
-from orchestrator.db.repositories.prompts import (
-    PromptStatus,
-    OptimizationMethod,
+    SchedulerConfig,
 )
 
 
@@ -107,10 +104,12 @@ class TestDeploymentController:
         """Test starting shadow testing."""
         # Mock the prompt repo
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "draft",
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "draft",
+            }
+        )
         controller._prompt_repo.update_status = AsyncMock()
 
         result = await controller.start_shadow_testing("test-v1")
@@ -124,10 +123,12 @@ class TestDeploymentController:
     async def test_start_shadow_testing_wrong_status(self, controller):
         """Test starting shadow testing from wrong status."""
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "production",  # Wrong status
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "production",  # Wrong status
+            }
+        )
 
         result = await controller.start_shadow_testing("test-v1")
 
@@ -149,18 +150,22 @@ class TestDeploymentController:
     async def test_evaluate_shadow_insufficient_tests(self, controller):
         """Test shadow evaluation with insufficient tests."""
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "shadow",
-            "agent": "claude",
-            "template_name": "default",
-            "content": "test prompt",
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "shadow",
+                "agent": "claude",
+                "template_name": "default",
+                "content": "test prompt",
+            }
+        )
 
         controller._eval_repo = MagicMock()
-        controller._eval_repo.get_by_prompt_hash = AsyncMock(return_value=[
-            {"overall_score": 8.0},  # Only 1, need 2
-        ])
+        controller._eval_repo.get_by_prompt_hash = AsyncMock(
+            return_value=[
+                {"overall_score": 8.0},  # Only 1, need 2
+            ]
+        )
 
         result = await controller.evaluate_shadow_test("test-v1")
 
@@ -171,24 +176,30 @@ class TestDeploymentController:
     async def test_evaluate_shadow_promote_to_canary(self, controller):
         """Test shadow evaluation promoting to canary."""
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "shadow",
-            "agent": "claude",
-            "template_name": "default",
-            "content": "test prompt",
-        })
-        controller._prompt_repo.get_production_version = AsyncMock(return_value={
-            "metrics": {"avg_score": 7.0},
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "shadow",
+                "agent": "claude",
+                "template_name": "default",
+                "content": "test prompt",
+            }
+        )
+        controller._prompt_repo.get_production_version = AsyncMock(
+            return_value={
+                "metrics": {"avg_score": 7.0},
+            }
+        )
         controller._prompt_repo.update_status = AsyncMock()
         controller._prompt_repo.update_metrics = AsyncMock()
 
         controller._eval_repo = MagicMock()
-        controller._eval_repo.get_by_prompt_hash = AsyncMock(return_value=[
-            {"overall_score": 8.0},
-            {"overall_score": 8.5},
-        ])
+        controller._eval_repo.get_by_prompt_hash = AsyncMock(
+            return_value=[
+                {"overall_score": 8.0},
+                {"overall_score": 8.5},
+            ]
+        )
 
         result = await controller.evaluate_shadow_test("test-v1")
 
@@ -200,21 +211,25 @@ class TestDeploymentController:
     async def test_evaluate_shadow_reject_low_score(self, controller):
         """Test shadow evaluation rejecting low score."""
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "shadow",
-            "agent": "claude",
-            "template_name": "default",
-            "content": "test prompt",
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "shadow",
+                "agent": "claude",
+                "template_name": "default",
+                "content": "test prompt",
+            }
+        )
         controller._prompt_repo.get_production_version = AsyncMock(return_value=None)
         controller._prompt_repo.update_status = AsyncMock()
 
         controller._eval_repo = MagicMock()
-        controller._eval_repo.get_by_prompt_hash = AsyncMock(return_value=[
-            {"overall_score": 3.0},
-            {"overall_score": 4.0},
-        ])
+        controller._eval_repo.get_by_prompt_hash = AsyncMock(
+            return_value=[
+                {"overall_score": 3.0},
+                {"overall_score": 4.0},
+            ]
+        )
 
         result = await controller.evaluate_shadow_test("test-v1")
 
@@ -226,10 +241,12 @@ class TestDeploymentController:
     async def test_rollback(self, controller):
         """Test version rollback."""
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "canary",
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "canary",
+            }
+        )
         controller._prompt_repo.update_status = AsyncMock()
         controller._prompt_repo.update_metrics = AsyncMock()
 
@@ -243,10 +260,12 @@ class TestDeploymentController:
     async def test_rollback_production_fails(self, controller):
         """Test that rollback of production version fails."""
         controller._prompt_repo = MagicMock()
-        controller._prompt_repo.find_by_id = AsyncMock(return_value={
-            "version_id": "test-v1",
-            "status": "production",
-        })
+        controller._prompt_repo.find_by_id = AsyncMock(
+            return_value={
+                "version_id": "test-v1",
+                "status": "production",
+            }
+        )
 
         result = await controller.rollback("test-v1", "Should fail")
 

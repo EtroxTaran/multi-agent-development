@@ -14,25 +14,22 @@ Run with: pytest tests/test_markdown_tracker.py -v
 import json
 import os
 import stat
+
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 from orchestrator.langgraph.state import TaskStatus
-
 
 # =============================================================================
 # Test MarkdownTrackerConfig
 # =============================================================================
+
 
 class TestMarkdownTrackerConfig:
     """Test markdown tracker configuration loading."""
 
     def test_default_config(self):
         """Test default configuration values."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            MarkdownTrackerConfig,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import MarkdownTrackerConfig
 
         config = MarkdownTrackerConfig()
 
@@ -43,9 +40,7 @@ class TestMarkdownTrackerConfig:
 
     def test_load_config_no_file(self, temp_project_dir):
         """Test loading when no config file exists."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            load_tracker_config,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import load_tracker_config
 
         config = load_tracker_config(temp_project_dir)
 
@@ -54,9 +49,7 @@ class TestMarkdownTrackerConfig:
 
     def test_load_config_with_tracking_section(self, temp_project_dir):
         """Test loading config with task_tracking section."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            load_tracker_config,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import load_tracker_config
 
         config_content = {
             "project_type": "node-api",
@@ -67,11 +60,9 @@ class TestMarkdownTrackerConfig:
                     "make_readonly": False,
                     "validate_checksums": False,
                 }
-            }
+            },
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         config = load_tracker_config(temp_project_dir)
 
@@ -82,9 +73,7 @@ class TestMarkdownTrackerConfig:
 
     def test_load_config_disabled(self, temp_project_dir):
         """Test loading config with tracking disabled."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            load_tracker_config,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import load_tracker_config
 
         config_content = {
             "integrations": {
@@ -93,9 +82,7 @@ class TestMarkdownTrackerConfig:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         config = load_tracker_config(temp_project_dir)
 
@@ -103,9 +90,7 @@ class TestMarkdownTrackerConfig:
 
     def test_load_config_invalid_json(self, temp_project_dir):
         """Test loading with invalid JSON returns defaults."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            load_tracker_config,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import load_tracker_config
 
         (temp_project_dir / ".project-config.json").write_text("invalid json")
 
@@ -117,6 +102,7 @@ class TestMarkdownTrackerConfig:
 # =============================================================================
 # Test MarkdownTracker Initialization
 # =============================================================================
+
 
 class TestMarkdownTrackerInit:
     """Test markdown tracker initialization."""
@@ -148,9 +134,7 @@ class TestMarkdownTrackerInit:
 
     def test_factory_function(self, temp_project_dir):
         """Test create_markdown_tracker factory."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -161,14 +145,13 @@ class TestMarkdownTrackerInit:
 # Test Task File Creation
 # =============================================================================
 
+
 class TestTaskFileCreation:
     """Test creating task markdown files."""
 
     def test_create_single_task_file(self, temp_project_dir):
         """Test creating a single task file."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -195,9 +178,7 @@ class TestTaskFileCreation:
 
     def test_task_file_frontmatter(self, temp_project_dir):
         """Test task file has correct YAML frontmatter."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         # Disable readonly for easier testing
         config_content = {
@@ -207,9 +188,7 @@ class TestTaskFileCreation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -242,9 +221,7 @@ class TestTaskFileCreation:
 
     def test_task_file_body(self, temp_project_dir):
         """Test task file has correct markdown body."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -253,9 +230,7 @@ class TestTaskFileCreation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -296,9 +271,7 @@ class TestTaskFileCreation:
 
     def test_create_multiple_task_files(self, temp_project_dir):
         """Test creating multiple task files."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -307,9 +280,7 @@ class TestTaskFileCreation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -326,9 +297,7 @@ class TestTaskFileCreation:
 
     def test_create_task_with_linear_mapping(self, temp_project_dir):
         """Test creating task file with Linear issue ID."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -337,9 +306,7 @@ class TestTaskFileCreation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -357,9 +324,7 @@ class TestTaskFileCreation:
 
     def test_create_task_disabled(self, temp_project_dir):
         """Test creating tasks when tracking is disabled."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -368,9 +333,7 @@ class TestTaskFileCreation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -387,14 +350,13 @@ class TestTaskFileCreation:
 # Test Status Updates
 # =============================================================================
 
+
 class TestStatusUpdates:
     """Test updating task status."""
 
     def test_update_status_to_in_progress(self, temp_project_dir):
         """Test updating status to in_progress."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -403,9 +365,7 @@ class TestStatusUpdates:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -425,9 +385,7 @@ class TestStatusUpdates:
 
     def test_update_status_adds_history(self, temp_project_dir):
         """Test updating status adds history entry."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -436,9 +394,7 @@ class TestStatusUpdates:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -457,9 +413,7 @@ class TestStatusUpdates:
 
     def test_update_status_nonexistent_task(self, temp_project_dir):
         """Test updating status for non-existent task."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -472,14 +426,13 @@ class TestStatusUpdates:
 # Test Read-Only Enforcement
 # =============================================================================
 
+
 class TestReadOnlyEnforcement:
     """Test read-only file permissions."""
 
     def test_files_are_readonly(self, temp_project_dir):
         """Test task files are made read-only."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         # Enable readonly
         config_content = {
@@ -489,9 +442,7 @@ class TestReadOnlyEnforcement:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -509,9 +460,7 @@ class TestReadOnlyEnforcement:
 
     def test_status_update_with_readonly(self, temp_project_dir):
         """Test status update works with readonly files."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -520,9 +469,7 @@ class TestReadOnlyEnforcement:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -547,14 +494,13 @@ class TestReadOnlyEnforcement:
 # Test Checksum Validation
 # =============================================================================
 
+
 class TestChecksumValidation:
     """Test checksum validation functionality."""
 
     def test_checksums_file_created(self, temp_project_dir):
         """Test checksums file is created."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -563,9 +509,7 @@ class TestChecksumValidation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -583,9 +527,7 @@ class TestChecksumValidation:
 
     def test_validate_integrity_unchanged(self, temp_project_dir):
         """Test validating unchanged task file."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -594,9 +536,7 @@ class TestChecksumValidation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -611,9 +551,7 @@ class TestChecksumValidation:
 
     def test_validate_integrity_modified(self, temp_project_dir):
         """Test detecting modified task file."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -622,9 +560,7 @@ class TestChecksumValidation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -643,10 +579,8 @@ class TestChecksumValidation:
 
     def test_read_task_validates_checksum(self, temp_project_dir):
         """Test read_task validates checksum when enabled."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
-        import logging
+
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -656,9 +590,7 @@ class TestChecksumValidation:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -677,14 +609,13 @@ class TestChecksumValidation:
 # Test Reading Tasks
 # =============================================================================
 
+
 class TestReadTask:
     """Test reading task files."""
 
     def test_read_task(self, temp_project_dir):
         """Test reading a task file."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         config_content = {
             "integrations": {
@@ -693,9 +624,7 @@ class TestReadTask:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -719,9 +648,7 @@ class TestReadTask:
 
     def test_read_nonexistent_task(self, temp_project_dir):
         """Test reading non-existent task."""
-        from orchestrator.langgraph.integrations.markdown_tracker import (
-            create_markdown_tracker,
-        )
+        from orchestrator.langgraph.integrations.markdown_tracker import create_markdown_tracker
 
         tracker = create_markdown_tracker(temp_project_dir)
 
@@ -733,6 +660,7 @@ class TestReadTask:
 # =============================================================================
 # Test Integration Exports
 # =============================================================================
+
 
 class TestIntegrationExports:
     """Test integrations __init__ exports."""

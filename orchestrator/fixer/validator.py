@@ -4,14 +4,13 @@ The validator ensures fixes are safe before applying them and
 verifies they actually resolved the issue afterward.
 """
 
-import json
 import logging
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .strategies import FixPlan, FixResult, is_protected_file
 

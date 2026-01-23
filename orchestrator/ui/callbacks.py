@@ -1,17 +1,17 @@
 """Callback handlers for UI updates."""
 
-from typing import Protocol, Optional, Dict, Any, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class ProgressCallback(Protocol):
     """Protocol for progress callbacks."""
 
-    def on_node_start(self, node_name: str, state: Dict[str, Any]) -> None:
+    def on_node_start(self, node_name: str, state: dict[str, Any]) -> None:
         """Called when a workflow node starts."""
         ...
 
-    def on_node_end(self, node_name: str, state: Dict[str, Any]) -> None:
+    def on_node_end(self, node_name: str, state: dict[str, Any]) -> None:
         """Called when a workflow node ends."""
         ...
 
@@ -48,11 +48,11 @@ class ProgressCallback(Protocol):
 class NullCallback:
     """No-op callback implementation."""
 
-    def on_node_start(self, node_name: str, state: Dict[str, Any]) -> None:
+    def on_node_start(self, node_name: str, state: dict[str, Any]) -> None:
         """No-op."""
         pass
 
-    def on_node_end(self, node_name: str, state: Dict[str, Any]) -> None:
+    def on_node_end(self, node_name: str, state: dict[str, Any]) -> None:
         """No-op."""
         pass
 
@@ -98,12 +98,12 @@ class UICallbackHandler:
         """
         self._display = display
 
-    def on_node_start(self, node_name: str, state: Dict[str, Any]) -> None:
+    def on_node_start(self, node_name: str, state: dict[str, Any]) -> None:
         """Forward node start to display."""
         self._display.log_event(f"Starting node: {node_name}", "info")
         self._display.update_state(state)
 
-    def on_node_end(self, node_name: str, state: Dict[str, Any]) -> None:
+    def on_node_end(self, node_name: str, state: dict[str, Any]) -> None:
         """Forward node end to display."""
         errors = state.get("errors", [])
         if errors:

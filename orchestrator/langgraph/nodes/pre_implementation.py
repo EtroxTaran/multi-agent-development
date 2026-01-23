@@ -4,15 +4,14 @@ Validates that the development environment is ready
 before starting implementation.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState
-from ...validators import EnvironmentChecker
 from ...config import load_project_config
+from ...validators import EnvironmentChecker
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,9 @@ async def pre_implementation_node(state: WorkflowState) -> dict[str, Any]:
         "test_command": result.test_command,
     }
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save_output(phase=3, output_type="pre_implementation_check", content=check_result))
+    run_async(
+        repo.save_output(phase=3, output_type="pre_implementation_check", content=check_result)
+    )
 
     if not result.ready:
         # Format failed checks
@@ -75,20 +76,21 @@ async def pre_implementation_node(state: WorkflowState) -> dict[str, Any]:
             if check.details:
                 error_details.append(f"  Details: {check.details}")
 
-        error_message = (
-            f"Environment not ready for implementation\n"
-            f"Failed checks:\n" + "\n".join(error_details)
+        error_message = "Environment not ready for implementation\n" "Failed checks:\n" + "\n".join(
+            error_details
         )
 
         logger.warning(f"Pre-implementation check failed: {len(failed_checks)} issues")
 
         return {
-            "errors": [{
-                "type": "environment_not_ready",
-                "message": error_message,
-                "failed_checks": [c.to_dict() for c in failed_checks],
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "environment_not_ready",
+                    "message": error_message,
+                    "failed_checks": [c.to_dict() for c in failed_checks],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }

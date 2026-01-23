@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Play } from 'lucide-react';
+import { useState } from "react";
+import { Play } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui';
-import { useStartWorkflow } from '@/hooks';
+} from "@/components/ui";
+import { useStartWorkflow } from "@/hooks";
 
 interface StartWorkflowDialogProps {
   projectName: string;
@@ -35,7 +35,7 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
       });
       setOpen(false);
     } catch (error) {
-      console.error('Failed to start workflow', error);
+      console.error("Failed to start workflow", error);
     }
   };
 
@@ -56,7 +56,10 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="startPhase" className="text-right text-sm font-medium">
+            <label
+              htmlFor="startPhase"
+              className="text-right text-sm font-medium"
+            >
               Start Phase
             </label>
             <select
@@ -73,7 +76,10 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
             </select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="endPhase" className="text-right text-sm font-medium">
+            <label
+              htmlFor="endPhase"
+              className="text-right text-sm font-medium"
+            >
               End Phase
             </label>
             <select
@@ -90,7 +96,10 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
             </select>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="skipValidation" className="text-right text-sm font-medium">
+            <label
+              htmlFor="skipValidation"
+              className="text-right text-sm font-medium"
+            >
               Skip Validation
             </label>
             <div className="col-span-3 flex items-center space-x-2">
@@ -101,11 +110,16 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
                 checked={skipValidation}
                 onChange={(e) => setSkipValidation(e.target.checked)}
               />
-              <span className="text-sm text-muted-foreground">Skip phase 2 checks</span>
+              <span className="text-sm text-muted-foreground">
+                Skip phase 2 checks
+              </span>
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <label htmlFor="autonomous" className="text-right text-sm font-medium">
+            <label
+              htmlFor="autonomous"
+              className="text-right text-sm font-medium"
+            >
               Autonomous
             </label>
             <div className="col-span-3 flex items-center space-x-2">
@@ -116,7 +130,9 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
                 checked={autonomous}
                 onChange={(e) => setAutonomous(e.target.checked)}
               />
-              <span className="text-sm text-muted-foreground">Run without human pauses</span>
+              <span className="text-sm text-muted-foreground">
+                Run without human pauses
+              </span>
             </div>
           </div>
         </div>
@@ -125,7 +141,7 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
             Cancel
           </Button>
           <Button onClick={handleStart} disabled={startWorkflow.isPending}>
-            {startWorkflow.isPending ? 'Starting...' : 'Start'}
+            {startWorkflow.isPending ? "Starting..." : "Start"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { WebSocket, Server } from 'ws';
-import { WebsocketGateway } from './websocket.gateway';
-import { WebsocketService } from './websocket.service';
-import { OrchestratorBridgeService } from './orchestrator-bridge.service';
-import { WebSocketEventType } from '../common/enums';
+import { Test, TestingModule } from "@nestjs/testing";
+import { WebSocket, Server } from "ws";
+import { WebsocketGateway } from "./websocket.gateway";
+import { WebsocketService } from "./websocket.service";
+import { OrchestratorBridgeService } from "./orchestrator-bridge.service";
+import { WebSocketEventType } from "../common/enums";
 
 // Mock WebSocket
 const createMockWebSocket = (): jest.Mocked<WebSocket> =>
@@ -24,7 +24,7 @@ const createMockServer = (): jest.Mocked<Server> =>
     close: jest.fn(),
   }) as unknown as jest.Mocked<Server>;
 
-describe('WebsocketGateway', () => {
+describe("WebsocketGateway", () => {
   let gateway: WebsocketGateway;
   let websocketService: jest.Mocked<WebsocketService>;
   let orchestratorBridge: jest.Mocked<OrchestratorBridgeService>;
@@ -50,7 +50,10 @@ describe('WebsocketGateway', () => {
       providers: [
         WebsocketGateway,
         { provide: WebsocketService, useValue: mockWebsocketService },
-        { provide: OrchestratorBridgeService, useValue: mockOrchestratorBridge },
+        {
+          provide: OrchestratorBridgeService,
+          useValue: mockOrchestratorBridge,
+        },
       ],
     }).compile();
 
@@ -62,15 +65,15 @@ describe('WebsocketGateway', () => {
     gateway.server = createMockServer();
   });
 
-  describe('initialization', () => {
-    it('should be defined', () => {
+  describe("initialization", () => {
+    it("should be defined", () => {
       expect(gateway).toBeDefined();
     });
   });
 
-  describe('lifecycle hooks', () => {
-    describe('afterInit', () => {
-      it('should log initialization', () => {
+  describe("lifecycle hooks", () => {
+    describe("afterInit", () => {
+      it("should log initialization", () => {
         const mockServer = createMockServer();
 
         // Should not throw
@@ -78,8 +81,8 @@ describe('WebsocketGateway', () => {
       });
     });
 
-    describe('handleConnection', () => {
-      it('should initialize client metadata', () => {
+    describe("handleConnection", () => {
+      it("should initialize client metadata", () => {
         const mockClient = createMockWebSocket();
 
         gateway.handleConnection(mockClient);
@@ -88,7 +91,7 @@ describe('WebsocketGateway', () => {
         // The metadata map is private, so we verify behavior through handleJoinProject
       });
 
-      it('should handle multiple client connections', () => {
+      it("should handle multiple client connections", () => {
         const client1 = createMockWebSocket();
         const client2 = createMockWebSocket();
 
@@ -97,8 +100,8 @@ describe('WebsocketGateway', () => {
       });
     });
 
-    describe('handleDisconnect', () => {
-      it('should clean up client when not in a project', () => {
+    describe("handleDisconnect", () => {
+      it("should clean up client when not in a project", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
 
@@ -107,36 +110,36 @@ describe('WebsocketGateway', () => {
         expect(websocketService.removeConnection).not.toHaveBeenCalled();
       });
 
-      it('should remove connection when client was in a project', () => {
+      it("should remove connection when client was in a project", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
 
         gateway.handleDisconnect(mockClient);
 
         expect(websocketService.removeConnection).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           mockClient,
         );
       });
 
-      it('should disconnect from orchestrator when last client leaves', () => {
+      it("should disconnect from orchestrator when last client leaves", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
         mockWebsocketService.getConnectionCount.mockReturnValueOnce(0);
 
         gateway.handleDisconnect(mockClient);
 
         expect(orchestratorBridge.disconnectFromProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
         );
       });
 
-      it('should not disconnect from orchestrator when other clients remain', () => {
+      it("should not disconnect from orchestrator when other clients remain", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
         mockWebsocketService.getConnectionCount.mockReturnValueOnce(1);
 
         gateway.handleDisconnect(mockClient);
@@ -146,73 +149,73 @@ describe('WebsocketGateway', () => {
     });
   });
 
-  describe('message handlers', () => {
-    describe('handleJoinProject', () => {
-      it('should join a project successfully', () => {
+  describe("message handlers", () => {
+    describe("handleJoinProject", () => {
+      it("should join a project successfully", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
 
         const result = gateway.handleJoinProject(
-          { projectName: 'test-project' },
+          { projectName: "test-project" },
           mockClient,
         );
 
         expect(result).toEqual({
-          event: 'joined',
-          data: { success: true, projectName: 'test-project' },
+          event: "joined",
+          data: { success: true, projectName: "test-project" },
         });
         expect(websocketService.addConnection).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           mockClient,
         );
         expect(orchestratorBridge.connectToProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
         );
       });
 
-      it('should leave previous project when joining a new one', () => {
+      it("should leave previous project when joining a new one", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'project-a' }, mockClient);
+        gateway.handleJoinProject({ projectName: "project-a" }, mockClient);
 
         // Reset mocks
         jest.clearAllMocks();
         mockWebsocketService.getConnectionCount.mockReturnValueOnce(0);
 
-        gateway.handleJoinProject({ projectName: 'project-b' }, mockClient);
+        gateway.handleJoinProject({ projectName: "project-b" }, mockClient);
 
         expect(websocketService.removeConnection).toHaveBeenCalledWith(
-          'project-a',
+          "project-a",
           mockClient,
         );
         expect(orchestratorBridge.disconnectFromProject).toHaveBeenCalledWith(
-          'project-a',
+          "project-a",
         );
         expect(websocketService.addConnection).toHaveBeenCalledWith(
-          'project-b',
+          "project-b",
           mockClient,
         );
       });
 
-      it('should not leave current project when re-joining same project', () => {
+      it("should not leave current project when re-joining same project", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
 
         jest.clearAllMocks();
 
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
 
         // Should not try to leave since it's the same project
         expect(websocketService.removeConnection).not.toHaveBeenCalled();
       });
     });
 
-    describe('handleLeaveProject', () => {
-      it('should leave project successfully', () => {
+    describe("handleLeaveProject", () => {
+      it("should leave project successfully", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
 
         jest.clearAllMocks();
         mockWebsocketService.getConnectionCount.mockReturnValueOnce(0);
@@ -220,19 +223,19 @@ describe('WebsocketGateway', () => {
         const result = gateway.handleLeaveProject(mockClient);
 
         expect(result).toEqual({
-          event: 'left',
+          event: "left",
           data: { success: true },
         });
         expect(websocketService.removeConnection).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           mockClient,
         );
       });
 
-      it('should disconnect from orchestrator when last client leaves', () => {
+      it("should disconnect from orchestrator when last client leaves", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
-        gateway.handleJoinProject({ projectName: 'test-project' }, mockClient);
+        gateway.handleJoinProject({ projectName: "test-project" }, mockClient);
 
         jest.clearAllMocks();
         mockWebsocketService.getConnectionCount.mockReturnValueOnce(0);
@@ -240,106 +243,106 @@ describe('WebsocketGateway', () => {
         gateway.handleLeaveProject(mockClient);
 
         expect(orchestratorBridge.disconnectFromProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
         );
       });
 
-      it('should handle leave when client is not in a project', () => {
+      it("should handle leave when client is not in a project", () => {
         const mockClient = createMockWebSocket();
         gateway.handleConnection(mockClient);
 
         const result = gateway.handleLeaveProject(mockClient);
 
         expect(result).toEqual({
-          event: 'left',
+          event: "left",
           data: { success: true },
         });
         expect(websocketService.removeConnection).not.toHaveBeenCalled();
       });
     });
 
-    describe('handlePing', () => {
-      it('should return pong with timestamp', () => {
+    describe("handlePing", () => {
+      it("should return pong with timestamp", () => {
         const before = new Date().toISOString();
         const result = gateway.handlePing();
         const after = new Date().toISOString();
 
-        expect(result.event).toBe('pong');
+        expect(result.event).toBe("pong");
         expect(result.data.timestamp >= before).toBe(true);
         expect(result.data.timestamp <= after).toBe(true);
       });
     });
   });
 
-  describe('broadcast methods', () => {
-    describe('broadcastStateChange', () => {
-      it('should broadcast state change to project', () => {
-        const state = { phase: 2, status: 'in_progress' };
+  describe("broadcast methods", () => {
+    describe("broadcastStateChange", () => {
+      it("should broadcast state change to project", () => {
+        const state = { phase: 2, status: "in_progress" };
 
-        gateway.broadcastStateChange('test-project', state);
+        gateway.broadcastStateChange("test-project", state);
 
         expect(websocketService.broadcastToProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           WebSocketEventType.STATE_CHANGE,
           state,
         );
       });
     });
 
-    describe('broadcastAction', () => {
-      it('should broadcast action to project', () => {
-        const action = { name: 'planning', node: 'plan_feature' };
+    describe("broadcastAction", () => {
+      it("should broadcast action to project", () => {
+        const action = { name: "planning", node: "plan_feature" };
 
-        gateway.broadcastAction('test-project', action);
+        gateway.broadcastAction("test-project", action);
 
         expect(websocketService.broadcastToProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           WebSocketEventType.ACTION,
           action,
         );
       });
     });
 
-    describe('broadcastEscalation', () => {
-      it('should broadcast escalation to project', () => {
+    describe("broadcastEscalation", () => {
+      it("should broadcast escalation to project", () => {
         const escalation = {
-          type: 'approval_required',
-          message: 'Please review the plan',
-          options: ['approve', 'reject'],
+          type: "approval_required",
+          message: "Please review the plan",
+          options: ["approve", "reject"],
         };
 
-        gateway.broadcastEscalation('test-project', escalation);
+        gateway.broadcastEscalation("test-project", escalation);
 
         expect(websocketService.broadcastToProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           WebSocketEventType.ESCALATION,
           escalation,
         );
       });
     });
 
-    describe('broadcastWorkflowComplete', () => {
-      it('should broadcast workflow completion to project', () => {
-        const result = { summary: 'Feature implemented successfully' };
+    describe("broadcastWorkflowComplete", () => {
+      it("should broadcast workflow completion to project", () => {
+        const result = { summary: "Feature implemented successfully" };
 
-        gateway.broadcastWorkflowComplete('test-project', result);
+        gateway.broadcastWorkflowComplete("test-project", result);
 
         expect(websocketService.broadcastToProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           WebSocketEventType.WORKFLOW_COMPLETE,
           result,
         );
       });
     });
 
-    describe('broadcastWorkflowError', () => {
-      it('should broadcast workflow error to project', () => {
-        gateway.broadcastWorkflowError('test-project', 'Task T1 failed');
+    describe("broadcastWorkflowError", () => {
+      it("should broadcast workflow error to project", () => {
+        gateway.broadcastWorkflowError("test-project", "Task T1 failed");
 
         expect(websocketService.broadcastToProject).toHaveBeenCalledWith(
-          'test-project',
+          "test-project",
           WebSocketEventType.WORKFLOW_ERROR,
-          { error: 'Task T1 failed' },
+          { error: "Task T1 failed" },
         );
       });
     });

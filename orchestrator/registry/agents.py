@@ -14,8 +14,7 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 
 @dataclass
@@ -29,12 +28,12 @@ class AgentConfig:
     backup_cli: Optional[str] = None
     context_file: Optional[str] = None  # Path to CLAUDE.md, GEMINI.md, etc.
     tools_file: Optional[str] = None  # Path to TOOLS.json
-    reviewers: List[str] = field(default_factory=list)  # Agent IDs that review this agent
+    reviewers: list[str] = field(default_factory=list)  # Agent IDs that review this agent
     fallback_reviewer: Optional[str] = None  # Fallback if primary reviewers unavailable
     can_write_files: bool = False
     can_read_files: bool = True
-    allowed_paths: List[str] = field(default_factory=list)  # Glob patterns for writable paths
-    forbidden_paths: List[str] = field(default_factory=list)  # Glob patterns never writable
+    allowed_paths: list[str] = field(default_factory=list)  # Glob patterns for writable paths
+    forbidden_paths: list[str] = field(default_factory=list)  # Glob patterns never writable
     output_schema: Optional[str] = None  # JSON schema for output validation
     max_iterations: int = 3
     timeout_seconds: int = 600  # 10 minutes default
@@ -43,15 +42,15 @@ class AgentConfig:
     weight_in_conflicts: float = 0.5  # Weight when resolving review conflicts
     # Loop execution metadata (for unified loop pattern)
     supports_loop: bool = True  # Whether agent can be used in iterative loops
-    completion_patterns: List[str] = field(default_factory=list)  # Patterns that signal completion
-    available_models: List[str] = field(default_factory=list)  # Available model options
+    completion_patterns: list[str] = field(default_factory=list)  # Patterns that signal completion
+    available_models: list[str] = field(default_factory=list)  # Available model options
     default_model: Optional[str] = None  # Default model to use
     # Prompt template metadata
     prompt_template_type: str = "writer"  # "planner" | "writer" | "reviewer"
 
 
 # Complete Agent Registry
-AGENT_REGISTRY: Dict[str, AgentConfig] = {
+AGENT_REGISTRY: dict[str, AgentConfig] = {
     # =========================================================================
     # PLANNING AGENTS
     # =========================================================================
@@ -336,6 +335,57 @@ AGENT_REGISTRY: Dict[str, AgentConfig] = {
         max_iterations=3,
         timeout_seconds=600,
     ),
+    # =========================================================================
+    # QUALITY INFRASTRUCTURE AGENTS
+    # =========================================================================
+    "A13": AgentConfig(
+        id="A13",
+        name="Quality Gate",
+        description="TypeScript strict mode, ESLint, naming conventions, code structure checks",
+        primary_cli="cursor",
+        backup_cli="claude",
+        context_file="agents/A13-quality-gate/CURSOR-RULES.md",
+        tools_file="agents/A13-quality-gate/TOOLS.json",
+        reviewers=[],  # Top-level automated reviewer (like A07/A08)
+        can_write_files=False,
+        can_read_files=True,
+        allowed_paths=[],
+        forbidden_paths=["**/*"],  # Read only
+        output_schema="schemas/quality_gate_output.json",
+        max_iterations=2,
+        timeout_seconds=300,
+        is_reviewer=True,
+        review_specialization="code_quality",
+        weight_in_conflicts=0.7,  # High weight for quality enforcement
+        prompt_template_type="reviewer",
+    ),
+    "A14": AgentConfig(
+        id="A14",
+        name="Dependency Checker",
+        description="Outdated dependencies, Docker security, version compatibility analysis",
+        primary_cli="claude",
+        backup_cli="cursor",
+        context_file="agents/A14-dependency-checker/CLAUDE.md",
+        tools_file="agents/A14-dependency-checker/TOOLS.json",
+        reviewers=["A07", "A08"],  # Security and Code reviewers check dependency changes
+        fallback_reviewer="A11",  # DevOps as fallback
+        can_write_files=True,
+        can_read_files=True,
+        allowed_paths=[
+            "package.json",
+            "package-lock.json",
+            "Dockerfile*",
+            "docker-compose*",
+            "CHANGELOG.md",
+            "README.md",
+            ".github/dependabot.yml",
+            ".github/renovate.json",
+        ],
+        forbidden_paths=["src/**/*", "tests/**/*", "lib/**/*", "app/**/*"],
+        output_schema="schemas/dependency_checker_output.json",
+        max_iterations=3,
+        timeout_seconds=480,
+    ),
 }
 
 
@@ -359,7 +409,7 @@ def get_agent(agent_id: str) -> AgentConfig:
     return AGENT_REGISTRY[agent_id]
 
 
-def get_agent_reviewers(agent_id: str) -> List[AgentConfig]:
+def get_agent_reviewers(agent_id: str) -> list[AgentConfig]:
     """Get the reviewer agents for a given agent.
 
     Args:
@@ -378,7 +428,7 @@ def get_agent_reviewers(agent_id: str) -> List[AgentConfig]:
     return reviewers
 
 
-def get_all_agents() -> List[AgentConfig]:
+def get_all_agents() -> list[AgentConfig]:
     """Get all registered agents.
 
     Returns:
@@ -387,7 +437,7 @@ def get_all_agents() -> List[AgentConfig]:
     return list(AGENT_REGISTRY.values())
 
 
-def get_agents_by_cli(cli: str) -> List[AgentConfig]:
+def get_agents_by_cli(cli: str) -> list[AgentConfig]:
     """Get agents that use a specific CLI as primary.
 
     Args:
@@ -399,7 +449,7 @@ def get_agents_by_cli(cli: str) -> List[AgentConfig]:
     return [agent for agent in AGENT_REGISTRY.values() if agent.primary_cli == cli]
 
 
-def get_reviewer_agents() -> List[AgentConfig]:
+def get_reviewer_agents() -> list[AgentConfig]:
     """Get all agents that can act as reviewers.
 
     Returns:
@@ -441,7 +491,7 @@ def validate_agent_can_write(agent_id: str, file_path: str) -> bool:
     return False
 
 
-def get_review_pairings() -> Dict[str, Dict[str, str]]:
+def get_review_pairings() -> dict[str, dict[str, str]]:
     """Get the review pairings for all working agents.
 
     Returns:

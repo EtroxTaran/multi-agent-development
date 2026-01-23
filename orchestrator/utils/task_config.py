@@ -20,11 +20,9 @@ References:
 
 import json
 import logging
-import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -139,21 +137,13 @@ class TaskSizeConfig:
                 max_acceptance_criteria=task_limits.get(
                     "max_criteria_per_task", DEFAULT_MAX_ACCEPTANCE_CRITERIA
                 ),
-                max_input_tokens=task_limits.get(
-                    "max_input_tokens", DEFAULT_MAX_INPUT_TOKENS
-                ),
-                max_output_tokens=task_limits.get(
-                    "max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS
-                ),
-                max_time_minutes=task_limits.get(
-                    "max_time_minutes", DEFAULT_MAX_TIME_MINUTES
-                ),
+                max_input_tokens=task_limits.get("max_input_tokens", DEFAULT_MAX_INPUT_TOKENS),
+                max_output_tokens=task_limits.get("max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS),
+                max_time_minutes=task_limits.get("max_time_minutes", DEFAULT_MAX_TIME_MINUTES),
                 complexity_threshold=task_limits.get(
                     "complexity_threshold", DEFAULT_COMPLEXITY_THRESHOLD
                 ),
-                auto_split_enabled=task_limits.get(
-                    "auto_split", DEFAULT_AUTO_SPLIT_ENABLED
-                ),
+                auto_split_enabled=task_limits.get("auto_split", DEFAULT_AUTO_SPLIT_ENABLED),
             )
         except (json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Failed to parse .project-config.json: {e}, using defaults")
@@ -287,24 +277,63 @@ class ComplexityScorer:
 
     # Keywords indicating high semantic complexity
     HIGH_COMPLEXITY_KEYWORDS = [
-        "algorithm", "optimize", "performance", "concurrent", "async",
-        "parallel", "distributed", "cache", "index", "migration",
-        "refactor", "architecture", "redesign", "security", "encrypt",
-        "authentication", "authorization", "state machine", "workflow",
+        "algorithm",
+        "optimize",
+        "performance",
+        "concurrent",
+        "async",
+        "parallel",
+        "distributed",
+        "cache",
+        "index",
+        "migration",
+        "refactor",
+        "architecture",
+        "redesign",
+        "security",
+        "encrypt",
+        "authentication",
+        "authorization",
+        "state machine",
+        "workflow",
     ]
 
     # Keywords indicating medium complexity
     MEDIUM_COMPLEXITY_KEYWORDS = [
-        "integrate", "api", "database", "query", "validation",
-        "transform", "parse", "serialize", "handler", "middleware",
-        "configuration", "schema", "model", "entity", "service",
+        "integrate",
+        "api",
+        "database",
+        "query",
+        "validation",
+        "transform",
+        "parse",
+        "serialize",
+        "handler",
+        "middleware",
+        "configuration",
+        "schema",
+        "model",
+        "entity",
+        "service",
     ]
 
     # Keywords indicating requirement uncertainty
     UNCERTAINTY_KEYWORDS = [
-        "should", "might", "consider", "optional", "if needed",
-        "possibly", "maybe", "tbd", "todo", "decide", "unclear",
-        "flexible", "configurable", "depends on", "varies",
+        "should",
+        "might",
+        "consider",
+        "optional",
+        "if needed",
+        "possibly",
+        "maybe",
+        "tbd",
+        "todo",
+        "decide",
+        "unclear",
+        "flexible",
+        "configurable",
+        "depends on",
+        "varies",
     ]
 
     def __init__(self, config: TaskSizeConfig):
@@ -336,18 +365,14 @@ class ComplexityScorer:
         file_scope = min(total_files * 0.5, 5.0)
 
         # 2. Cross-file dependency score (0-2 points)
-        cross_file_deps = self._score_cross_file_deps(
-            files_to_create, files_to_modify
-        )
+        cross_file_deps = self._score_cross_file_deps(files_to_create, files_to_modify)
 
         # 3. Semantic complexity score (0-3 points)
         text = f"{title} {user_story} {' '.join(acceptance_criteria)}".lower()
         semantic_complexity = self._score_semantic_complexity(text)
 
         # 4. Requirement uncertainty score (0-2 points)
-        requirement_uncertainty = self._score_uncertainty(
-            text, acceptance_criteria
-        )
+        requirement_uncertainty = self._score_uncertainty(text, acceptance_criteria)
 
         # 5. Token penalty (0-1 point)
         estimated_tokens = self._estimate_tokens(task)
@@ -454,9 +479,7 @@ class ComplexityScorer:
 
         Based on vague language and criteria clarity.
         """
-        uncertainty_count = sum(
-            1 for kw in self.UNCERTAINTY_KEYWORDS if kw in text
-        )
+        uncertainty_count = sum(1 for kw in self.UNCERTAINTY_KEYWORDS if kw in text)
 
         score = 0.0
 
@@ -499,7 +522,9 @@ class ComplexityScorer:
         files_to_modify = task.get("files_to_modify", [])
 
         # Files to modify need to be read first
-        file_context_tokens = len(files_to_modify) * LINES_PER_FILE_ESTIMATE * TOKENS_PER_LINE_ESTIMATE
+        file_context_tokens = (
+            len(files_to_modify) * LINES_PER_FILE_ESTIMATE * TOKENS_PER_LINE_ESTIMATE
+        )
 
         # New files need examples/patterns
         new_file_tokens = len(files_to_create) * 50  # Template overhead

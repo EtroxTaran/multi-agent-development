@@ -8,14 +8,13 @@ import logging
 import os
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Template for bootstrap optimization
-BOOTSTRAP_TEMPLATE = '''You are an expert prompt engineer adding few-shot examples to improve prompt effectiveness.
+BOOTSTRAP_TEMPLATE = """You are an expert prompt engineer adding few-shot examples to improve prompt effectiveness.
 
 ## Current Prompt
 ```
@@ -46,7 +45,7 @@ Provide ONLY the improved prompt with integrated examples.
 No explanations or commentary.
 
 ---
-Improved Prompt with Examples:'''
+Improved Prompt with Examples:"""
 
 
 @dataclass
@@ -96,6 +95,7 @@ class BootstrapOptimizer:
     def golden_repo(self):
         if self._golden_repo is None:
             from ..db.repositories import get_golden_example_repository
+
             self._golden_repo = get_golden_example_repository(self.project_name)
         return self._golden_repo
 
@@ -191,9 +191,12 @@ class BootstrapOptimizer:
         try:
             cmd = [
                 "claude",
-                "-p", prompt,
-                "--output-format", "text",
-                "--max-turns", "1",
+                "-p",
+                prompt,
+                "--output-format",
+                "text",
+                "--max-turns",
+                "1",
             ]
 
             result = subprocess.run(

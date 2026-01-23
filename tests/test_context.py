@@ -1,16 +1,11 @@
 """Tests for context management and drift detection."""
 
-import json
-import pytest
 import tempfile
 from pathlib import Path
 
-from orchestrator.utils.context import (
-    ContextManager,
-    ContextState,
-    FileChecksum,
-    DriftResult,
-)
+import pytest
+
+from orchestrator.utils.context import ContextManager, ContextState, DriftResult, FileChecksum
 
 
 @pytest.fixture

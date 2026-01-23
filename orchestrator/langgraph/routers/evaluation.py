@@ -90,9 +90,7 @@ def optimize_prompts_router(
 
     if optimization_results:
         successes = sum(1 for r in optimization_results if r.get("success"))
-        logger.info(
-            f"Optimization completed: {successes}/{len(optimization_results)} succeeded"
-        )
+        logger.info(f"Optimization completed: {successes}/{len(optimization_results)} succeeded")
 
     return "continue_workflow"
 
@@ -125,6 +123,7 @@ def should_evaluate_router(
 
     # Check sampling rate
     import random
+
     sampling_rate = config.get("evaluation", {}).get("sampling_rate", 1.0)
     if sampling_rate < 1.0 and random.random() > sampling_rate:
         logger.debug("Skipping evaluation due to sampling")

@@ -3,12 +3,11 @@
 Loads developer preferences and research findings to inform implementation.
 """
 
-import json
 import logging
 from pathlib import Path
 from typing import Optional
 
-from ...state import WorkflowState, Task
+from ...state import Task, WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,9 @@ def load_research_findings(project_name: str) -> str:
             if languages:
                 parts.append(f"**Languages**: {', '.join(languages)}")
             if frameworks:
-                fw_names = [f.get("name", str(f)) if isinstance(f, dict) else str(f) for f in frameworks]
+                fw_names = [
+                    f.get("name", str(f)) if isinstance(f, dict) else str(f) for f in frameworks
+                ]
                 parts.append(f"**Frameworks**: {', '.join(fw_names)}")
 
         # Patterns

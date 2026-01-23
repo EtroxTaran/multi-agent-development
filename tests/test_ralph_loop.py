@@ -11,26 +11,25 @@ Run with: pytest tests/test_ralph_loop.py -v
 """
 
 import json
+
 import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from orchestrator.langgraph.integrations.ralph_loop import (
     COMPLETION_PROMISE,
     RalphLoopConfig,
     RalphLoopResult,
-    detect_test_framework,
     _build_previous_context,
     _extract_test_summary,
     _format_criteria,
     _format_list,
     _parse_iteration_output,
+    detect_test_framework,
 )
-
 
 # =============================================================================
 # Test RalphLoopConfig
 # =============================================================================
+
 
 class TestRalphLoopConfig:
     """Test Ralph loop configuration."""
@@ -64,6 +63,7 @@ class TestRalphLoopConfig:
 # =============================================================================
 # Test RalphLoopResult
 # =============================================================================
+
 
 class TestRalphLoopResult:
     """Test Ralph loop result dataclass."""
@@ -113,6 +113,7 @@ class TestRalphLoopResult:
 # Test Test Framework Detection
 # =============================================================================
 
+
 class TestDetectTestFramework:
     """Test test framework detection."""
 
@@ -134,9 +135,9 @@ class TestDetectTestFramework:
 
     def test_detect_bun(self, temp_project_dir):
         """Test detecting bun test."""
-        (temp_project_dir / "package.json").write_text(json.dumps({
-            "devDependencies": {"bun": "^1.0.0"}
-        }))
+        (temp_project_dir / "package.json").write_text(
+            json.dumps({"devDependencies": {"bun": "^1.0.0"}})
+        )
 
         result = detect_test_framework(temp_project_dir)
 
@@ -144,9 +145,9 @@ class TestDetectTestFramework:
 
     def test_detect_jest(self, temp_project_dir):
         """Test detecting jest via npm."""
-        (temp_project_dir / "package.json").write_text(json.dumps({
-            "devDependencies": {"jest": "^29.0.0"}
-        }))
+        (temp_project_dir / "package.json").write_text(
+            json.dumps({"devDependencies": {"jest": "^29.0.0"}})
+        )
 
         result = detect_test_framework(temp_project_dir)
 
@@ -154,9 +155,9 @@ class TestDetectTestFramework:
 
     def test_detect_vitest(self, temp_project_dir):
         """Test detecting vitest via npm."""
-        (temp_project_dir / "package.json").write_text(json.dumps({
-            "devDependencies": {"vitest": "^1.0.0"}
-        }))
+        (temp_project_dir / "package.json").write_text(
+            json.dumps({"devDependencies": {"vitest": "^1.0.0"}})
+        )
 
         result = detect_test_framework(temp_project_dir)
 
@@ -188,6 +189,7 @@ class TestDetectTestFramework:
 # =============================================================================
 # Test Helper Functions
 # =============================================================================
+
 
 class TestHelperFunctions:
     """Test helper formatting functions."""
@@ -223,6 +225,7 @@ class TestHelperFunctions:
 # Test Output Parsing
 # =============================================================================
 
+
 class TestOutputParsing:
     """Test iteration output parsing."""
 
@@ -243,11 +246,11 @@ class TestOutputParsing:
 
     def test_parse_json_in_text(self):
         """Test extracting JSON from text output."""
-        output = '''
+        output = """
         Some text before
         {"status": "completed"}
         Some text after
-        '''
+        """
 
         result = _parse_iteration_output(output)
 
@@ -265,6 +268,7 @@ class TestOutputParsing:
 # =============================================================================
 # Test Context Building
 # =============================================================================
+
 
 class TestContextBuilding:
     """Test previous iteration context building."""
@@ -306,6 +310,7 @@ class TestContextBuilding:
 # =============================================================================
 # Test Summary Extraction
 # =============================================================================
+
 
 class TestSummaryExtraction:
     """Test test summary extraction."""
@@ -349,6 +354,7 @@ class TestSummaryExtraction:
 # Test Completion Promise
 # =============================================================================
 
+
 class TestCompletionPromise:
     """Test completion promise detection."""
 
@@ -367,17 +373,18 @@ class TestCompletionPromise:
 # Test Integration Exports
 # =============================================================================
 
+
 class TestIntegrationExports:
     """Test Ralph loop is exported from integrations."""
 
     def test_exports(self):
         """Test Ralph loop classes are exported."""
         from orchestrator.langgraph.integrations import (
+            COMPLETION_PROMISE,
             RalphLoopConfig,
             RalphLoopResult,
-            run_ralph_loop,
             detect_test_framework,
-            COMPLETION_PROMISE,
+            run_ralph_loop,
         )
 
         assert RalphLoopConfig is not None

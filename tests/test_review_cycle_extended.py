@@ -12,23 +12,14 @@ Tests cover additional scenarios beyond the basic tests in test_review_cycle.py:
 """
 
 import asyncio
-import pytest
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.review.cycle import (
-    ReviewCycle,
-    ReviewCycleResult,
-    ReviewDecision,
-    ReviewFeedback,
-    ReviewIteration,
-)
-from orchestrator.review.resolver import (
-    ConflictResolver,
-    ResolutionResult,
-)
+import pytest
+
 from orchestrator.dispatch import DispatchResult, Task
+from orchestrator.review.cycle import ReviewCycle, ReviewDecision, ReviewFeedback
+from orchestrator.review.resolver import ResolutionResult
 
 
 class TestParallelReviewerExecution:
@@ -301,7 +292,10 @@ class TestConflictDecisionEscalates:
         )
 
         assert result.final_status == "escalated"
-        assert "disagreement" in result.escalation_reason.lower() or "conflict" in result.escalation_reason.lower()
+        assert (
+            "disagreement" in result.escalation_reason.lower()
+            or "conflict" in result.escalation_reason.lower()
+        )
 
 
 class TestReviewerErrorContinues:
@@ -529,8 +523,12 @@ class TestDetermineDecision:
     def test_score_below_threshold_not_approved(self, review_cycle):
         """Test that approval requires meeting score threshold."""
         reviews = [
-            ReviewFeedback(reviewer_id="A07", cli_used="cursor", approved=True, score=6.0),  # Below threshold
-            ReviewFeedback(reviewer_id="A08", cli_used="gemini", approved=True, score=6.5),  # Below threshold
+            ReviewFeedback(
+                reviewer_id="A07", cli_used="cursor", approved=True, score=6.0
+            ),  # Below threshold
+            ReviewFeedback(
+                reviewer_id="A08", cli_used="gemini", approved=True, score=6.5
+            ),  # Below threshold
         ]
 
         decision, resolution = review_cycle._determine_decision(reviews, approval_score=7.0)

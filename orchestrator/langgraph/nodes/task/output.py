@@ -7,7 +7,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ def get_task_output_schema() -> Optional[dict]:
         if path.exists():
             try:
                 return json.loads(path.read_text())
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Failed to load schema from {path}: {e}")
                 return None
 

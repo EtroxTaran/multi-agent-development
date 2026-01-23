@@ -1,15 +1,13 @@
 """Tests for checkpoint storage adapter."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.storage.checkpoint_adapter import (
-    CheckpointStorageAdapter,
-    get_checkpoint_storage,
-)
+import pytest
+
 from orchestrator.storage.base import CheckpointData
+from orchestrator.storage.checkpoint_adapter import CheckpointStorageAdapter, get_checkpoint_storage
 
 
 @pytest.fixture
@@ -134,9 +132,7 @@ class TestCheckpointStorageAdapter:
             checkpoints = adapter.list_checkpoints()
             assert checkpoints == []
 
-    def test_list_checkpoints_after_create(
-        self, temp_project, mock_checkpoint_repository
-    ):
+    def test_list_checkpoints_after_create(self, temp_project, mock_checkpoint_repository):
         """Test listing checkpoints after creating some."""
         # Set up mock to return checkpoints
         mock_checkpoint_1 = MagicMock()
@@ -185,9 +181,7 @@ class TestCheckpointStorageAdapter:
         mock_checkpoint.files_snapshot = []
         mock_checkpoint.created_at = None
 
-        mock_checkpoint_repository.get_checkpoint = AsyncMock(
-            return_value=mock_checkpoint
-        )
+        mock_checkpoint_repository.get_checkpoint = AsyncMock(return_value=mock_checkpoint)
 
         with patch(
             "orchestrator.db.repositories.checkpoints.get_checkpoint_repository",
@@ -254,9 +248,7 @@ class TestCheckpointStorageAdapter:
 
             result = adapter.delete_checkpoint("test-id")
             assert result is True
-            mock_checkpoint_repository.delete_checkpoint.assert_called_once_with(
-                "test-id"
-            )
+            mock_checkpoint_repository.delete_checkpoint.assert_called_once_with("test-id")
 
     def test_prune_old_checkpoints(self, temp_project, mock_checkpoint_repository):
         """Test pruning old checkpoints."""
@@ -290,9 +282,7 @@ class TestCheckpointStorageAdapter:
         mock_checkpoint.files_snapshot = []
         mock_checkpoint.created_at = None
 
-        mock_checkpoint_repository.get_checkpoint = AsyncMock(
-            return_value=mock_checkpoint
-        )
+        mock_checkpoint_repository.get_checkpoint = AsyncMock(return_value=mock_checkpoint)
 
         with (
             patch(
@@ -327,9 +317,7 @@ class TestCheckpointStorageAdapter:
         mock_checkpoint.files_snapshot = []
         mock_checkpoint.created_at = None
 
-        mock_checkpoint_repository.get_checkpoint = AsyncMock(
-            return_value=mock_checkpoint
-        )
+        mock_checkpoint_repository.get_checkpoint = AsyncMock(return_value=mock_checkpoint)
 
         with (
             patch(

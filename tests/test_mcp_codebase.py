@@ -11,27 +11,24 @@ Run with: pytest tests/test_mcp_codebase.py -v
 """
 
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-import tempfile
-import os
 
 # Import server functions
 from mcp_servers.codebase.server import (
-    search_code,
-    get_symbols,
+    create_server,
     find_references,
     get_file_structure,
     get_file_summary,
-    create_server,
-    PROJECTS_ROOT,
+    get_symbols,
+    search_code,
 )
-
 
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def temp_projects_dir(tmp_path):
@@ -48,7 +45,8 @@ def temp_projects_dir(tmp_path):
     src_dir.mkdir()
 
     # Create Python files
-    (src_dir / "calculator.py").write_text('''"""Calculator module."""
+    (src_dir / "calculator.py").write_text(
+        '''"""Calculator module."""
 
 import math
 from typing import Optional
@@ -76,9 +74,11 @@ def helper_function():
     pass
 
 PI = 3.14159
-''')
+'''
+    )
 
-    (src_dir / "utils.py").write_text('''"""Utility functions."""
+    (src_dir / "utils.py").write_text(
+        '''"""Utility functions."""
 
 from calculator import Calculator
 
@@ -91,10 +91,12 @@ def create_calculator() -> Calculator:
     return Calculator()
 
 calc = Calculator()
-''')
+'''
+    )
 
     # Create TypeScript file
-    (src_dir / "app.ts").write_text('''import { Calculator } from './calculator';
+    (src_dir / "app.ts").write_text(
+        """import { Calculator } from './calculator';
 
 export class App {
     private calculator: Calculator;
@@ -113,10 +115,12 @@ export function createApp(): App {
 }
 
 export const VERSION = '1.0.0';
-''')
+"""
+    )
 
     # Create JavaScript file
-    (src_dir / "legacy.js").write_text('''const Calculator = require('./calculator');
+    (src_dir / "legacy.js").write_text(
+        """const Calculator = require('./calculator');
 
 function legacyAdd(a, b) {
     return a + b;
@@ -129,13 +133,15 @@ class LegacyHelper {
 }
 
 module.exports = { legacyAdd, LegacyHelper };
-''')
+"""
+    )
 
     # Create tests directory
     tests_dir = project_dir / "tests"
     tests_dir.mkdir()
 
-    (tests_dir / "test_calculator.py").write_text('''"""Tests for calculator."""
+    (tests_dir / "test_calculator.py").write_text(
+        '''"""Tests for calculator."""
 
 import pytest
 from src.calculator import Calculator
@@ -147,7 +153,8 @@ def test_add():
 def test_subtract():
     calc = Calculator()
     assert calc.subtract(5, 3) == 2
-''')
+'''
+    )
 
     return projects_dir
 
@@ -156,13 +163,15 @@ def test_subtract():
 def mock_projects_root(temp_projects_dir, monkeypatch):
     """Mock PROJECTS_ROOT to use temp directory."""
     import mcp_servers.codebase.server as server_module
-    monkeypatch.setattr(server_module, 'PROJECTS_ROOT', temp_projects_dir)
+
+    monkeypatch.setattr(server_module, "PROJECTS_ROOT", temp_projects_dir)
     return temp_projects_dir
 
 
 # =============================================================================
 # Test search_code
 # =============================================================================
+
 
 class TestSearchCode:
     """Tests for search_code function."""
@@ -181,26 +190,32 @@ class TestSearchCode:
     @pytest.mark.asyncio
     async def test_search_code_with_ripgrep_mock(self, mock_projects_root):
         """Test search_code with mocked ripgrep."""
-        mock_output = '\n'.join([
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/calculator.py"},
-                    "line_number": 10,
-                    "lines": {"text": "    def add(self, a: int, b: int) -> int:\n"}
-                }
-            }),
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/utils.py"},
-                    "line_number": 5,
-                    "lines": {"text": "    return a + b\n"}
-                }
-            }),
-        ])
+        mock_output = "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/calculator.py"},
+                            "line_number": 10,
+                            "lines": {"text": "    def add(self, a: int, b: int) -> int:\n"},
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/utils.py"},
+                            "line_number": 5,
+                            "lines": {"text": "    return a + b\n"},
+                        },
+                    }
+                ),
+            ]
+        )
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout=mock_output, returncode=0)
 
             result = await search_code(
@@ -217,7 +232,7 @@ class TestSearchCode:
     @pytest.mark.asyncio
     async def test_search_code_with_file_type_filter(self, mock_projects_root):
         """Test search with file type filter."""
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout="", returncode=0)
 
             await search_code(
@@ -236,7 +251,7 @@ class TestSearchCode:
         """Test search timeout handling."""
         import subprocess
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired(cmd="rg", timeout=30)
 
             result = await search_code(
@@ -250,7 +265,7 @@ class TestSearchCode:
     @pytest.mark.asyncio
     async def test_search_code_ripgrep_not_found(self, mock_projects_root):
         """Test handling when ripgrep is not installed."""
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError()
 
             result = await search_code(
@@ -266,19 +281,21 @@ class TestSearchCode:
         """Test max_results parameter."""
         # Create output with more matches than limit
         matches = [
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": f"file{i}.py"},
-                    "line_number": i,
-                    "lines": {"text": f"match {i}\n"}
+            json.dumps(
+                {
+                    "type": "match",
+                    "data": {
+                        "path": {"text": f"file{i}.py"},
+                        "line_number": i,
+                        "lines": {"text": f"match {i}\n"},
+                    },
                 }
-            })
+            )
             for i in range(10)
         ]
 
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = MagicMock(stdout='\n'.join(matches), returncode=0)
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="\n".join(matches), returncode=0)
 
             result = await search_code(
                 query="match",
@@ -292,6 +309,7 @@ class TestSearchCode:
 # =============================================================================
 # Test get_symbols
 # =============================================================================
+
 
 class TestGetSymbols:
     """Tests for get_symbols function."""
@@ -384,6 +402,7 @@ class TestGetSymbols:
 # Test find_references
 # =============================================================================
 
+
 class TestFindReferences:
     """Tests for find_references function."""
 
@@ -401,34 +420,42 @@ class TestFindReferences:
     @pytest.mark.asyncio
     async def test_find_references_with_mock(self, mock_projects_root):
         """Test finding references with mocked ripgrep."""
-        mock_output = '\n'.join([
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/calculator.py"},
-                    "line_number": 5,
-                    "lines": {"text": "class Calculator:\n"}
-                }
-            }),
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/utils.py"},
-                    "line_number": 3,
-                    "lines": {"text": "from calculator import Calculator\n"}
-                }
-            }),
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/utils.py"},
-                    "line_number": 10,
-                    "lines": {"text": "    return Calculator()\n"}
-                }
-            }),
-        ])
+        mock_output = "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/calculator.py"},
+                            "line_number": 5,
+                            "lines": {"text": "class Calculator:\n"},
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/utils.py"},
+                            "line_number": 3,
+                            "lines": {"text": "from calculator import Calculator\n"},
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/utils.py"},
+                            "line_number": 10,
+                            "lines": {"text": "    return Calculator()\n"},
+                        },
+                    }
+                ),
+            ]
+        )
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout=mock_output, returncode=0)
 
             result = await find_references(
@@ -448,26 +475,32 @@ class TestFindReferences:
     @pytest.mark.asyncio
     async def test_find_references_exclude_definition(self, mock_projects_root):
         """Test excluding definition from results."""
-        mock_output = '\n'.join([
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/calculator.py"},
-                    "line_number": 5,
-                    "lines": {"text": "class Calculator:\n"}
-                }
-            }),
-            json.dumps({
-                "type": "match",
-                "data": {
-                    "path": {"text": "src/utils.py"},
-                    "line_number": 10,
-                    "lines": {"text": "    return Calculator()\n"}
-                }
-            }),
-        ])
+        mock_output = "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/calculator.py"},
+                            "line_number": 5,
+                            "lines": {"text": "class Calculator:\n"},
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "match",
+                        "data": {
+                            "path": {"text": "src/utils.py"},
+                            "line_number": 10,
+                            "lines": {"text": "    return Calculator()\n"},
+                        },
+                    }
+                ),
+            ]
+        )
 
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout=mock_output, returncode=0)
 
             result = await find_references(
@@ -484,6 +517,7 @@ class TestFindReferences:
 # =============================================================================
 # Test get_file_structure
 # =============================================================================
+
 
 class TestGetFileStructure:
     """Tests for get_file_structure function."""
@@ -607,6 +641,7 @@ class TestGetFileStructure:
 # Test get_file_summary
 # =============================================================================
 
+
 class TestGetFileSummary:
     """Tests for get_file_summary function."""
 
@@ -694,6 +729,7 @@ class TestGetFileSummary:
 # Test Server Creation
 # =============================================================================
 
+
 class TestCreateServer:
     """Tests for server creation and configuration."""
 
@@ -711,7 +747,7 @@ class TestCreateServer:
 
         # The MCP Server stores handlers in request_handlers dict
         # Access the list_tools handler via the proper internal attribute
-        assert hasattr(server, 'request_handlers'), "Server should have request_handlers"
+        assert hasattr(server, "request_handlers"), "Server should have request_handlers"
 
         # Verify the server is properly configured by checking it has the expected handlers
         # Note: The actual tools are verified via integration tests; here we just verify
@@ -720,6 +756,7 @@ class TestCreateServer:
 
         # Check that list_tools handler is registered
         from mcp.types import ListToolsRequest
+
         assert ListToolsRequest in server.request_handlers
 
     @pytest.mark.asyncio
@@ -736,6 +773,7 @@ class TestCreateServer:
 # =============================================================================
 # Test Edge Cases
 # =============================================================================
+
 
 class TestEdgeCases:
     """Test edge cases and error handling."""
@@ -757,7 +795,7 @@ class TestEdgeCases:
         """Test handling binary files gracefully."""
         # Create a binary file
         binary_file = mock_projects_root / "test-project" / "src" / "binary.bin"
-        binary_file.write_bytes(b'\x00\x01\x02\x03')
+        binary_file.write_bytes(b"\x00\x01\x02\x03")
 
         # This shouldn't crash
         result = await get_file_structure(project="test-project")
@@ -766,7 +804,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_special_characters_in_search(self, mock_projects_root):
         """Test search with regex special characters."""
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout="", returncode=0)
 
             # This shouldn't crash
@@ -782,7 +820,9 @@ class TestEdgeCases:
         """Test handling files with unicode content."""
         # Create file with unicode
         unicode_file = mock_projects_root / "test-project" / "src" / "unicode.py"
-        unicode_file.write_text('# -*- coding: utf-8 -*-\n"""Unicode: 你好世界 🌍"""\n\ndef greet():\n    return "Hello 世界"')
+        unicode_file.write_text(
+            '# -*- coding: utf-8 -*-\n"""Unicode: 你好世界 🌍"""\n\ndef greet():\n    return "Hello 世界"'
+        )
 
         result = await get_file_summary(
             project="test-project",

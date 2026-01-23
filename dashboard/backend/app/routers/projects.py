@@ -1,28 +1,18 @@
 """Project management API routes."""
 
-import os
-from pathlib import Path
-from typing import Optional
+
+# Import orchestrator modules
+import sys
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
 from ..deps import get_project_manager
-from ..models import (
-    ErrorResponse,
-    FolderInfo,
-    ProjectInitRequest,
-    ProjectInitResponse,
-    ProjectStatus,
-    ProjectSummary,
-)
+from ..models import ErrorResponse, FolderInfo, ProjectInitResponse, ProjectStatus, ProjectSummary
 
-# Import orchestrator modules
-import sys
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 from orchestrator.project_manager import ProjectManager
-
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -73,7 +63,9 @@ async def init_project(
     """Initialize a new project."""
     result = project_manager.init_project(project_name)
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to initialize project"))
+        raise HTTPException(
+            status_code=400, detail=result.get("error", "Failed to initialize project")
+        )
     return ProjectInitResponse(**result)
 
 
@@ -101,7 +93,8 @@ async def list_workspace_folders(
                 path=str(item),
                 is_project=(item / ".project-config.json").exists(),
                 has_workflow=(item / ".workflow").exists(),
-                has_product_md=(item / "PRODUCT.md").exists() or (item / "Docs" / "PRODUCT.md").exists(),
+                has_product_md=(item / "PRODUCT.md").exists()
+                or (item / "Docs" / "PRODUCT.md").exists(),
             )
             folders.append(folder_info)
 

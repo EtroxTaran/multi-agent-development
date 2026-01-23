@@ -1,31 +1,12 @@
 """Tests for fixer agent."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from orchestrator.fixer.agent import (
-    FixerAgent,
-    FixAttempt,
-    create_fixer_agent,
-)
-from orchestrator.fixer.triage import (
-    ErrorCategory,
-    FixerError,
-    TriageDecision,
-    TriageResult,
-)
-from orchestrator.fixer.diagnosis import (
-    DiagnosisConfidence,
-    DiagnosisResult,
-    RootCause,
-)
-from orchestrator.fixer.strategies import (
-    FixAction,
-    FixPlan,
-    FixResult,
-    FixStatus,
-)
+import pytest
+
+from orchestrator.fixer.agent import FixAttempt, FixerAgent, create_fixer_agent
+from orchestrator.fixer.diagnosis import DiagnosisConfidence, DiagnosisResult, RootCause
+from orchestrator.fixer.strategies import FixAction, FixPlan, FixResult, FixStatus
+from orchestrator.fixer.triage import ErrorCategory, FixerError, TriageDecision, TriageResult
 
 
 class TestFixAttempt:

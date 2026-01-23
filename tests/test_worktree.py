@@ -1,17 +1,12 @@
 """Tests for git worktree management."""
 
-import os
-import pytest
 import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from orchestrator.utils.worktree import (
-    WorktreeManager,
-    WorktreeError,
-    WorktreeInfo,
-)
+import pytest
+
+from orchestrator.utils.worktree import WorktreeError, WorktreeInfo, WorktreeManager
 
 
 @pytest.fixture
@@ -253,9 +248,7 @@ class TestMergeWorktree:
 
             # Merge without making changes
             commit_hash = manager.merge_worktree(
-                worktree_path,
-                "Should not create commit",
-                allow_empty=False
+                worktree_path, "Should not create commit", allow_empty=False
             )
 
             assert commit_hash is None

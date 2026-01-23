@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class ScenarioResult:
     name: str
     feature: str
     status: str  # "passed", "failed", "skipped", "pending"
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     steps_total: int = 0
     steps_passed: int = 0
     steps_failed: int = 0
@@ -50,8 +50,8 @@ class FeatureResult:
     name: str
     path: str
     description: str = ""
-    scenarios: List[ScenarioResult] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    scenarios: list[ScenarioResult] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
 
     @property
@@ -79,7 +79,7 @@ class FeatureResult:
 class BDDResult:
     """Complete result of BDD test run."""
 
-    features: List[FeatureResult] = field(default_factory=list)
+    features: list[FeatureResult] = field(default_factory=list)
     total_scenarios: int = 0
     passed_scenarios: int = 0
     failed_scenarios: int = 0
@@ -93,7 +93,7 @@ class BDDResult:
         """Check if all features passed."""
         return self.failed_scenarios == 0 and self.total_scenarios > 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_scenarios": self.total_scenarios,
@@ -144,8 +144,8 @@ class BDDRunner:
 
     def discover_features(
         self,
-        tags: Optional[List[str]] = None,
-    ) -> List[Path]:
+        tags: Optional[list[str]] = None,
+    ) -> list[Path]:
         """Discover feature files in the project.
 
         Args:
@@ -169,7 +169,7 @@ class BDDRunner:
 
         return features
 
-    def _extract_tags(self, content: str) -> List[str]:
+    def _extract_tags(self, content: str) -> list[str]:
         """Extract tags from feature file content.
 
         Args:
@@ -212,7 +212,9 @@ class BDDRunner:
         for line in lines:
             if line.strip().startswith("@"):
                 current_tags.extend(re.findall(r"@(\w+)", line))
-            elif line.strip().startswith("Scenario:") or line.strip().startswith("Scenario Outline:"):
+            elif line.strip().startswith("Scenario:") or line.strip().startswith(
+                "Scenario Outline:"
+            ):
                 scenario_match = re.search(r"(?:Scenario|Scenario Outline):\s*(.+)", line)
                 if scenario_match:
                     scenarios.append(
@@ -234,8 +236,8 @@ class BDDRunner:
 
     async def run_features(
         self,
-        feature_files: Optional[List[str]] = None,
-        tags: Optional[List[str]] = None,
+        feature_files: Optional[list[str]] = None,
+        tags: Optional[list[str]] = None,
         timeout: int = 300,
     ) -> BDDResult:
         """Run BDD tests.
@@ -330,7 +332,7 @@ class BDDRunner:
             return BDDResult()
 
         result = BDDResult()
-        features_map: Dict[str, FeatureResult] = {}
+        features_map: dict[str, FeatureResult] = {}
 
         for test in report.get("tests", []):
             nodeid = test.get("nodeid", "")
@@ -388,7 +390,7 @@ class BDDRunner:
     def _parse_terminal_output(
         self,
         output: str,
-        files: List[Path],
+        files: list[Path],
     ) -> BDDResult:
         """Parse terminal output when JSON report not available.
 
@@ -413,9 +415,7 @@ class BDDRunner:
             result.failed_scenarios = int(summary_match.group(2) or 0)
             result.skipped_scenarios = int(summary_match.group(3) or 0)
             result.total_scenarios = (
-                result.passed_scenarios +
-                result.failed_scenarios +
-                result.skipped_scenarios
+                result.passed_scenarios + result.failed_scenarios + result.skipped_scenarios
             )
 
         # Create basic feature results from files
@@ -427,7 +427,7 @@ class BDDRunner:
 
     async def run_by_tags(
         self,
-        tags: List[str],
+        tags: list[str],
         timeout: int = 300,
     ) -> BDDResult:
         """Run tests matching specific tags.

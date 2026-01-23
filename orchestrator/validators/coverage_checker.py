@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class CoverageStatus(str, Enum):
     """Status of coverage check."""
+
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"
@@ -27,6 +28,7 @@ class CoverageStatus(str, Enum):
 @dataclass
 class FileCoverage:
     """Coverage data for a single file."""
+
     file_path: str
     lines_total: int
     lines_covered: int
@@ -50,6 +52,7 @@ class FileCoverage:
 @dataclass
 class CoverageCheckResult:
     """Result of coverage check."""
+
     status: CoverageStatus
     overall_percent: float
     threshold: float
@@ -213,7 +216,9 @@ class CoverageChecker:
 
         return None
 
-    def _find_and_parse_coverage(self) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
+    def _find_and_parse_coverage(
+        self,
+    ) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
         """Find and parse coverage report.
 
         Returns:
@@ -254,7 +259,9 @@ class CoverageChecker:
 
         return None
 
-    def _parse_json_coverage(self, report_path: Path) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
+    def _parse_json_coverage(
+        self, report_path: Path
+    ) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
         """Parse Vitest/Jest JSON coverage report."""
         try:
             data = json.loads(report_path.read_text())
@@ -325,7 +332,9 @@ class CoverageChecker:
                     elif pct < self.threshold:
                         low_coverage.append((file_path, pct))
 
-                overall = (covered_statements / total_statements * 100) if total_statements > 0 else 0
+                overall = (
+                    (covered_statements / total_statements * 100) if total_statements > 0 else 0
+                )
                 return overall, files, uncovered, low_coverage
 
         except Exception as e:
@@ -333,7 +342,9 @@ class CoverageChecker:
 
         return None
 
-    def _parse_pytest_coverage(self, report_path: Path) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
+    def _parse_pytest_coverage(
+        self, report_path: Path
+    ) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
         """Parse pytest coverage JSON report."""
         try:
             data = json.loads(report_path.read_text())
@@ -371,7 +382,9 @@ class CoverageChecker:
 
         return None
 
-    def _parse_lcov_coverage(self, report_path: Path) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
+    def _parse_lcov_coverage(
+        self, report_path: Path
+    ) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
         """Parse LCOV format coverage report."""
         try:
             content = report_path.read_text()
@@ -390,7 +403,7 @@ class CoverageChecker:
             for line in content.splitlines():
                 if line.startswith("SF:"):
                     if current_file and file_lines > 0:
-                        pct = (file_hits / file_lines * 100)
+                        pct = file_hits / file_lines * 100
                         fc = FileCoverage(
                             file_path=current_file,
                             lines_total=file_lines,
@@ -420,7 +433,7 @@ class CoverageChecker:
 
                 elif line == "end_of_record":
                     if current_file and file_lines > 0:
-                        pct = (file_hits / file_lines * 100)
+                        pct = file_hits / file_lines * 100
                         fc = FileCoverage(
                             file_path=current_file,
                             lines_total=file_lines,
@@ -444,7 +457,9 @@ class CoverageChecker:
 
         return None
 
-    def _parse_go_coverage(self, report_path: Path) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
+    def _parse_go_coverage(
+        self, report_path: Path
+    ) -> Optional[tuple[float, list[FileCoverage], list[str], list[tuple[str, float]]]]:
         """Parse Go coverage profile."""
         try:
             content = report_path.read_text()

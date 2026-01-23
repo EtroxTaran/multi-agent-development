@@ -7,12 +7,12 @@ import {
   OnGatewayDisconnect,
   MessageBody,
   ConnectedSocket,
-} from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
-import { Server, WebSocket } from 'ws';
-import { WebsocketService } from './websocket.service';
-import { OrchestratorBridgeService } from './orchestrator-bridge.service';
-import { WebSocketEventType } from '../common/enums';
+} from "@nestjs/websockets";
+import { Logger } from "@nestjs/common";
+import { Server, WebSocket } from "ws";
+import { WebsocketService } from "./websocket.service";
+import { OrchestratorBridgeService } from "./orchestrator-bridge.service";
+import { WebSocketEventType } from "../common/enums";
 
 interface JoinProjectMessage {
   projectName: string;
@@ -23,9 +23,9 @@ interface ClientMetadata {
 }
 
 @WebSocketGateway({
-  path: '/api/ws',
+  path: "/api/ws",
   cors: {
-    origin: '*',
+    origin: "*",
     credentials: true,
   },
 })
@@ -44,29 +44,31 @@ export class WebsocketGateway
   ) {}
 
   afterInit(server: Server): void {
-    this.logger.log('WebSocket Gateway initialized');
+    this.logger.log("WebSocket Gateway initialized");
   }
 
   handleConnection(client: WebSocket): void {
     this.clientMetadata.set(client, {});
-    this.logger.log('New WebSocket client connected');
+    this.logger.log("New WebSocket client connected");
   }
 
   handleDisconnect(client: WebSocket): void {
     const metadata = this.clientMetadata.get(client);
     if (metadata?.projectName) {
       this.websocketService.removeConnection(metadata.projectName, client);
-      
+
       // If no more clients for this project, disconnect from orchestrator
-      if (this.websocketService.getConnectionCount(metadata.projectName) === 0) {
+      if (
+        this.websocketService.getConnectionCount(metadata.projectName) === 0
+      ) {
         this.orchestratorBridge.disconnectFromProject(metadata.projectName);
       }
     }
     this.clientMetadata.delete(client);
-    this.logger.log('WebSocket client disconnected');
+    this.logger.log("WebSocket client disconnected");
   }
 
-  @SubscribeMessage('join')
+  @SubscribeMessage("join")
   handleJoinProject(
     @MessageBody() data: JoinProjectMessage,
     @ConnectedSocket() client: WebSocket,
@@ -77,7 +79,9 @@ export class WebsocketGateway
     const metadata = this.clientMetadata.get(client);
     if (metadata?.projectName && metadata.projectName !== projectName) {
       this.websocketService.removeConnection(metadata.projectName, client);
-      if (this.websocketService.getConnectionCount(metadata.projectName) === 0) {
+      if (
+        this.websocketService.getConnectionCount(metadata.projectName) === 0
+      ) {
         this.orchestratorBridge.disconnectFromProject(metadata.projectName);
       }
     }
@@ -90,36 +94,39 @@ export class WebsocketGateway
     this.orchestratorBridge.connectToProject(projectName);
 
     return {
-      event: 'joined',
+      event: "joined",
       data: { success: true, projectName },
     };
   }
 
-  @SubscribeMessage('leave')
-  handleLeaveProject(
-    @ConnectedSocket() client: WebSocket,
-  ): { event: string; data: { success: boolean } } {
+  @SubscribeMessage("leave")
+  handleLeaveProject(@ConnectedSocket() client: WebSocket): {
+    event: string;
+    data: { success: boolean };
+  } {
     const metadata = this.clientMetadata.get(client);
     if (metadata?.projectName) {
       this.websocketService.removeConnection(metadata.projectName, client);
-      
-      if (this.websocketService.getConnectionCount(metadata.projectName) === 0) {
+
+      if (
+        this.websocketService.getConnectionCount(metadata.projectName) === 0
+      ) {
         this.orchestratorBridge.disconnectFromProject(metadata.projectName);
       }
-      
+
       this.clientMetadata.set(client, {});
     }
 
     return {
-      event: 'left',
+      event: "left",
       data: { success: true },
     };
   }
 
-  @SubscribeMessage('ping')
+  @SubscribeMessage("ping")
   handlePing(): { event: string; data: { timestamp: string } } {
     return {
-      event: 'pong',
+      event: "pong",
       data: { timestamp: new Date().toISOString() },
     };
   }

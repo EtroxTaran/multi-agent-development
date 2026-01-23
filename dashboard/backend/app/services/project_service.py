@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Add orchestrator to path
 import sys
+
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 
@@ -119,14 +120,16 @@ class ProjectService:
         folders = []
         for item in sorted(workspace_path.iterdir()):
             if item.is_dir() and not item.name.startswith("."):
-                folders.append({
-                    "name": item.name,
-                    "path": str(item),
-                    "is_project": (item / ".project-config.json").exists(),
-                    "has_workflow": (item / ".workflow").exists(),
-                    "has_product_md": self._has_product_md(item),
-                    "has_docs": (item / "Docs").exists() or (item / "Documents").exists(),
-                })
+                folders.append(
+                    {
+                        "name": item.name,
+                        "path": str(item),
+                        "is_project": (item / ".project-config.json").exists(),
+                        "has_workflow": (item / ".workflow").exists(),
+                        "has_product_md": self._has_product_md(item),
+                        "has_docs": (item / "Docs").exists() or (item / "Documents").exists(),
+                    }
+                )
 
         return folders
 

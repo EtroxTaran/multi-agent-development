@@ -9,16 +9,16 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 
-from orchestrator.agents.adapter import create_adapter, AgentType
-from orchestrator.fixer.triage import FixerError, ErrorCategory
+from orchestrator.agents.adapter import AgentType, create_adapter
 from orchestrator.fixer.diagnosis import (
+    AffectedFile,
+    DiagnosisConfidence,
     DiagnosisResult,
     RootCause,
-    DiagnosisConfidence,
-    AffectedFile,
 )
+from orchestrator.fixer.triage import ErrorCategory, FixerError
 
 logger = logging.getLogger(__name__)
 
@@ -103,11 +103,11 @@ You MUST respond with a valid JSON object matching this structure:
     ]
 }}
 """
-        
+
         try:
             # Run LLM analysis
             result = await self.agent.run_iteration(prompt, timeout=120)
-            
+
             # Parse JSON output
             analysis = self._parse_llm_output(result.output)
             if not analysis:
@@ -124,12 +124,14 @@ You MUST respond with a valid JSON object matching this structure:
             # Convert affected files
             llm_files = []
             for f in analysis.get("affected_files", []):
-                llm_files.append(AffectedFile(
-                    path=f.get("path", ""),
-                    line_number=f.get("line_number"),
-                    snippet=f.get("snippet"),
-                    suggested_fix=f.get("suggested_fix")
-                ))
+                llm_files.append(
+                    AffectedFile(
+                        path=f.get("path", ""),
+                        line_number=f.get("line_number"),
+                        snippet=f.get("snippet"),
+                        suggested_fix=f.get("suggested_fix"),
+                    )
+                )
 
             # Merge with regex-detected files if LLM missed them
             if not llm_files and affected_files:
@@ -157,12 +159,12 @@ You MUST respond with a valid JSON object matching this structure:
             match = re.search(r"```json\n(.*?)\n```", output, re.DOTALL)
             if match:
                 return json.loads(match.group(1))
-            
+
             # specific look for json block if the above failed
             match = re.search(r"({.*})", output, re.DOTALL)
             if match:
                 return json.loads(match.group(1))
-                
+
             return None
         except json.JSONDecodeError:
             return None

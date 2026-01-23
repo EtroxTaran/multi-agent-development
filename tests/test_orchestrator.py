@@ -1,11 +1,8 @@
 """Tests for the main orchestrator."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from orchestrator.orchestrator import Orchestrator
-from orchestrator.models import PhaseStatus
 
 
 class TestOrchestrator:
@@ -81,9 +78,7 @@ class TestOrchestrator:
         # The actual state verification requires a real DB
 
     @patch.object(Orchestrator, "check_prerequisites")
-    def test_run_executes_workflow(
-        self, mock_prereq, temp_project_dir
-    ):
+    def test_run_executes_workflow(self, mock_prereq, temp_project_dir):
         """Test that run executes LangGraph workflow."""
         mock_prereq.return_value = (True, [])
 
@@ -100,9 +95,7 @@ class TestOrchestrator:
         orch.run_langgraph.assert_called_once()
 
     @patch.object(Orchestrator, "check_prerequisites")
-    def test_run_handles_failure(
-        self, mock_prereq, temp_project_dir
-    ):
+    def test_run_handles_failure(self, mock_prereq, temp_project_dir):
         """Test that run handles workflow failure."""
         mock_prereq.return_value = (True, [])
 
@@ -117,16 +110,12 @@ class TestOrchestrator:
         assert "error" in result
 
     @patch.object(Orchestrator, "check_prerequisites")
-    def test_run_with_start_phase(
-        self, mock_prereq, temp_project_dir
-    ):
+    def test_run_with_start_phase(self, mock_prereq, temp_project_dir):
         """Test run accepts start_phase parameter (passed to LangGraph)."""
         mock_prereq.return_value = (True, [])
 
         orch = Orchestrator(temp_project_dir, auto_commit=False)
-        orch.run_langgraph = AsyncMock(
-            return_value={"success": True, "current_phase": 5}
-        )
+        orch.run_langgraph = AsyncMock(return_value={"success": True, "current_phase": 5})
 
         # Note: start_phase is accepted but LangGraph manages its own state
         result = orch.run(start_phase=3)
@@ -135,16 +124,12 @@ class TestOrchestrator:
         orch.run_langgraph.assert_called_once()
 
     @patch.object(Orchestrator, "check_prerequisites")
-    def test_run_with_options(
-        self, mock_prereq, temp_project_dir
-    ):
+    def test_run_with_options(self, mock_prereq, temp_project_dir):
         """Test run accepts skip_validation parameter."""
         mock_prereq.return_value = (True, [])
 
         orch = Orchestrator(temp_project_dir, auto_commit=False)
-        orch.run_langgraph = AsyncMock(
-            return_value={"success": True, "current_phase": 5}
-        )
+        orch.run_langgraph = AsyncMock(return_value={"success": True, "current_phase": 5})
 
         # Note: skip_validation is accepted but LangGraph manages validation
         result = orch.run(skip_validation=True)

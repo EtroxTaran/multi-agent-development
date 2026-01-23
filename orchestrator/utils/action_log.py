@@ -10,15 +10,16 @@ import sys
 import tempfile
 import threading
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Any, Dict
+from typing import Optional
 
 
 class ActionType(str, Enum):
     """Types of actions that can be logged."""
+
     # Workflow level
     WORKFLOW_START = "workflow_start"
     WORKFLOW_END = "workflow_end"
@@ -69,6 +70,7 @@ class ActionType(str, Enum):
 
 class ActionStatus(str, Enum):
     """Status of an action."""
+
     STARTED = "started"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -79,6 +81,7 @@ class ActionStatus(str, Enum):
 @dataclass
 class ErrorInfo:
     """Structured error information."""
+
     error_type: str
     message: str
     stack_trace: Optional[str] = None
@@ -96,6 +99,7 @@ class ErrorInfo:
     def from_exception(cls, exc: Exception, context: Optional[dict] = None) -> "ErrorInfo":
         """Create ErrorInfo from an exception."""
         import traceback
+
         return cls(
             error_type=type(exc).__name__,
             message=str(exc),
@@ -111,6 +115,7 @@ class ErrorInfo:
 @dataclass
 class ActionEntry:
     """A single action log entry."""
+
     id: str
     timestamp: str
     action_type: ActionType
@@ -236,9 +241,9 @@ class ActionLog:
         """Load index from file if it exists."""
         if self.index_file.exists():
             try:
-                with open(self.index_file, "r", encoding="utf-8") as f:
+                with open(self.index_file, encoding="utf-8") as f:
                     self._index = json.load(f)
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass  # Start with empty index
 
     def _save_index(self) -> None:
@@ -250,12 +255,12 @@ class ActionLog:
         try:
             # Write to temp file first
             with tempfile.NamedTemporaryFile(
-                mode='w',
+                mode="w",
                 dir=self.workflow_dir,
-                prefix='.index_',
-                suffix='.json',
+                prefix=".index_",
+                suffix=".json",
                 delete=False,
-                encoding='utf-8'
+                encoding="utf-8",
             ) as tmp_file:
                 tmp_path = tmp_file.name
                 json.dump(self._index, tmp_file, indent=2)
@@ -497,7 +502,7 @@ class ActionLog:
             List of ActionEntry objects (newest first)
         """
         entries = []
-        with open(self.log_file, "r", encoding="utf-8") as f:
+        with open(self.log_file, encoding="utf-8") as f:
             lines = f.readlines()
 
         for line in reversed(lines):
@@ -533,7 +538,8 @@ class ActionLog:
             return (
                 data.get("error")
                 or data.get("status") == "failed"
-                or data.get("action_type") in ["error", "agent_error", "phase_failed", "task_failed"]
+                or data.get("action_type")
+                in ["error", "agent_error", "phase_failed", "task_failed"]
             )
 
         with self._lock:
@@ -621,7 +627,7 @@ class ActionLog:
 
 
 # Global action log registry - keyed by resolved path to prevent cross-contamination
-_action_logs: Dict[str, ActionLog] = {}
+_action_logs: dict[str, ActionLog] = {}
 _action_log_lock = threading.Lock()
 
 

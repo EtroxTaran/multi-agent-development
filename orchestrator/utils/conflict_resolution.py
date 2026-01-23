@@ -11,25 +11,28 @@ from typing import Optional
 
 class ResolutionStrategy(str, Enum):
     """Strategy for resolving agent conflicts."""
-    UNANIMOUS = "unanimous"           # Both must agree
-    WEIGHTED = "weighted"             # Based on expertise area
-    ESCALATE = "escalate"             # Require human decision
-    DEFER_TO_LEAD = "defer_to_lead"   # Claude decides as lead orchestrator
-    CONSERVATIVE = "conservative"     # Take the more cautious position
-    OPTIMISTIC = "optimistic"         # Take the more permissive position
+
+    UNANIMOUS = "unanimous"  # Both must agree
+    WEIGHTED = "weighted"  # Based on expertise area
+    ESCALATE = "escalate"  # Require human decision
+    DEFER_TO_LEAD = "defer_to_lead"  # Claude decides as lead orchestrator
+    CONSERVATIVE = "conservative"  # Take the more cautious position
+    OPTIMISTIC = "optimistic"  # Take the more permissive position
 
 
 class ConflictType(str, Enum):
     """Types of conflicts between agents."""
-    APPROVAL_MISMATCH = "approval_mismatch"       # One approves, one rejects
+
+    APPROVAL_MISMATCH = "approval_mismatch"  # One approves, one rejects
     SEVERITY_DISAGREEMENT = "severity_disagreement"  # Different severity for same issue
     RECOMMENDATION_CONFLICT = "recommendation_conflict"  # Different solutions proposed
-    SCORE_DIVERGENCE = "score_divergence"         # Significant score gap
+    SCORE_DIVERGENCE = "score_divergence"  # Significant score gap
 
 
 @dataclass
 class Conflict:
     """Represents a conflict between agents."""
+
     conflict_type: ConflictType
     area: str
     cursor_position: str
@@ -54,6 +57,7 @@ class Conflict:
 @dataclass
 class ConflictResolution:
     """Result of conflict resolution."""
+
     resolved: bool
     strategy_used: ResolutionStrategy
     winning_position: str
@@ -78,6 +82,7 @@ class ConflictResolution:
 @dataclass
 class ConflictResult:
     """Complete result of conflict detection and resolution."""
+
     has_conflicts: bool
     conflicts: list[Conflict] = field(default_factory=list)
     resolutions: list[ConflictResolution] = field(default_factory=list)
@@ -118,7 +123,7 @@ class ConflictResolver:
 
     # Thresholds for detecting conflicts
     SCORE_DIVERGENCE_THRESHOLD = 3.0  # Difference that indicates conflict
-    CONFIDENCE_THRESHOLD = 0.7        # Minimum confidence to auto-resolve
+    CONFIDENCE_THRESHOLD = 0.7  # Minimum confidence to auto-resolve
 
     def __init__(
         self,
@@ -163,33 +168,37 @@ class ConflictResolver:
         gemini_approves = gemini_assessment in ("approve", "approved", "pass")
 
         if cursor_approves != gemini_approves:
-            conflicts.append(Conflict(
-                conflict_type=ConflictType.APPROVAL_MISMATCH,
-                area="overall_approval",
-                cursor_position="approve" if cursor_approves else "reject",
-                gemini_position="approve" if gemini_approves else "reject",
-                details={
-                    "cursor_assessment": cursor_assessment,
-                    "gemini_assessment": gemini_assessment,
-                }
-            ))
+            conflicts.append(
+                Conflict(
+                    conflict_type=ConflictType.APPROVAL_MISMATCH,
+                    area="overall_approval",
+                    cursor_position="approve" if cursor_approves else "reject",
+                    gemini_position="approve" if gemini_approves else "reject",
+                    details={
+                        "cursor_assessment": cursor_assessment,
+                        "gemini_assessment": gemini_assessment,
+                    },
+                )
+            )
 
         # Check for score divergence
         cursor_score = float(cursor_feedback.get("score", 0))
         gemini_score = float(gemini_feedback.get("score", 0))
 
         if abs(cursor_score - gemini_score) >= self.SCORE_DIVERGENCE_THRESHOLD:
-            conflicts.append(Conflict(
-                conflict_type=ConflictType.SCORE_DIVERGENCE,
-                area="overall_score",
-                cursor_position=f"score: {cursor_score}",
-                gemini_position=f"score: {gemini_score}",
-                details={
-                    "cursor_score": cursor_score,
-                    "gemini_score": gemini_score,
-                    "divergence": abs(cursor_score - gemini_score),
-                }
-            ))
+            conflicts.append(
+                Conflict(
+                    conflict_type=ConflictType.SCORE_DIVERGENCE,
+                    area="overall_score",
+                    cursor_position=f"score: {cursor_score}",
+                    gemini_position=f"score: {gemini_score}",
+                    details={
+                        "cursor_score": cursor_score,
+                        "gemini_score": gemini_score,
+                        "divergence": abs(cursor_score - gemini_score),
+                    },
+                )
+            )
 
         # Detect severity disagreements on common issues
         cursor_concerns = self._extract_concerns(cursor_feedback)
@@ -200,16 +209,18 @@ class ConflictResolver:
             gemini_severity = gemini_concerns[area].get("severity", "").lower()
 
             if cursor_severity != gemini_severity:
-                conflicts.append(Conflict(
-                    conflict_type=ConflictType.SEVERITY_DISAGREEMENT,
-                    area=area,
-                    cursor_position=cursor_severity or "unspecified",
-                    gemini_position=gemini_severity or "unspecified",
-                    details={
-                        "cursor_concern": cursor_concerns[area],
-                        "gemini_concern": gemini_concerns[area],
-                    }
-                ))
+                conflicts.append(
+                    Conflict(
+                        conflict_type=ConflictType.SEVERITY_DISAGREEMENT,
+                        area=area,
+                        cursor_position=cursor_severity or "unspecified",
+                        gemini_position=gemini_severity or "unspecified",
+                        details={
+                            "cursor_concern": cursor_concerns[area],
+                            "gemini_concern": gemini_concerns[area],
+                        },
+                    )
+                )
 
         return conflicts
 
@@ -361,7 +372,9 @@ class ConflictResolver:
                 cursor_score = float(conflict.details.get("cursor_score", 5))
                 gemini_score = float(conflict.details.get("gemini_score", 5))
                 winner = "cursor" if cursor_score <= gemini_score else "gemini"
-                position = conflict.cursor_position if winner == "cursor" else conflict.gemini_position
+                position = (
+                    conflict.cursor_position if winner == "cursor" else conflict.gemini_position
+                )
             else:
                 winner = "cursor"
                 position = conflict.cursor_position
@@ -390,7 +403,9 @@ class ConflictResolver:
                 cursor_score = float(conflict.details.get("cursor_score", 5))
                 gemini_score = float(conflict.details.get("gemini_score", 5))
                 winner = "cursor" if cursor_score >= gemini_score else "gemini"
-                position = conflict.cursor_position if winner == "cursor" else conflict.gemini_position
+                position = (
+                    conflict.cursor_position if winner == "cursor" else conflict.gemini_position
+                )
             else:
                 winner = "gemini"
                 position = conflict.gemini_position
@@ -485,8 +500,12 @@ class ConflictResolver:
             consensus["recommendation"] = "escalate"
             consensus["recommendation_reason"] = "Unresolved conflicts require human input"
         elif not result.has_conflicts:
-            cursor_approved = cursor_feedback and cursor_feedback.get("overall_assessment", "").lower() in ("approve", "approved")
-            gemini_approved = gemini_feedback and gemini_feedback.get("overall_assessment", "").lower() in ("approve", "approved")
+            cursor_approved = cursor_feedback and cursor_feedback.get(
+                "overall_assessment", ""
+            ).lower() in ("approve", "approved")
+            gemini_approved = gemini_feedback and gemini_feedback.get(
+                "overall_assessment", ""
+            ).lower() in ("approve", "approved")
             if cursor_approved and gemini_approved:
                 consensus["recommendation"] = "proceed"
                 consensus["recommendation_reason"] = "Both agents agree to approve"

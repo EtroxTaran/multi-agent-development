@@ -1,16 +1,17 @@
 """Tests for audit storage adapter."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from orchestrator.storage.audit_adapter import (
-    AuditStorageAdapter,
     AuditRecordContext,
+    AuditStorageAdapter,
     get_audit_storage,
 )
-from orchestrator.storage.base import AuditEntryData, AuditStatisticsData
+from orchestrator.storage.base import AuditStatisticsData
 
 
 @pytest.fixture
@@ -83,9 +84,7 @@ class TestAuditStorageAdapter:
         adapter = AuditStorageAdapter(temp_project, project_name="custom-name")
         assert adapter.project_name == "custom-name"
 
-    def test_record_context_manager_with_mock_db(
-        self, temp_project, mock_audit_repository
-    ):
+    def test_record_context_manager_with_mock_db(self, temp_project, mock_audit_repository):
         """Test record context manager uses DB backend."""
         with patch(
             "orchestrator.db.repositories.audit.get_audit_repository",

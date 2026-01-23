@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-23 13:42:04 -->
+<!-- Last synced: 2026-01-23 17:03:56 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Claude Code as lead orchestrator.
@@ -868,6 +868,48 @@ ConnectionPoolExhausted: No available connections in pool
 - Run scripts: `.venv/bin/python script.py`
 
 
+## Available Skills
+
+The following skills are available for use via the specified commands:
+
+| Skill | Command | Description |
+|-------|---------|-------------|
+| ADD-LESSON | /add-lesson | No description provided |
+| API-CONTRACTS-AND-VALIDATION | /api-contracts-and-validation | Define and validate API contracts using Zod |
+| CALL-CURSOR | /call-cursor | No description provided |
+| CALL-GEMINI | /call-gemini | No description provided |
+| CODEBASE-VISUALIZER | /codebase-visualizer | Extract diagrams and explain complex logic |
+| DISCOVER | /discover | No description provided |
+| E2E-WEBAPP-TESTING | /e2e-webapp-testing | Create resilient E2E tests using Playwright/Cypress |
+| FRONTEND-DEV-GUIDELINES | n/a | Standards for React / TypeScript development |
+| GIT-COMMIT-CONVENTIONAL | /git-commit-conventional | Generate conventional commit messages with strict formatting rules |
+| GIT-COMMITTER-ATOMIC | /git-committer-atomic | Plan and create atomic commits ordered by dependencies |
+| GIT-WORKFLOW-HELPER | /git-workflow-helper | Handle common git scenarios, conflicts, and hook failures |
+| GITHUB-ACTIONS-DEBUGGING | /github-actions-debugging | Debug and fix GitHub Actions CI/CD failures |
+| IMPLEMENT-TASK | /implement-task | No description provided |
+| LIST-PROJECTS | /list-projects | No description provided |
+| ORCHESTRATE | /orchestrate | No description provided |
+| PHASE-STATUS | /phase-status | No description provided |
+| PLAN | /plan | No description provided |
+| PLAN-FEATURE | /plan-feature | No description provided |
+| REFACTOR-SAFE-WORKFLOW | /refactor-safe-workflow | Orchestrate safe refactoring with multi-step validation |
+| RELEASE-NOTES-AND-CHANGELOG | /release-notes-and-changelog | Generate release notes from git history |
+| RESOLVE-CONFLICT | /resolve-conflict | No description provided |
+| SKILL-CREATOR | /skill-creator | Scaffold new skills with standard directory structure |
+| SKILL-EVAL | /skill-eval | Evaluate skill performance against test cases |
+| SKILLS | /skills | No description provided |
+| STATUS | /status | No description provided |
+| SYNC-RULES | /sync-rules | No description provided |
+| TASK | /task | No description provided |
+| TDD-OVERNIGHT-DEV | /tdd-overnight-dev | Autonomous Feature-to-Commit TDD loop for long-running sessions |
+| TEST-WRITER-UNIT-INTEGRATION | /test-writer-unit-integration | Generate standardized unit and integration tests |
+| TS-STRICT-GUARDIAN | /ts-strict-guardian | Enforce strict TypeScript guidelines and safety |
+| UI-DESIGN-SYSTEM | /ui-design-system | Authoritative UI/UX Design System Guide based on EtroxTaran/Uiplatformguide |
+| VALIDATE-PLAN | /validate-plan | No description provided |
+| VERIFY-CODE | /verify-code | No description provided |
+| WORKFLOW-MANAGER | /workflow-manager | No description provided |
+
+
 ---
 
 
@@ -915,6 +957,11 @@ The following rules apply to all agents in the workflow.
 - Always read CLAUDE.md for workflow rules (or agent-specific context file)
 - Always read PRODUCT.md for requirements
 - Check .workflow/state.json for current state
+
+### Documentation Access
+- **Use the Context Map**: Start at `docs/readme.md` to find the correct file.
+- **No Monoliths**: Do not assume `CONDUCTOR-GUIDE.md` or similar huge files exist. Follow the links.
+
 
 ## Error Handling
 
@@ -978,6 +1025,19 @@ The following rules apply to all agents in the workflow.
 - Use consistent naming conventions
 - Don't mix paradigms unnecessarily
 
+## Documentation & Naming
+
+### Naming Conventions
+- **Strict Lowercase**: All file and directory names must be lowercase (e.g., `documentation/` not `Documentation/`, `product-vision.md` not `ProductVision.md`).
+- **Separators**: Use hyphens (kebab-case) or underscores (snake_case) for multi-word names.
+- **Exceptions**: Specific system files if required by tools (e.g., `Dockerfile`, `Makefile`), but standard docs must be lowercase.
+
+### Documentation Structure
+- **Split by Topic**: Avoid monolithic files like `product.md`. Split into `product-vision.md`, `technical-decisions.md`, etc.
+- **Task Linkage**: Technical tasks must clearly link to User Stories.
+- **Detail Level**: Tasks must specify frameworks, interfaces, and methods used.
+- **Best Practices**: Explicitly research and cite best practices before implementation.
+
 ## Code Organization
 
 ### Files
@@ -1033,11 +1093,19 @@ The following rules apply to all agents in the workflow.
 - Prefer f-strings over .format()
 - Use pathlib for file paths
 
-### JavaScript/TypeScript
-- Use const/let, never var
-- Prefer async/await over raw promises
-- Use TypeScript for new code when possible
-- Prefer named exports over default exports
+### TypeScript (Standard)
+- **Strict Mode**: Always use `strict: true`. No implicit any.
+- **Types**: Explicitly define return types for all public functions.
+- **No Any**: Never use `any`. Use `unknown` and narrow types if needed.
+- **Interfaces vs Types**: Use `interface` for object definitions/APIs, `type` for unions/intersections.
+- **Async**: Always await promises or explicitly ignore.
+
+### React (Standard)
+- **Components**: Functional components only. Use PascalCase.
+- **Hooks**: Custom hooks must start with `use`. Follow strict hook rules.
+- **State**: Keep state local. Lift only when necessary.
+- **Re-renders**: Use `memo`, `useMemo`, `useCallback` only when performance issues specially identified (avoid premature optimization).
+- **Styling**: Use module-scoped CSS or Utility-first (Tailwind) if project configured.
 
 ### Shell Scripts
 - Use `set -e` for error handling
@@ -1128,12 +1196,16 @@ If you see `DatabaseRequiredError`:
 - Create empty catch blocks
 - Use magic numbers without constants
 - Ignore linter/type errors
+- Use `any` type (unless strictly necessary for migration, comment required)
+- Suppress linter rules without valid reason and comment
 
 ### Always Do
 - Run tests before marking complete
 - Check for regressions in existing tests
 - Follow existing code patterns
 - Clean up temporary files
+- Fix all linter errors before committing
+- Ensure `npm run typecheck` leads to 0 errors
 
 ---
 

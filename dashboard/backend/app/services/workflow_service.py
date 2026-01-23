@@ -3,10 +3,10 @@
 Wraps Orchestrator with additional functionality for the dashboard.
 """
 
-import asyncio
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from ..config import get_settings
 from ..websocket import get_connection_manager
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Add orchestrator to path
 import sys
+
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 

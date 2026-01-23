@@ -1,19 +1,20 @@
 """Agent management API routes."""
 
+# Import orchestrator modules
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from ..config import get_settings
-from ..deps import get_project_dir, get_audit_adapter
+from ..deps import get_audit_adapter, get_project_dir
 from ..models import (
     AgentStatus,
     AgentStatusResponse,
     AgentType,
     AuditEntry,
-    AuditQueryRequest,
     AuditResponse,
     AuditStatistics,
     ErrorResponse,
@@ -21,12 +22,9 @@ from ..models import (
     SessionListResponse,
 )
 
-# Import orchestrator modules
-import sys
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 from orchestrator.storage.audit_adapter import AuditStorageAdapter
-
 
 router = APIRouter(prefix="/projects/{project_name}", tags=["agents"])
 
@@ -55,7 +53,9 @@ async def get_agents_status(
         recent_entries = audit_adapter.query(agent=agent_name, limit=1)
         last_invocation = None
         if recent_entries:
-            last_invocation = recent_entries[0].timestamp.isoformat() if recent_entries[0].timestamp else None
+            last_invocation = (
+                recent_entries[0].timestamp.isoformat() if recent_entries[0].timestamp else None
+            )
 
         # Calculate agent-specific metrics
         agent_entries = audit_adapter.query(agent=agent_name, limit=1000)
@@ -66,6 +66,7 @@ async def get_agents_status(
 
         # Check if agent is available
         from orchestrator.agents import ClaudeAgent, CursorAgent, GeminiAgent
+
         if agent_name == "claude":
             available = ClaudeAgent(project_dir).check_available()
         elif agent_name == "cursor":
@@ -75,15 +76,17 @@ async def get_agents_status(
         else:
             available = False
 
-        agents.append(AgentStatus(
-            agent=agent_type,
-            available=available,
-            last_invocation=last_invocation,
-            total_invocations=total,
-            success_rate=success / total if total > 0 else 0.0,
-            avg_duration_seconds=total_duration / total if total > 0 else 0.0,
-            total_cost_usd=total_cost,
-        ))
+        agents.append(
+            AgentStatus(
+                agent=agent_type,
+                available=available,
+                last_invocation=last_invocation,
+                total_invocations=total,
+                success_rate=success / total if total > 0 else 0.0,
+                avg_duration_seconds=total_duration / total if total > 0 else 0.0,
+                total_cost_usd=total_cost,
+            )
+        )
 
     return AgentStatusResponse(agents=agents)
 
@@ -195,15 +198,17 @@ async def get_sessions(
         for session_file in sessions_dir.glob("*.json"):
             try:
                 session_data = json.loads(session_file.read_text())
-                sessions.append(SessionInfo(
-                    session_id=session_data.get("session_id", session_file.stem),
-                    task_id=session_data.get("task_id", ""),
-                    agent=session_data.get("agent", "claude"),
-                    created_at=session_data.get("created_at", ""),
-                    last_active=session_data.get("last_active"),
-                    iteration=session_data.get("iteration", 0),
-                    active=session_data.get("active", True),
-                ))
+                sessions.append(
+                    SessionInfo(
+                        session_id=session_data.get("session_id", session_file.stem),
+                        task_id=session_data.get("task_id", ""),
+                        agent=session_data.get("agent", "claude"),
+                        created_at=session_data.get("created_at", ""),
+                        last_active=session_data.get("last_active"),
+                        iteration=session_data.get("iteration", 0),
+                        active=session_data.get("active", True),
+                    )
+                )
             except (json.JSONDecodeError, OSError):
                 continue
 

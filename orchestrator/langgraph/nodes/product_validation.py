@@ -4,15 +4,14 @@ Validates PRODUCT.md content for completeness and quality
 before starting the planning phase.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState, PhaseStatus
-from ...validators import ProductValidator
 from ...config import load_project_config
+from ...validators import ProductValidator
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +62,14 @@ async def product_validation_node(state: WorkflowState) -> dict[str, Any]:
         "placeholder_count": result.placeholder_count,
     }
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save_output(phase=0, output_type="product_validation", content=validation_result))
+    run_async(
+        repo.save_output(phase=0, output_type="product_validation", content=validation_result)
+    )
 
     if not result.valid:
-        logger.warning(f"PRODUCT.md validation failed: score={result.score}, issues={len(result.issues)}")
+        logger.warning(
+            f"PRODUCT.md validation failed: score={result.score}, issues={len(result.issues)}"
+        )
 
         # Format error message
         error_details = []
@@ -81,13 +84,15 @@ async def product_validation_node(state: WorkflowState) -> dict[str, Any]:
         )
 
         return {
-            "errors": [{
-                "type": "product_validation_failed",
-                "message": error_message,
-                "score": result.score,
-                "issues": [i.to_dict() for i in result.issues],
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "product_validation_failed",
+                    "message": error_message,
+                    "score": result.score,
+                    "issues": [i.to_dict() for i in result.issues],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }

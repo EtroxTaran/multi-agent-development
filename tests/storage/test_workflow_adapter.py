@@ -1,16 +1,13 @@
 """Tests for workflow storage adapter."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.storage.workflow_adapter import (
-    WorkflowStorageAdapter,
-    get_workflow_storage,
-)
+import pytest
+
 from orchestrator.storage.surreal_store import SurrealWorkflowRepository
-from orchestrator.storage.base import WorkflowStateData
+from orchestrator.storage.workflow_adapter import WorkflowStorageAdapter, get_workflow_storage
 
 
 @pytest.fixture
@@ -55,9 +52,7 @@ def mock_workflow_repository():
     mock_repo.set_phase = AsyncMock(return_value=mock_state)
     # reset_state returns None in the new implementation
     mock_repo.reset_state = AsyncMock(return_value=None)
-    mock_repo.get_summary = AsyncMock(
-        return_value={"current_phase": 1, "project": "test"}
-    )
+    mock_repo.get_summary = AsyncMock(return_value={"current_phase": 1, "project": "test"})
     mock_repo.increment_iteration = AsyncMock(return_value=mock_state)
     mock_repo.set_plan = AsyncMock(return_value=mock_state)
     mock_repo.set_validation_feedback = AsyncMock(return_value=mock_state)
@@ -91,19 +86,23 @@ class TestWorkflowStorageAdapter:
 
     def test_get_state_exists(self, temp_project, mock_workflow_repository):
         """Test get_state returns state when exists."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
             state = adapter.get_state()
 
             assert state is not None
             # The repository returns whatever the DB returns. We mocked it to return a MagicMock.
-            # In real usage it returns a Pydantic model. 
+            # In real usage it returns a Pydantic model.
             # We just verify it returns the mock object.
             assert state.current_phase == 1
 
     def test_initialize_state(self, temp_project, mock_workflow_repository):
         """Test initializing workflow state."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             state = adapter.initialize_state(
@@ -121,10 +120,12 @@ class TestWorkflowStorageAdapter:
         updated_state.project_dir = str(temp_project)
         updated_state.current_phase = 2
         updated_state.iteration_count = 1
-        
+
         mock_workflow_repository.update_state = AsyncMock(return_value=updated_state)
 
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             state = adapter.update_state(
@@ -138,7 +139,9 @@ class TestWorkflowStorageAdapter:
 
     def test_set_phase_in_progress(self, temp_project, mock_workflow_repository):
         """Test setting phase to in_progress."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             state = adapter.set_phase(1, status="in_progress")
@@ -148,7 +151,9 @@ class TestWorkflowStorageAdapter:
 
     def test_set_phase_completed(self, temp_project, mock_workflow_repository):
         """Test setting phase to completed."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             # Complete it
@@ -160,7 +165,9 @@ class TestWorkflowStorageAdapter:
         # reset_state returns None in new implementation
         mock_workflow_repository.reset_state = AsyncMock(return_value=None)
 
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             state = adapter.reset_state()
@@ -171,7 +178,9 @@ class TestWorkflowStorageAdapter:
 
     def test_get_summary(self, temp_project, mock_workflow_repository):
         """Test getting workflow summary."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             summary = adapter.get_summary()
@@ -192,7 +201,9 @@ class TestWorkflowStorageAdapter:
             side_effect=[state_count_1, state_count_2]
         )
 
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             count = adapter.increment_iteration()
@@ -203,7 +214,9 @@ class TestWorkflowStorageAdapter:
 
     def test_set_plan(self, temp_project, mock_workflow_repository):
         """Test setting implementation plan."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             plan = {
@@ -217,7 +230,9 @@ class TestWorkflowStorageAdapter:
 
     def test_set_validation_feedback(self, temp_project, mock_workflow_repository):
         """Test setting validation feedback."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             feedback = {
@@ -234,7 +249,9 @@ class TestWorkflowStorageAdapter:
 
     def test_set_verification_feedback(self, temp_project, mock_workflow_repository):
         """Test setting verification feedback."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             feedback = {
@@ -251,7 +268,9 @@ class TestWorkflowStorageAdapter:
 
     def test_set_implementation_result(self, temp_project, mock_workflow_repository):
         """Test setting implementation result."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             result = {
@@ -262,20 +281,18 @@ class TestWorkflowStorageAdapter:
 
             state = adapter.set_implementation_result(result)
             assert state is not None
-            mock_workflow_repository.set_implementation_result.assert_called_once_with(
-                result
-            )
+            mock_workflow_repository.set_implementation_result.assert_called_once_with(result)
 
     def test_set_decision(self, temp_project, mock_workflow_repository):
         """Test setting next routing decision."""
-        with patch.object(SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository):
+        with patch.object(
+            SurrealWorkflowRepository, "_get_db_backend", return_value=mock_workflow_repository
+        ):
             adapter = WorkflowStorageAdapter(temp_project)
 
             state = adapter.set_decision("continue")
             assert state is not None
-            mock_workflow_repository.update_state.assert_called_once_with(
-                next_decision="continue"
-            )
+            mock_workflow_repository.update_state.assert_called_once_with(next_decision="continue")
 
 
 class TestGetWorkflowStorage:

@@ -13,7 +13,6 @@ Available strategies:
 - DependencyFixStrategy: Resolve dependency conflicts
 """
 
-import json
 import logging
 import os
 import re
@@ -24,9 +23,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-from .diagnosis import DiagnosisResult, RootCause, AffectedFile
+from .diagnosis import DiagnosisResult, RootCause
 from .triage import ErrorCategory
 
 logger = logging.getLogger(__name__)
@@ -266,11 +265,13 @@ class FixStrategy(ABC):
                 if action.rollback:
                     rollback_data["actions"].append(action.rollback)
 
-                changes_made.append({
-                    "action": action.to_dict(),
-                    "result": result,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                changes_made.append(
+                    {
+                        "action": action.to_dict(),
+                        "result": result,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             except Exception as e:
                 logger.error(f"Fix action failed: {action.action_type} on {action.target}: {e}")
@@ -370,7 +371,7 @@ class FixStrategy(ABC):
             file_path.write_text(content)
             return {"status": "success", "backup": str(backup_path)}
 
-        except Exception as e:
+        except Exception:
             # Restore backup on failure
             if backup_path.exists():
                 shutil.copy2(backup_path, file_path)
@@ -417,7 +418,12 @@ class FixStrategy(ABC):
         for i, line in enumerate(lines):
             if line.startswith("import ") or line.startswith("from "):
                 insert_pos = i + 1
-            elif line.strip() and not line.startswith("#") and not line.startswith('"""') and insert_pos == 0:
+            elif (
+                line.strip()
+                and not line.startswith("#")
+                and not line.startswith('"""')
+                and insert_pos == 0
+            ):
                 break
 
         lines.insert(insert_pos, import_stmt)
@@ -502,22 +508,26 @@ class ImportErrorFixStrategy(FixStrategy):
         if diagnosis.root_cause == RootCause.MISSING_DEPENDENCY:
             # Install the package
             package = self.MODULE_TO_PACKAGE.get(module_name, module_name)
-            actions.append(FixAction(
-                action_type="install_package",
-                target=package,
-                params={"manager": "pip"},
-                description=f"Install missing package: {package}",
-            ))
+            actions.append(
+                FixAction(
+                    action_type="install_package",
+                    target=package,
+                    params={"manager": "pip"},
+                    description=f"Install missing package: {package}",
+                )
+            )
 
         elif diagnosis.root_cause == RootCause.MISSING_IMPORT:
             # Add import statement
             if diagnosis.affected_files:
-                actions.append(FixAction(
-                    action_type="add_import",
-                    target=diagnosis.affected_files[0].path,
-                    params={"import_statement": f"import {module_name}"},
-                    description=f"Add import statement for {module_name}",
-                ))
+                actions.append(
+                    FixAction(
+                        action_type="add_import",
+                        target=diagnosis.affected_files[0].path,
+                        params={"import_statement": f"import {module_name}"},
+                        description=f"Add import statement for {module_name}",
+                    )
+                )
 
         return FixPlan(
             diagnosis=diagnosis,
@@ -571,12 +581,14 @@ class SyntaxErrorFixStrategy(FixStrategy):
 
         if diagnosis.root_cause == RootCause.INDENTATION_ERROR:
             # Run autopep8 or similar
-            actions.append(FixAction(
-                action_type="run_command",
-                target=f"autopep8 --in-place {affected_file.path}",
-                params={"timeout": 30},
-                description="Auto-fix indentation with autopep8",
-            ))
+            actions.append(
+                FixAction(
+                    action_type="run_command",
+                    target=f"autopep8 --in-place {affected_file.path}",
+                    params={"timeout": 30},
+                    description="Auto-fix indentation with autopep8",
+                )
+            )
 
         return FixPlan(
             diagnosis=diagnosis,
@@ -634,12 +646,14 @@ class ConfigurationFixStrategy(FixStrategy):
             # Extract env var name
             env_var = self._extract_env_var(diagnosis)
             if env_var:
-                actions.append(FixAction(
-                    action_type="run_command",
-                    target=f"echo '{env_var}=' >> .env.example",
-                    params={},
-                    description=f"Add {env_var} to .env.example template",
-                ))
+                actions.append(
+                    FixAction(
+                        action_type="run_command",
+                        target=f"echo '{env_var}=' >> .env.example",
+                        params={},
+                        description=f"Add {env_var} to .env.example template",
+                    )
+                )
 
         return FixPlan(
             diagnosis=diagnosis,
@@ -670,7 +684,10 @@ class TimeoutFixStrategy(FixStrategy):
     name = "timeout_fix"
 
     def can_fix(self, diagnosis: DiagnosisResult) -> bool:
-        return diagnosis.category == ErrorCategory.TIMEOUT_ERROR or diagnosis.root_cause == RootCause.TIMEOUT
+        return (
+            diagnosis.category == ErrorCategory.TIMEOUT_ERROR
+            or diagnosis.root_cause == RootCause.TIMEOUT
+        )
 
     def create_plan(self, diagnosis: DiagnosisResult) -> FixPlan:
         return FixPlan(
@@ -709,19 +726,23 @@ class DependencyFixStrategy(FixStrategy):
 
         # Check if requirements.txt or package.json exists
         if (self.project_dir / "requirements.txt").exists():
-            actions.append(FixAction(
-                action_type="run_command",
-                target="pip install -r requirements.txt",
-                params={"timeout": 300},
-                description="Reinstall Python dependencies",
-            ))
+            actions.append(
+                FixAction(
+                    action_type="run_command",
+                    target="pip install -r requirements.txt",
+                    params={"timeout": 300},
+                    description="Reinstall Python dependencies",
+                )
+            )
         elif (self.project_dir / "package.json").exists():
-            actions.append(FixAction(
-                action_type="run_command",
-                target="npm install",
-                params={"timeout": 300},
-                description="Reinstall Node.js dependencies",
-            ))
+            actions.append(
+                FixAction(
+                    action_type="run_command",
+                    target="npm install",
+                    params={"timeout": 300},
+                    description="Reinstall Node.js dependencies",
+                )
+            )
 
         return FixPlan(
             diagnosis=diagnosis,

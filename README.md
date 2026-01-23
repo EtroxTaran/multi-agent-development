@@ -364,7 +364,7 @@ Conductor includes advanced "Cognitive Orchestration" capabilities for resilienc
 ### Self-Healing (The Fixer)
 When errors occur, the system doesn't just blindly retry. It enters a "Fixer" loop:
 1. **Triage:** Is it a syntax error, test failure, or something deeper?
-2. **Diagnosis:** 
+2. **Diagnosis:**
    - **Regex:** Fast path for common issues (missing imports, typos).
    - **Deep Semantic (LLM):** If complex, Claude analyzes the stack trace and logic to find the root cause.
 3. **Dynamic Adaptation:** If the diagnosis reveals a knowledge gap (e.g., "API Misuse"), the system dynamically inserts a **Research Phase** to read documentation and generate a correct usage guide before retrying.

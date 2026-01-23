@@ -105,12 +105,16 @@ async def fixer_validate_node(state: WorkflowState) -> dict[str, Any]:
         return {
             "current_fix_attempt": updated_fix,
             "next_decision": "escalate",
-            "errors": [{
-                "type": "fixer_validation_failed",
-                "message": validation_result.get("reason", "Fix plan rejected by validation agent"),
-                "concerns": validation_result.get("concerns", []),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "fixer_validation_failed",
+                    "message": validation_result.get(
+                        "reason", "Fix plan rejected by validation agent"
+                    ),
+                    "concerns": validation_result.get("concerns", []),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "updated_at": datetime.now().isoformat(),
         }
 
@@ -139,7 +143,7 @@ def _build_validation_prompt(diagnosis_data: dict, plan_data: dict) -> str:
             prompt += f" (line {af['line_number']})"
         prompt += "\n"
 
-    prompt += f"""
+    prompt += """
 ## Proposed Fix Actions
 """
     for i, action in enumerate(actions[:10], 1):

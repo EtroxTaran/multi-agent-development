@@ -504,7 +504,7 @@ async def apply_schema(conn: Connection) -> bool:
 
         # Create a temporary project name from the connection
         # The connection is already scoped to a database
-        project_name = getattr(conn, '_database', 'default')
+        project_name = getattr(conn, "_database", "default")
 
         # Create migration context
         ctx = MigrationContext(
@@ -554,9 +554,7 @@ async def _apply_schema_legacy(conn: Connection) -> bool:
     """
     try:
         # Check current schema version
-        existing = await conn.query(
-            "SELECT * FROM schema_version ORDER BY applied_at DESC LIMIT 1"
-        )
+        existing = await conn.query("SELECT * FROM schema_version ORDER BY applied_at DESC LIMIT 1")
 
         current_version = existing[0].get("version") if existing else None
 
@@ -574,9 +572,12 @@ async def _apply_schema_legacy(conn: Connection) -> bool:
             await _migrate_to_flexible_types(conn)
 
         # Record new schema version
-        await conn.create("schema_version", {
-            "version": SCHEMA_VERSION,
-        })
+        await conn.create(
+            "schema_version",
+            {
+                "version": SCHEMA_VERSION,
+            },
+        )
 
         logger.info(f"Applied schema version {SCHEMA_VERSION}")
         return True
@@ -610,9 +611,7 @@ async def get_schema_version(project_name: Optional[str] = None) -> Optional[str
     """
     async with get_connection(project_name) as conn:
         # Note: SurrealDB v2 requires ORDER BY fields to be in SELECT
-        result = await conn.query(
-            "SELECT * FROM schema_version ORDER BY applied_at DESC LIMIT 1"
-        )
+        result = await conn.query("SELECT * FROM schema_version ORDER BY applied_at DESC LIMIT 1")
         if result:
             return result[0].get("version")
         return None

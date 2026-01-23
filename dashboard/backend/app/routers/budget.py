@@ -1,25 +1,18 @@
 """Budget management API routes."""
 
-from pathlib import Path
+# Import orchestrator modules
+import sys
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
-from ..deps import get_project_dir, get_budget_manager
-from ..models import (
-    BudgetReportResponse,
-    BudgetStatus,
-    ErrorResponse,
-    TaskSpending,
-)
+from ..deps import get_budget_manager
+from ..models import BudgetReportResponse, BudgetStatus, ErrorResponse, TaskSpending
 
-# Import orchestrator modules
-import sys
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 from orchestrator.agents.budget import BudgetManager
-
 
 router = APIRouter(prefix="/projects/{project_name}/budget", tags=["budget"])
 
@@ -66,12 +59,18 @@ async def get_budget_report(
     responses={404: {"model": ErrorResponse}},
 )
 async def set_project_budget(
-    limit_usd: Optional[float] = Query(default=None, description="Budget limit in USD (null for unlimited)"),
+    limit_usd: Optional[float] = Query(
+        default=None, description="Budget limit in USD (null for unlimited)"
+    ),
     budget_manager: BudgetManager = Depends(get_budget_manager),
 ) -> dict:
     """Set project budget limit."""
     budget_manager.set_project_budget(limit_usd)
-    return {"message": f"Project budget set to ${limit_usd:.2f}" if limit_usd else "Project budget set to unlimited"}
+    return {
+        "message": f"Project budget set to ${limit_usd:.2f}"
+        if limit_usd
+        else "Project budget set to unlimited"
+    }
 
 
 @router.post(
@@ -82,12 +81,18 @@ async def set_project_budget(
 )
 async def set_task_budget(
     task_id: str,
-    limit_usd: Optional[float] = Query(default=None, description="Budget limit in USD (null to remove)"),
+    limit_usd: Optional[float] = Query(
+        default=None, description="Budget limit in USD (null to remove)"
+    ),
     budget_manager: BudgetManager = Depends(get_budget_manager),
 ) -> dict:
     """Set task budget limit."""
     budget_manager.set_task_budget(task_id, limit_usd)
-    return {"message": f"Task {task_id} budget set to ${limit_usd:.2f}" if limit_usd else f"Task {task_id} budget limit removed"}
+    return {
+        "message": f"Task {task_id} budget set to ${limit_usd:.2f}"
+        if limit_usd
+        else f"Task {task_id} budget limit removed"
+    }
 
 
 @router.post(

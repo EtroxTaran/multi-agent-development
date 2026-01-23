@@ -2,11 +2,11 @@
 
 from orchestrator.registry.agents import (
     AGENT_REGISTRY,
+    AgentConfig,
     get_agent,
     get_agent_reviewers,
-    get_all_agents,
     get_agents_by_cli,
-    AgentConfig,
+    get_all_agents,
 )
 
 __all__ = [

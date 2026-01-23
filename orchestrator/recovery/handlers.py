@@ -18,11 +18,12 @@ Usage:
 import asyncio
 import logging
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class ErrorContext:
     agent_id: Optional[str] = None
     iteration: int = 0
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     stack_trace: Optional[str] = None
 
 
@@ -82,7 +83,7 @@ class RecoveryResult:
     recovered_value: Any = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -104,12 +105,12 @@ class EscalationRequest:
     reason: str
     context: str
     attempts_made: int
-    options: List[str] = field(default_factory=list)
+    options: list[str] = field(default_factory=list)
     recommendation: Optional[str] = None
     severity: str = "medium"  # low, medium, high, critical
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "task_id": self.task_id,
@@ -158,8 +159,8 @@ class RecoveryHandler:
         self.project_dir = Path(project_dir)
         self.max_retries = max_retries
         self.escalation_callback = escalation_callback
-        self._error_log: List[Dict[str, Any]] = []
-        self._escalation_log: List[EscalationRequest] = []
+        self._error_log: list[dict[str, Any]] = []
+        self._escalation_log: list[EscalationRequest] = []
 
     async def handle_error(
         self,
@@ -226,7 +227,7 @@ class RecoveryHandler:
         for attempt in range(self.max_retries):
             # Calculate backoff with jitter
             backoff = min(
-                self.BASE_BACKOFF_SECONDS * (2 ** attempt),
+                self.BASE_BACKOFF_SECONDS * (2**attempt),
                 self.MAX_BACKOFF_SECONDS,
             )
             jitter = random.uniform(*self.JITTER_RANGE)
@@ -241,7 +242,11 @@ class RecoveryHandler:
 
             if retry_operation:
                 try:
-                    result = await retry_operation() if asyncio.iscoroutinefunction(retry_operation) else retry_operation()
+                    result = (
+                        await retry_operation()
+                        if asyncio.iscoroutinefunction(retry_operation)
+                        else retry_operation()
+                    )
                     return RecoveryResult(
                         success=True,
                         action_taken=RecoveryAction.RETRY_WITH_BACKOFF,
@@ -296,7 +301,11 @@ class RecoveryHandler:
             if retry_with_backup:
                 try:
                     logger.info(f"Agent {agent_id} failed, attempting backup CLI")
-                    result = await retry_with_backup() if asyncio.iscoroutinefunction(retry_with_backup) else retry_with_backup()
+                    result = (
+                        await retry_with_backup()
+                        if asyncio.iscoroutinefunction(retry_with_backup)
+                        else retry_with_backup()
+                    )
                     return RecoveryResult(
                         success=True,
                         action_taken=RecoveryAction.USE_BACKUP,
@@ -334,7 +343,7 @@ class RecoveryHandler:
 
     async def handle_review_conflict(
         self,
-        reviews: List[Dict[str, Any]],
+        reviews: list[dict[str, Any]],
         context: ErrorContext,
     ) -> RecoveryResult:
         """Handle conflicts between reviewers.
@@ -507,7 +516,7 @@ class RecoveryHandler:
         reason: str,
         message: str,
         severity: str = "medium",
-        options: Optional[List[str]] = None,
+        options: Optional[list[str]] = None,
         recommendation: Optional[str] = None,
     ) -> RecoveryResult:
         """Create an escalation request.
@@ -581,11 +590,11 @@ class RecoveryHandler:
         escalation_file.write_text(json.dumps(escalation.to_dict(), indent=2))
         logger.info(f"Escalation written to {escalation_file}")
 
-    def get_error_log(self) -> List[Dict[str, Any]]:
+    def get_error_log(self) -> list[dict[str, Any]]:
         """Get the error log."""
         return self._error_log.copy()
 
-    def get_escalation_log(self) -> List[Dict[str, Any]]:
+    def get_escalation_log(self) -> list[dict[str, Any]]:
         """Get the escalation log."""
         return [e.to_dict() for e in self._escalation_log]
 
@@ -615,7 +624,7 @@ async def handle_agent_failure(
 
 async def handle_review_conflict(
     project_dir: Path,
-    reviews: List[Dict[str, Any]],
+    reviews: list[dict[str, Any]],
     context: ErrorContext,
 ) -> RecoveryResult:
     """Handle a review conflict."""

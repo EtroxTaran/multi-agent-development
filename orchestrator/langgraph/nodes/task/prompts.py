@@ -8,13 +8,13 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from ...state import WorkflowState, Task
-from ....agents.prompts import load_prompt, format_prompt
+from ....agents.prompts import format_prompt, load_prompt
+from ...state import Task, WorkflowState
 from .context import (
-    load_context_preferences,
-    load_research_findings,
     build_completed_context,
     build_diff_context,
+    load_context_preferences,
+    load_research_findings,
     load_task_clarification_answers,
 )
 
@@ -127,18 +127,11 @@ def build_scoped_prompt(task: Task) -> str:
         return SCOPED_TASK_PROMPT.format(
             task_id=task_id,
             description=description,
-            acceptance_criteria="\n".join(
-                f"- {c}" for c in acceptance_criteria
-            ) or "- No specific criteria defined",
-            files_to_create="\n".join(
-                f"- {f}" for f in files_to_create
-            ) or "- None",
-            files_to_modify="\n".join(
-                f"- {f}" for f in files_to_modify
-            ) or "- None",
-            test_files="\n".join(
-                f"- {f}" for f in test_files
-            ) or "- None",
+            acceptance_criteria="\n".join(f"- {c}" for c in acceptance_criteria)
+            or "- No specific criteria defined",
+            files_to_create="\n".join(f"- {f}" for f in files_to_create) or "- None",
+            files_to_modify="\n".join(f"- {f}" for f in files_to_modify) or "- None",
+            test_files="\n".join(f"- {f}" for f in test_files) or "- None",
         )
 
 
@@ -233,7 +226,9 @@ def build_task_prompt(
         correction_prompt = state.get("correction_prompt")
         if correction_prompt:
             prompt = f"{correction_prompt}\n\n---\n\n{prompt}"
-            logger.info(f"Task {task.get('id')} prompt includes correction context from failed verification")
+            logger.info(
+                f"Task {task.get('id')} prompt includes correction context from failed verification"
+            )
 
     # Include CONTEXT.md preferences (GSD pattern)
     context_preferences = load_context_preferences(project_dir)

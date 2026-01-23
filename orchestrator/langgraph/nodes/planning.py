@@ -13,15 +13,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ...specialists.runner import SpecialistRunner
+from ..integrations.action_logging import get_node_logger
 from ..state import (
-    WorkflowState,
-    PhaseStatus,
     PhaseState,
+    PhaseStatus,
+    WorkflowState,
     create_agent_execution,
     create_error_context,
 )
-from ..integrations.action_logging import get_node_logger
-from ...specialists.runner import SpecialistRunner
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +89,7 @@ def validate_plan(plan: dict) -> None:
                     errors.append(f"Milestone {i}: missing 'id' field")
 
     if errors:
-        raise PlanValidationError(
-            f"Plan validation failed with {len(errors)} error(s)",
-            errors
-        )
+        raise PlanValidationError(f"Plan validation failed with {len(errors)} error(s)", errors)
 
 
 def _validate_task(task: dict, index: int) -> list[str]:
@@ -184,13 +181,15 @@ async def planning_node(state: WorkflowState) -> dict[str, Any]:
         action_logger.log_error("PRODUCT.md not found", phase=1)
         return {
             "phase_status": phase_status,
-            "errors": [{
-                "type": "missing_file",
-                "file": "PRODUCT.md",
-                "message": "PRODUCT.md not found",
-                "phase": 1,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "missing_file",
+                    "file": "PRODUCT.md",
+                    "message": "PRODUCT.md not found",
+                    "phase": 1,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "abort",
         }
 
@@ -228,11 +227,8 @@ Please revise the plan to resolve these blocking issues."""
     try:
         # Use SpecialistRunner to execute A01-planner
         runner = SpecialistRunner(project_dir)
-        
-        result = await asyncio.to_thread(
-            runner.create_agent("A01-planner").run,
-            prompt
-        )
+
+        result = await asyncio.to_thread(runner.create_agent("A01-planner").run, prompt)
 
         if not result.success:
             raise Exception(result.error or "Planning failed")
@@ -259,8 +255,9 @@ Please revise the plan to resolve these blocking issues."""
             raise Exception(f"Plan validation failed:\n  - {error_details}") from e
 
         # Save plan to database
-        from ...db.repositories.phase_outputs import get_phase_output_repository, OutputType
+        from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_plan(plan))
 
@@ -295,7 +292,7 @@ Please revise the plan to resolve these blocking issues."""
             success=True,
             exit_code=0,
             duration_seconds=(time.time() - start_time),
-            model=getattr(result, 'model', 'claude'),
+            model=getattr(result, "model", "claude"),
             task_id=None,  # Planning is not task-specific
         )
 
@@ -348,29 +345,35 @@ Please revise the plan to resolve these blocking issues."""
             return {
                 "phase_status": phase_status,
                 "next_decision": "retry",
-                "errors": [{
-                    "type": "planning_error",
-                    "message": str(e),
-                    "phase": 1,
-                    "attempt": phase_1.attempts,
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "planning_error",
+                        "message": str(e),
+                        "phase": 1,
+                        "attempt": phase_1.attempts,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "error_context": error_context,
                 "last_agent_execution": failed_execution,
                 "execution_history": [failed_execution],
             }
         else:
             action_logger.log_phase_failed(1, "Planning", str(e))
-            action_logger.log_escalation(f"Planning failed after {phase_1.attempts} attempts", phase=1)
+            action_logger.log_escalation(
+                f"Planning failed after {phase_1.attempts} attempts", phase=1
+            )
             return {
                 "phase_status": phase_status,
                 "next_decision": "escalate",
-                "errors": [{
-                    "type": "planning_error",
-                    "message": f"Planning failed after {phase_1.attempts} attempts: {e}",
-                    "phase": 1,
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "planning_error",
+                        "message": f"Planning failed after {phase_1.attempts} attempts: {e}",
+                        "phase": 1,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "error_context": error_context,
                 "last_agent_execution": failed_execution,
                 "execution_history": [failed_execution],

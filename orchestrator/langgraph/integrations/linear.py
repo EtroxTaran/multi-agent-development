@@ -9,14 +9,13 @@ Uses the official Linear MCP (https://mcp.linear.app/mcp) with graceful degradat
 MCP calls are made via subprocess to the Claude CLI.
 """
 
-import asyncio
 import json
 import logging
 import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from ..state import Task, TaskStatus
 
@@ -39,13 +38,15 @@ class LinearConfig:
     team_id: Optional[str] = None
     create_project: bool = True
     project_id: Optional[str] = None
-    status_mapping: dict[str, str] = field(default_factory=lambda: {
-        "pending": "Backlog",
-        "in_progress": "In Progress",
-        "completed": "Done",
-        "blocked": "Blocked",
-        "failed": "Cancelled",
-    })
+    status_mapping: dict[str, str] = field(
+        default_factory=lambda: {
+            "pending": "Backlog",
+            "in_progress": "In Progress",
+            "completed": "Done",
+            "blocked": "Blocked",
+            "failed": "Cancelled",
+        }
+    )
 
 
 # Default status mapping used when not specified in config
@@ -110,7 +111,9 @@ class LinearAdapter:
         """
         self.config = config
         self._mcp_available: Optional[bool] = None
-        self._issue_cache: dict[str, tuple[str, float]] = {}  # task_id -> (linear_issue_id, timestamp)
+        self._issue_cache: dict[
+            str, tuple[str, float]
+        ] = {}  # task_id -> (linear_issue_id, timestamp)
 
     @property
     def enabled(self) -> bool:
@@ -141,6 +144,7 @@ class LinearAdapter:
 
         results = {}
         import time
+
         now = time.time()
 
         for task in tasks:
@@ -177,8 +181,7 @@ class LinearAdapter:
             return True
 
         linear_status = self.config.status_mapping.get(
-            status.value if isinstance(status, TaskStatus) else status,
-            "Backlog"
+            status.value if isinstance(status, TaskStatus) else status, "Backlog"
         )
 
         try:
@@ -290,7 +293,8 @@ class LinearAdapter:
 
         now = time.time()
         expired = [
-            task_id for task_id, (_, timestamp) in self._issue_cache.items()
+            task_id
+            for task_id, (_, timestamp) in self._issue_cache.items()
             if now - timestamp > self.CACHE_TTL_SECONDS
         ]
 
@@ -324,8 +328,7 @@ class LinearAdapter:
             else:
                 self._mcp_available = False
                 logger.info(
-                    "Linear MCP not available. "
-                    "Ensure mcp-linear is configured in your mcp.json."
+                    "Linear MCP not available. " "Ensure mcp-linear is configured in your mcp.json."
                 )
         except Exception as e:
             self._mcp_available = False
@@ -498,10 +501,14 @@ Return SUCCESS if added, or ERROR with reason."""
         """
         cmd = [
             "claude",
-            "-p", prompt,
-            "--output-format", "text",
-            "--allowedTools", "mcp__linear__*",
-            "--max-turns", "3",
+            "-p",
+            prompt,
+            "--output-format",
+            "text",
+            "--allowedTools",
+            "mcp__linear__*",
+            "--max-turns",
+            "3",
         ]
 
         try:

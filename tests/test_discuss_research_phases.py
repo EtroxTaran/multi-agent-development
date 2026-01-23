@@ -1,26 +1,19 @@
 """Tests for discussion and research phase nodes."""
 
-import json
-import pytest
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
+
+import pytest
 
 from orchestrator.langgraph.nodes.discuss_phase import (
-    discuss_phase_node,
-    DISCUSSION_QUESTIONS,
     CONTEXT_MD_TEMPLATE,
+    DISCUSSION_QUESTIONS,
     _is_context_complete,
     _write_context_md,
+    discuss_phase_node,
 )
-from orchestrator.langgraph.nodes.research_phase import (
-    research_phase_node,
-    RESEARCH_AGENTS,
-)
-from orchestrator.langgraph.routers.general import (
-    discuss_router,
-    research_router,
-)
+from orchestrator.langgraph.nodes.research_phase import RESEARCH_AGENTS, research_phase_node
+from orchestrator.langgraph.routers.general import discuss_router, research_router
 
 
 class TestDiscussionQuestions:
@@ -153,7 +146,8 @@ class TestDiscussPhaseNode:
         """Test node skips if CONTEXT.md already exists and is complete."""
         project_dir = Path(mock_state["project_dir"])
         context_file = project_dir / "CONTEXT.md"
-        context_file.write_text("""# Context
+        context_file.write_text(
+            """# Context
 ## Library Preferences
 - Use axios
 ## Architectural Decisions
@@ -164,7 +158,8 @@ class TestDiscussPhaseNode:
 - Early returns
 ## Error Handling
 - Custom errors
-""")
+"""
+        )
 
         result = await discuss_phase_node(mock_state)
         assert result.get("discussion_complete") is True

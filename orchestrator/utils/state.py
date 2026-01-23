@@ -5,18 +5,19 @@ import os
 import shutil
 import tempfile
 import threading
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
-from dataclasses import dataclass, field, asdict
 from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from .context import ContextState, ContextManager
+    pass
 
 
 class PhaseStatus(str, Enum):
     """Status of a workflow phase."""
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -27,6 +28,7 @@ class PhaseStatus(str, Enum):
 @dataclass
 class PhaseState:
     """State of a single phase."""
+
     name: str
     status: PhaseStatus = PhaseStatus.PENDING
     started_at: Optional[str] = None
@@ -54,6 +56,7 @@ class PhaseState:
 @dataclass
 class WorkflowState:
     """Complete workflow state."""
+
     project_name: str
     current_phase: int = 1
     iteration_count: int = 0
@@ -74,10 +77,7 @@ class WorkflowState:
                 "verification",
                 "completion",
             ]
-            self.phases = {
-                name: PhaseState(name=name)
-                for name in phase_names
-            }
+            self.phases = {name: PhaseState(name=name) for name in phase_names}
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -96,10 +96,7 @@ class WorkflowState:
     @classmethod
     def from_dict(cls, data: dict) -> "WorkflowState":
         """Create from dictionary."""
-        phases = {
-            k: PhaseState.from_dict(v)
-            for k, v in data.get("phases", {}).items()
-        }
+        phases = {k: PhaseState.from_dict(v) for k, v in data.get("phases", {}).items()}
         return cls(
             project_name=data["project_name"],
             current_phase=data.get("current_phase", 1),
@@ -131,7 +128,7 @@ class StateManager:
         self.project_dir = Path(project_dir)
         self.workflow_dir = self.project_dir / ".workflow"
         self.state_file = self.workflow_dir / "state.json"
-        self.backup_file = self.state_file.with_suffix('.json.bak')
+        self.backup_file = self.state_file.with_suffix(".json.bak")
         self._state: Optional[WorkflowState] = None
         self._lock = threading.RLock()  # Reentrant lock for nested calls
 
@@ -161,7 +158,7 @@ class StateManager:
         with self._lock:
             if self.state_file.exists():
                 try:
-                    with open(self.state_file, "r", encoding="utf-8") as f:
+                    with open(self.state_file, encoding="utf-8") as f:
                         data = json.load(f)
                     self._state = WorkflowState.from_dict(data)
                     return self._state
@@ -169,13 +166,14 @@ class StateManager:
                 except json.JSONDecodeError as e:
                     # Main state file is corrupted
                     import logging
+
                     logging.warning(f"Corrupted state file: {e}")
 
                     # Try to recover from backup
                     if self.backup_file.exists():
                         try:
                             logging.info("Attempting recovery from backup")
-                            with open(self.backup_file, "r", encoding="utf-8") as f:
+                            with open(self.backup_file, encoding="utf-8") as f:
                                 data = json.load(f)
                             self._state = WorkflowState.from_dict(data)
                             # Save recovered state to main file
@@ -192,6 +190,7 @@ class StateManager:
 
                 except Exception as e:
                     import logging
+
                     logging.error(f"Error loading state: {e}")
                     self._state = WorkflowState(project_name=self.project_dir.name)
                     self._atomic_save()
@@ -238,12 +237,12 @@ class StateManager:
         try:
             # Write to temp file first
             with tempfile.NamedTemporaryFile(
-                mode='w',
+                mode="w",
                 dir=self.workflow_dir,
-                prefix='.state_',
-                suffix='.json',
+                prefix=".state_",
+                suffix=".json",
                 delete=False,
-                encoding='utf-8'
+                encoding="utf-8",
             ) as tmp_file:
                 tmp_path = tmp_file.name
                 json.dump(data, tmp_file, indent=2)
@@ -355,12 +354,14 @@ class StateManager:
     def record_commit(self, phase_num: int, commit_hash: str, message: str) -> None:
         """Record a git commit for a phase (thread-safe)."""
         with self._lock:
-            self.state.git_commits.append({
-                "phase": phase_num,
-                "hash": commit_hash,
-                "message": message,
-                "timestamp": datetime.now().isoformat(),
-            })
+            self.state.git_commits.append(
+                {
+                    "phase": phase_num,
+                    "hash": commit_hash,
+                    "message": message,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             self.save()
 
     def can_retry(self, phase_num: int) -> bool:
@@ -405,8 +406,7 @@ class StateManager:
             "current_phase": self.state.current_phase,
             "iteration_count": self.state.iteration_count,
             "phase_statuses": {
-                name: phase.status.value
-                for name, phase in self.state.phases.items()
+                name: phase.status.value for name, phase in self.state.phases.items()
             },
             "total_commits": len(self.state.git_commits),
             "created": self.state.created_at,

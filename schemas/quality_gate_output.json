@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QualityGateOutput",
+  "description": "Schema for A13 Quality Gate agent output",
+  "type": "object",
+  "required": ["agent", "task_id", "status", "passed", "score", "checks"],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "const": "A13",
+      "description": "Agent identifier"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "Task identifier (typically 'quality-gate')"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "error"],
+      "description": "Overall gate status"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "Whether the quality gate passed"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality score (6.0+ required to pass)"
+    },
+    "checks": {
+      "type": "object",
+      "required": ["typescript", "eslint", "naming_conventions", "code_structure"],
+      "properties": {
+        "typescript": {
+          "type": "object",
+          "required": ["passed", "error_count"],
+          "properties": {
+            "passed": { "type": "boolean" },
+            "error_count": { "type": "integer", "minimum": 0 },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": { "type": "string" },
+                  "file": { "type": "string" },
+                  "line": { "type": "integer" },
+                  "column": { "type": "integer" },
+                  "message": { "type": "string" },
+                  "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] }
+                }
+              }
+            }
+          }
+        },
+        "eslint": {
+          "type": "object",
+          "required": ["passed", "error_count", "warning_count"],
+          "properties": {
+            "passed": { "type": "boolean" },
+            "error_count": { "type": "integer", "minimum": 0 },
+            "warning_count": { "type": "integer", "minimum": 0 },
+            "errors": { "type": "array" },
+            "warnings": { "type": "array" }
+          }
+        },
+        "naming_conventions": {
+          "type": "object",
+          "required": ["passed", "violation_count"],
+          "properties": {
+            "passed": { "type": "boolean" },
+            "violation_count": { "type": "integer", "minimum": 0 },
+            "violations": { "type": "array" }
+          }
+        },
+        "code_structure": {
+          "type": "object",
+          "required": ["passed", "issue_count"],
+          "properties": {
+            "passed": { "type": "boolean" },
+            "issue_count": { "type": "integer", "minimum": 0 },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string", "enum": ["file_too_long", "function_too_long"] },
+                  "file": { "type": "string" },
+                  "function": { "type": "string" },
+                  "lines": { "type": "integer" },
+                  "limit": { "type": "integer" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "type", "file", "description"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["TS_ERROR", "ESLINT_ERROR", "ESLINT_WARNING", "NAMING_VIOLATION", "STRUCTURE_ISSUE"]
+          },
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "column": { "type": "integer" },
+          "code": { "type": "string" },
+          "description": { "type": "string" },
+          "remediation": { "type": "string" }
+        }
+      }
+    },
+    "blocking_issues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of issues that block the workflow"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Brief summary of quality gate results"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

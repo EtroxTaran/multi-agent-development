@@ -1,14 +1,13 @@
 """Tests for conflict resolution between agents."""
 
-import pytest
 
 from orchestrator.utils.conflict_resolution import (
-    ConflictResolver,
-    ResolutionStrategy,
-    ConflictType,
     Conflict,
     ConflictResolution,
+    ConflictResolver,
     ConflictResult,
+    ConflictType,
+    ResolutionStrategy,
 )
 
 
@@ -44,8 +43,7 @@ class TestConflictDetection:
 
         assert len(conflicts) >= 1
         approval_conflict = next(
-            (c for c in conflicts if c.conflict_type == ConflictType.APPROVAL_MISMATCH),
-            None
+            (c for c in conflicts if c.conflict_type == ConflictType.APPROVAL_MISMATCH), None
         )
         assert approval_conflict is not None
         assert approval_conflict.cursor_position == "approve"
@@ -62,8 +60,7 @@ class TestConflictDetection:
         conflicts = resolver.detect_conflicts(cursor, gemini)
 
         score_conflict = next(
-            (c for c in conflicts if c.conflict_type == ConflictType.SCORE_DIVERGENCE),
-            None
+            (c for c in conflicts if c.conflict_type == ConflictType.SCORE_DIVERGENCE), None
         )
         assert score_conflict is not None
         assert "divergence" in score_conflict.details
@@ -75,25 +72,20 @@ class TestConflictDetection:
         cursor = {
             "overall_assessment": "needs_changes",
             "score": 6,
-            "concerns": [
-                {"area": "security", "severity": "high", "description": "Risk found"}
-            ],
+            "concerns": [{"area": "security", "severity": "high", "description": "Risk found"}],
         }
         gemini = {
             "overall_assessment": "needs_changes",
             "score": 7,
             "architecture_review": {
-                "concerns": [
-                    {"area": "security", "severity": "low", "description": "Minor risk"}
-                ]
+                "concerns": [{"area": "security", "severity": "low", "description": "Minor risk"}]
             },
         }
 
         conflicts = resolver.detect_conflicts(cursor, gemini)
 
         severity_conflict = next(
-            (c for c in conflicts if c.conflict_type == ConflictType.SEVERITY_DISAGREEMENT),
-            None
+            (c for c in conflicts if c.conflict_type == ConflictType.SEVERITY_DISAGREEMENT), None
         )
         assert severity_conflict is not None
         assert severity_conflict.area == "security"

@@ -7,86 +7,74 @@ with parallel fan-out/fan-in, checkpoints, and human-in-the-loop.
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from ..ui.callbacks import ProgressCallback
 
-from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, RetryPolicy
 
-from .surrealdb_saver import SurrealDBSaver
-from .state import WorkflowState, create_initial_state
-from .subgraphs import create_fixer_subgraph, create_task_subgraph
-from .nodes import (
-    prerequisites_node,
-    planning_node,
-    cursor_validate_node,
-    gemini_validate_node,
-    validation_fan_in_node,
-    implementation_node,
-    cursor_review_node,
-    gemini_review_node,
-    review_gate_node,
-    verification_fan_in_node,
-    human_escalation_node,
-    completion_node,
-    # New risk mitigation nodes
-    product_validation_node,
-    pre_implementation_node,
-    build_verification_node,
-    coverage_check_node,
-    security_scan_node,
+from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes; Discussion and Research nodes (GSD pattern); Handoff node (GSD pattern); Error dispatch node
     approval_gate_node,
-    # Discussion and Research nodes (GSD pattern)
+    build_verification_node,
+    completion_node,
+    coverage_check_node,
+    cursor_review_node,
+    cursor_validate_node,
+    dependency_check_node,
     discuss_phase_node,
-    research_phase_node,
-    # Handoff node (GSD pattern)
-    generate_handoff_node,
-    fixer_validate_node,
-    fixer_apply_node,
-    fixer_verify_node,
-    fixer_research_node,
-    # Error dispatch node
     error_dispatch_node,
+    fixer_apply_node,
+    fixer_research_node,
+    fixer_validate_node,
+    fixer_verify_node,
+    gemini_review_node,
+    gemini_validate_node,
+    generate_handoff_node,
+    human_escalation_node,
+    implementation_node,
+    planning_node,
+    pre_implementation_node,
+    prerequisites_node,
+    product_validation_node,
+    quality_gate_node,
+    research_phase_node,
+    review_gate_node,
+    security_scan_node,
+    validation_fan_in_node,
+    verification_fan_in_node,
 )
-from .routers import (
+from .routers import (  # New risk mitigation routers; Quality infrastructure routers; Discussion and Research routers (GSD pattern); Error dispatch router
+    approval_gate_router,
+    coverage_check_router,
+    dependency_check_router,
+    discuss_router,
+    error_dispatch_router,
+    human_escalation_router,
+    pre_implementation_router,
     prerequisites_router,
-    planning_router,
+    product_validation_router,
+    quality_gate_router,
+    research_router,
+    security_scan_router,
     validation_router,
     verification_router,
-    implementation_router,
-    completion_router,
-    human_escalation_router,
-    # New risk mitigation routers
-    product_validation_router,
-    pre_implementation_router,
-    build_verification_router,
-    coverage_check_router,
-    security_scan_router,
-    approval_gate_router,
-    # Discussion and Research routers (GSD pattern)
-    discuss_router,
-    research_router,
-    fixer_validate_router,
-    fixer_apply_router,
-    fixer_verify_router,
-    fixer_research_router,
-    should_use_fixer_router,
-    # Error dispatch router
-    error_dispatch_router,
 )
+from .state import WorkflowState, create_initial_state
+from .subgraphs import create_fixer_subgraph, create_task_subgraph
+from .surrealdb_saver import SurrealDBSaver
 
 logger = logging.getLogger(__name__)
 
 
 def subgraph_router(state: WorkflowState) -> str:
     """Route based on subgraph exit state.
-    
+
     Args:
         state: Workflow state
-        
+
     Returns:
         Next node name
     """
@@ -126,22 +114,32 @@ def create_workflow_graph(
     graph = StateGraph(WorkflowState)
 
     # Check if retry policy should be enabled
-    retry_enabled = enable_retry_policy or os.environ.get("LANGGRAPH_RETRY_ENABLED", "").lower() == "true"
+    retry_enabled = (
+        enable_retry_policy or os.environ.get("LANGGRAPH_RETRY_ENABLED", "").lower() == "true"
+    )
 
     # Create retry policies for different node types
-    agent_retry_policy = RetryPolicy(
-        max_attempts=3,
-        initial_interval=1.0,
-        backoff_factor=2.0,
-        jitter=True,
-    ) if retry_enabled else None
+    agent_retry_policy = (
+        RetryPolicy(
+            max_attempts=3,
+            initial_interval=1.0,
+            backoff_factor=2.0,
+            jitter=True,
+        )
+        if retry_enabled
+        else None
+    )
 
-    implementation_retry_policy = RetryPolicy(
-        max_attempts=2,
-        initial_interval=5.0,
-        backoff_factor=2.0,
-        jitter=True,
-    ) if retry_enabled else None
+    implementation_retry_policy = (
+        RetryPolicy(
+            max_attempts=2,
+            initial_interval=5.0,
+            backoff_factor=2.0,
+            jitter=True,
+        )
+        if retry_enabled
+        else None
+    )
 
     # Add all nodes with appropriate retry policies
     # Core workflow nodes
@@ -168,12 +166,14 @@ def create_workflow_graph(
 
     # Post-implementation nodes
     graph.add_node("build_verification", build_verification_node)
+    graph.add_node("quality_gate", quality_gate_node)  # A13: TypeScript/ESLint checks
     graph.add_node("review_gate", review_gate_node)
     graph.add_node("cursor_review", cursor_review_node, retry=agent_retry_policy)
     graph.add_node("gemini_review", gemini_review_node, retry=agent_retry_policy)
     graph.add_node("verification_fan_in", verification_fan_in_node)
     graph.add_node("coverage_check", coverage_check_node)
     graph.add_node("security_scan", security_scan_node)
+    graph.add_node("dependency_check", dependency_check_node)  # A14: Dependency analysis
     graph.add_node("human_escalation", human_escalation_node)
     graph.add_node("completion", completion_node)
 
@@ -285,22 +285,36 @@ def create_workflow_graph(
     )
 
     # ========== TASK SUBGRAPH ROUTING ==========
-    
+
     graph.add_conditional_edges(
         "task_subgraph",
         subgraph_router,
         {
             "continue": "build_verification",  # Success path
             "human_escalation": "error_dispatch",
-        }
+        },
     )
 
     # Legacy: Implementation → build_verification (for backward compatibility)
     graph.add_edge("implementation", "build_verification")
 
-    # Build verification → review gate → parallel verification fan-out
-    # Both review nodes run in parallel after build passes (unless gated)
-    graph.add_edge("build_verification", "review_gate")
+    # Build verification → quality_gate → review gate → parallel verification fan-out
+    # Quality gate runs TypeScript/ESLint checks before human code review
+    graph.add_edge("build_verification", "quality_gate")
+
+    # Quality gate → review gate (with conditional routing for failures)
+    graph.add_conditional_edges(
+        "quality_gate",
+        quality_gate_router,
+        {
+            "cursor_review": "review_gate",  # Passed, proceed to review
+            "implementation": "implementation",  # Failed, retry implementation
+            "human_escalation": "error_dispatch",
+            "__end__": END,
+        },
+    )
+
+    # Both review nodes run in parallel after quality gate passes
     graph.add_edge("review_gate", "cursor_review")
     graph.add_edge("review_gate", "gemini_review")
 
@@ -332,10 +346,22 @@ def create_workflow_graph(
         },
     )
 
-    # Security scan → completion (with conditional routing)
+    # Security scan → dependency_check (with conditional routing)
     graph.add_conditional_edges(
         "security_scan",
         security_scan_router,
+        {
+            "completion": "dependency_check",  # Changed: go to dependency_check first
+            "implementation": "implementation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
+            "__end__": END,
+        },
+    )
+
+    # Dependency check → completion (with conditional routing)
+    graph.add_conditional_edges(
+        "dependency_check",
+        dependency_check_router,
         {
             "completion": "completion",
             "implementation": "implementation",
@@ -366,20 +392,20 @@ def create_workflow_graph(
         "error_dispatch",
         error_dispatch_router,
         {
-            "fixer_triage": "fixer_subgraph", # Use subgraph
+            "fixer_triage": "fixer_subgraph",  # Use subgraph
             "human_escalation": "human_escalation",
         },
     )
 
     # ========== FIXER SUBGRAPH ROUTING ==========
-    
+
     graph.add_conditional_edges(
         "fixer_subgraph",
         subgraph_router,
         {
-            "continue": "task_subgraph", # Default retry logic
+            "continue": "task_subgraph",  # Default retry logic
             "human_escalation": "human_escalation",
-        }
+        },
     )
 
     # Compile the graph
@@ -499,6 +525,14 @@ class WorkflowRunner:
                 "thread_id": self.thread_id,
             },
         }
+        if progress_callback:
+
+            def path_emitter(router, decision, state):
+                if hasattr(progress_callback, "on_path_decision"):
+                    progress_callback.on_path_decision(router, decision, state)
+
+            run_config["configurable"]["path_emitter"] = path_emitter
+
         if config:
             run_config.update(config)
 
@@ -525,8 +559,8 @@ class WorkflowRunner:
         """
         try:
             # Import bootstrap function
-            from pathlib import Path
             import sys
+            from pathlib import Path
 
             scripts_dir = Path(__file__).parent.parent.parent / "scripts"
             if str(scripts_dir) not in sys.path:
@@ -637,6 +671,14 @@ class WorkflowRunner:
                 "thread_id": self.thread_id,
             },
         }
+        if progress_callback:
+
+            def path_emitter(router, decision, state):
+                if hasattr(progress_callback, "on_path_decision"):
+                    progress_callback.on_path_decision(router, decision, state)
+
+            run_config["configurable"]["path_emitter"] = path_emitter
+
         if config:
             run_config.update(config)
 
@@ -655,7 +697,9 @@ class WorkflowRunner:
         if execution_mode and state_snapshot.values:
             current_values = dict(state_snapshot.values)
             if current_values.get("execution_mode") != execution_mode:
-                logger.info(f"Updating execution mode from {current_values.get('execution_mode')} to {execution_mode}")
+                logger.info(
+                    f"Updating execution mode from {current_values.get('execution_mode')} to {execution_mode}"
+                )
                 await self.graph.aupdate_state(
                     run_config,
                     {"execution_mode": execution_mode},
@@ -670,9 +714,7 @@ class WorkflowRunner:
 
             if progress_callback:
                 # Use streaming to capture node events
-                result = await self._resume_with_callbacks(
-                    command, run_config, progress_callback
-                )
+                result = await self._resume_with_callbacks(command, run_config, progress_callback)
             else:
                 result = await self.graph.ainvoke(command, config=run_config)
         else:
@@ -738,9 +780,7 @@ class WorkflowRunner:
             Current state or None if no checkpoint exists
         """
         if self.graph is None:
-            raise RuntimeError(
-                "WorkflowRunner must be used as async context manager"
-            )
+            raise RuntimeError("WorkflowRunner must be used as async context manager")
 
         run_config = {
             "configurable": {
@@ -776,11 +816,13 @@ class WorkflowRunner:
 
         history = []
         async for snapshot in self.graph.aget_state_history(run_config):
-            history.append({
-                "values": snapshot.values,
-                "next": snapshot.next,
-                "config": snapshot.config,
-            })
+            history.append(
+                {
+                    "values": snapshot.values,
+                    "next": snapshot.next,
+                    "config": snapshot.config,
+                }
+            )
             # Stop collecting after limit to prevent unbounded memory
             if len(history) >= limit:
                 break
@@ -796,9 +838,7 @@ class WorkflowRunner:
             Interrupt details if paused, None otherwise
         """
         if self.graph is None:
-            raise RuntimeError(
-                "WorkflowRunner must be used as async context manager"
-            )
+            raise RuntimeError("WorkflowRunner must be used as async context manager")
 
         run_config = {
             "configurable": {

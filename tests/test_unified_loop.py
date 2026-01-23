@@ -7,29 +7,21 @@ Tests the universal loop pattern that works across all agents
 import asyncio
 import json
 import os
-import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from orchestrator.agents.adapter import AgentCapabilities, AgentType, IterationResult
 from orchestrator.langgraph.integrations.unified_loop import (
+    UNIFIED_ITERATION_PROMPT,
+    LoopContext,
     UnifiedLoopConfig,
     UnifiedLoopResult,
-    LoopContext,
     UnifiedLoopRunner,
-    create_unified_runner,
     create_runner_from_task,
-    should_use_unified_loop,
-    UNIFIED_ITERATION_PROMPT,
+    create_unified_runner,
 )
-from orchestrator.agents.adapter import (
-    AgentType,
-    AgentCapabilities,
-    IterationResult,
-)
-from orchestrator.langgraph.integrations.verification import (
-    VerificationType,
-    VerificationResult,
-)
+from orchestrator.langgraph.integrations.verification import VerificationResult, VerificationType
 
 
 class TestUnifiedLoopConfig:
@@ -677,7 +669,9 @@ class TestCreateRunnerFromTask:
         """Test creating runner from minimal task."""
         task = {"id": "T1"}
 
-        with patch("orchestrator.langgraph.integrations.unified_loop.get_agent_for_task") as mock_get:
+        with patch(
+            "orchestrator.langgraph.integrations.unified_loop.get_agent_for_task"
+        ) as mock_get:
             mock_get.return_value = (AgentType.CLAUDE, None)
             runner = create_runner_from_task(tmp_path, task)
 
@@ -687,7 +681,9 @@ class TestCreateRunnerFromTask:
         """Test creating runner from task with specified agent."""
         task = {"id": "T1", "agent_type": "cursor", "model": "composer"}
 
-        with patch("orchestrator.langgraph.integrations.unified_loop.get_agent_for_task") as mock_get:
+        with patch(
+            "orchestrator.langgraph.integrations.unified_loop.get_agent_for_task"
+        ) as mock_get:
             mock_get.return_value = (AgentType.CURSOR, "composer")
             runner = create_runner_from_task(tmp_path, task)
 
@@ -698,7 +694,9 @@ class TestCreateRunnerFromTask:
         """Test creating runner from task with verification."""
         task = {"id": "T1"}
 
-        with patch("orchestrator.langgraph.integrations.unified_loop.get_agent_for_task") as mock_get:
+        with patch(
+            "orchestrator.langgraph.integrations.unified_loop.get_agent_for_task"
+        ) as mock_get:
             mock_get.return_value = (AgentType.GEMINI, "gemini-2.0-flash")
             runner = create_runner_from_task(tmp_path, task, verification="security")
 
@@ -712,7 +710,7 @@ class TestShouldUseUnifiedLoop:
         """Test that default is false."""
         monkeypatch.delenv("USE_UNIFIED_LOOP", raising=False)
         # Need to reimport to pick up env change
-        from orchestrator.langgraph.integrations import unified_loop
+
         # The module-level constant was set at import time,
         # so we test the logic directly
         assert os.environ.get("USE_UNIFIED_LOOP", "false").lower() != "true"

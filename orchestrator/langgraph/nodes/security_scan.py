@@ -4,15 +4,14 @@ Scans source code for security vulnerabilities
 before completing the workflow.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState
-from ...validators import SecurityScanner
 from ...config import load_project_config
+from ...validators import SecurityScanner
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +68,7 @@ async def security_scan_node(state: WorkflowState) -> dict[str, Any]:
 
     if not result.passed:
         # Format error message
-        error_message = (
-            f"Security scan found {result.blocking_findings} blocking issues:\n\n"
-        )
+        error_message = f"Security scan found {result.blocking_findings} blocking issues:\n\n"
 
         # Group by severity
         by_severity: dict[str, list] = {}
@@ -94,16 +91,18 @@ async def security_scan_node(state: WorkflowState) -> dict[str, Any]:
                         error_message += f"    Fix: {finding.suggestion}\n"
 
         return {
-            "errors": [{
-                "type": "security_vulnerabilities",
-                "message": error_message,
-                "total_findings": result.total_findings,
-                "blocking_findings": result.blocking_findings,
-                "findings_by_severity": {
-                    k.value: v for k, v in result.findings_by_severity.items()
-                },
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "security_vulnerabilities",
+                    "message": error_message,
+                    "total_findings": result.total_findings,
+                    "blocking_findings": result.blocking_findings,
+                    "findings_by_severity": {
+                        k.value: v for k, v in result.findings_by_severity.items()
+                    },
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",  # Retry implementation to fix issues
             "updated_at": datetime.now().isoformat(),
         }

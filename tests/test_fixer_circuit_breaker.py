@@ -1,17 +1,9 @@
 """Tests for fixer circuit breaker."""
 
 import json
-import tempfile
 import time
-from pathlib import Path
 
-import pytest
-
-from orchestrator.fixer.circuit_breaker import (
-    CircuitBreaker,
-    CircuitState,
-    CircuitStats,
-)
+from orchestrator.fixer.circuit_breaker import CircuitBreaker, CircuitState, CircuitStats
 
 
 class TestCircuitStats:
@@ -54,11 +46,15 @@ class TestCircuitBreakerInit:
         fixer_dir = tmp_path / "fixer"
         fixer_dir.mkdir(parents=True)
         state_file = fixer_dir / "circuit_breaker.json"
-        state_file.write_text(json.dumps({
-            "state": "open",
-            "opened_at": time.time() - 1000,  # Far in the past
-            "stats": {"consecutive_failures": 5},
-        }))
+        state_file.write_text(
+            json.dumps(
+                {
+                    "state": "open",
+                    "opened_at": time.time() - 1000,  # Far in the past
+                    "stats": {"consecutive_failures": 5},
+                }
+            )
+        )
 
         cb = CircuitBreaker(tmp_path, failure_threshold=3)
         # State should be HALF_OPEN since timeout expired

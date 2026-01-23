@@ -8,22 +8,24 @@ Implements:
 
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 from enum import Enum
+from typing import Optional
 
 
 class ChunkStrategy(Enum):
     """Chunking strategies."""
-    FIXED = "fixed"           # Fixed size chunks
-    SENTENCE = "sentence"     # Sentence-based
-    PARAGRAPH = "paragraph"   # Paragraph-based
-    SEMANTIC = "semantic"     # Semantic boundaries
+
+    FIXED = "fixed"  # Fixed size chunks
+    SENTENCE = "sentence"  # Sentence-based
+    PARAGRAPH = "paragraph"  # Paragraph-based
+    SEMANTIC = "semantic"  # Semantic boundaries
     HIERARCHICAL = "hierarchical"  # Structure-aware
 
 
 @dataclass
 class Chunk:
     """A chunk of content with metadata."""
+
     content: str
     index: int
     start_char: int
@@ -53,6 +55,7 @@ class Chunk:
 @dataclass
 class ChunkingResult:
     """Result of chunking operation."""
+
     chunks: list[Chunk]
     total_tokens: int
     strategy_used: ChunkStrategy
@@ -81,11 +84,11 @@ class SemanticChunker:
     """
 
     # Patterns for detecting semantic boundaries
-    HEADING_PATTERN = re.compile(r'^#{1,6}\s+.+$', re.MULTILINE)
-    PARAGRAPH_BREAK = re.compile(r'\n\n+')
-    SENTENCE_END = re.compile(r'[.!?]\s+')
-    CODE_BLOCK = re.compile(r'```[\s\S]*?```')
-    LIST_ITEM = re.compile(r'^\s*[-*+]\s+', re.MULTILINE)
+    HEADING_PATTERN = re.compile(r"^#{1,6}\s+.+$", re.MULTILINE)
+    PARAGRAPH_BREAK = re.compile(r"\n\n+")
+    SENTENCE_END = re.compile(r"[.!?]\s+")
+    CODE_BLOCK = re.compile(r"```[\s\S]*?```")
+    LIST_ITEM = re.compile(r"^\s*[-*+]\s+", re.MULTILINE)
 
     def __init__(
         self,
@@ -156,13 +159,15 @@ class SemanticChunker:
             end = min(pos + char_size, len(text))
             content = text[pos:end]
 
-            chunks.append(Chunk(
-                content=content,
-                index=index,
-                start_char=pos,
-                end_char=end,
-                token_estimate=self._estimate_tokens(content),
-            ))
+            chunks.append(
+                Chunk(
+                    content=content,
+                    index=index,
+                    start_char=pos,
+                    end_char=end,
+                    token_estimate=self._estimate_tokens(content),
+                )
+            )
 
             pos = end - (self.overlap_tokens * 4)  # Overlap
             index += 1
@@ -188,13 +193,15 @@ class SemanticChunker:
             # If adding this sentence exceeds max, start new chunk
             if self._estimate_tokens(current_content + " " + sentence) > self.max_chunk_size:
                 if current_content:
-                    chunks.append(Chunk(
-                        content=current_content.strip(),
-                        index=index,
-                        start_char=current_start,
-                        end_char=char_pos,
-                        token_estimate=self._estimate_tokens(current_content),
-                    ))
+                    chunks.append(
+                        Chunk(
+                            content=current_content.strip(),
+                            index=index,
+                            start_char=current_start,
+                            end_char=char_pos,
+                            token_estimate=self._estimate_tokens(current_content),
+                        )
+                    )
                     index += 1
 
                 current_content = sentence
@@ -206,13 +213,15 @@ class SemanticChunker:
 
         # Add final chunk
         if current_content:
-            chunks.append(Chunk(
-                content=current_content.strip(),
-                index=index,
-                start_char=current_start,
-                end_char=len(text),
-                token_estimate=self._estimate_tokens(current_content),
-            ))
+            chunks.append(
+                Chunk(
+                    content=current_content.strip(),
+                    index=index,
+                    start_char=current_start,
+                    end_char=len(text),
+                    token_estimate=self._estimate_tokens(current_content),
+                )
+            )
 
         return chunks
 
@@ -235,13 +244,15 @@ class SemanticChunker:
             # If paragraph alone exceeds max, split it
             if para_tokens > self.max_chunk_size:
                 if current_content:
-                    chunks.append(Chunk(
-                        content=current_content.strip(),
-                        index=index,
-                        start_char=current_start,
-                        end_char=char_pos,
-                        token_estimate=self._estimate_tokens(current_content),
-                    ))
+                    chunks.append(
+                        Chunk(
+                            content=current_content.strip(),
+                            index=index,
+                            start_char=current_start,
+                            end_char=char_pos,
+                            token_estimate=self._estimate_tokens(current_content),
+                        )
+                    )
                     index += 1
                     current_content = ""
                     current_start = char_pos
@@ -257,13 +268,15 @@ class SemanticChunker:
 
             elif self._estimate_tokens(current_content + "\n\n" + para) > self.max_chunk_size:
                 if current_content:
-                    chunks.append(Chunk(
-                        content=current_content.strip(),
-                        index=index,
-                        start_char=current_start,
-                        end_char=char_pos,
-                        token_estimate=self._estimate_tokens(current_content),
-                    ))
+                    chunks.append(
+                        Chunk(
+                            content=current_content.strip(),
+                            index=index,
+                            start_char=current_start,
+                            end_char=char_pos,
+                            token_estimate=self._estimate_tokens(current_content),
+                        )
+                    )
                     index += 1
 
                 current_content = para
@@ -274,13 +287,15 @@ class SemanticChunker:
             char_pos += len(para) + 2
 
         if current_content:
-            chunks.append(Chunk(
-                content=current_content.strip(),
-                index=index,
-                start_char=current_start,
-                end_char=len(text),
-                token_estimate=self._estimate_tokens(current_content),
-            ))
+            chunks.append(
+                Chunk(
+                    content=current_content.strip(),
+                    index=index,
+                    start_char=current_start,
+                    end_char=len(text),
+                    token_estimate=self._estimate_tokens(current_content),
+                )
+            )
 
         return chunks
 
@@ -305,14 +320,16 @@ class SemanticChunker:
         for i, heading in enumerate(headings):
             start = heading.start()
             end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
-            heading_text = heading.group().strip('#').strip()
+            heading_text = heading.group().strip("#").strip()
 
-            sections.append({
-                "heading": heading_text,
-                "start": start,
-                "end": end,
-                "content": text[start:end],
-            })
+            sections.append(
+                {
+                    "heading": heading_text,
+                    "start": start,
+                    "end": end,
+                    "content": text[start:end],
+                }
+            )
 
         # Process each section
         current_section = None
@@ -323,16 +340,18 @@ class SemanticChunker:
 
             if section_tokens <= self.max_chunk_size:
                 # Section fits in one chunk
-                chunks.append(Chunk(
-                    content=content.strip(),
-                    index=index,
-                    start_char=section["start"],
-                    end_char=section["end"],
-                    token_estimate=section_tokens,
-                    heading=current_section,
-                    section=current_section,
-                    importance=self._calculate_importance(content, current_section),
-                ))
+                chunks.append(
+                    Chunk(
+                        content=content.strip(),
+                        index=index,
+                        start_char=section["start"],
+                        end_char=section["end"],
+                        token_estimate=section_tokens,
+                        heading=current_section,
+                        section=current_section,
+                        importance=self._calculate_importance(content, current_section),
+                    )
+                )
                 index += 1
             else:
                 # Split section by paragraphs
@@ -359,11 +378,11 @@ class SemanticChunker:
         for chunk in chunks:
             if chunk.heading:
                 # Determine heading level
-                heading_match = re.match(r'^(#+)', chunk.content)
+                heading_match = re.match(r"^(#+)", chunk.content)
                 if heading_match:
                     level = len(heading_match.group(1))
                     # Pop stack to this level
-                    heading_stack = heading_stack[:level-1]
+                    heading_stack = heading_stack[: level - 1]
                     heading_stack.append(chunk.heading)
 
                 chunk.metadata["hierarchy"] = list(heading_stack)
@@ -532,7 +551,5 @@ class SelectiveContextLoader:
             "chunk_count": len(result.chunks),
             "total_tokens": result.total_tokens,
             "strategy": result.strategy_used.value,
-            "sections": list(set(
-                c.section for c in result.chunks if c.section
-            )),
+            "sections": list(set(c.section for c in result.chunks if c.section)),
         }

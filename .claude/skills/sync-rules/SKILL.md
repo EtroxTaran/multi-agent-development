@@ -1,3 +1,12 @@
+---
+name: sync-rules
+description: Synchronize shared rules into agent context files and headers.
+version: 1.1.0
+tags: [rules, governance, sync]
+owner: orchestration
+status: active
+---
+
 # Sync Rules Skill
 
 Synchronize shared rules from `shared-rules/` to all agent context files.
@@ -14,6 +23,10 @@ This skill propagates rules from the central `shared-rules/` directory to:
 ```
 /sync-rules
 ```
+
+## Prerequisites
+
+- Python environment available to run `scripts/sync-rules.py`.
 
 ## How It Works
 
@@ -67,6 +80,25 @@ After sync, verify:
 - [ ] Timestamp current
 - [ ] No merge conflicts
 - [ ] Rules are complete
+
+## Outputs
+
+- Updated `CLAUDE.md` and any derived context files.
+
+## Error Handling
+
+- If sync fails, stop and fix the script or inputs before continuing.
+- If timestamps are stale, rerun the sync to avoid mismatched rules.
+
+## Examples
+
+```
+/sync-rules
+```
+
+## Related Skills
+
+- `/add-lesson` - Add a lesson before syncing rules
 
 ## When to Sync
 

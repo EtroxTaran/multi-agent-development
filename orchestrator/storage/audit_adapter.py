@@ -5,10 +5,11 @@ This is the DB-only version - no file fallback.
 """
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
 from .async_utils import run_async
 from .base import AuditEntryData, AuditStatisticsData, AuditStorageProtocol
@@ -130,6 +131,7 @@ class AuditStorageAdapter(AuditStorageProtocol):
         """Get or create database backend."""
         if self._db_backend is None:
             from orchestrator.db.repositories.audit import get_audit_repository
+
             self._db_backend = get_audit_repository(self.project_name)
         return self._db_backend
 

@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class VerificationType(str, Enum):
     """Types of verification strategies."""
+
     TESTS = "tests"
     LINT = "lint"
     SECURITY = "security"
@@ -57,6 +58,7 @@ class VerificationResult:
         duration_seconds: Time taken for verification
         command_output: Raw command output
     """
+
     passed: bool
     verification_type: VerificationType
     summary: str = ""
@@ -93,6 +95,7 @@ class VerificationContext:
         previous_failures: Failures from previous iteration
         timeout: Timeout in seconds
     """
+
     project_dir: Path
     test_files: list[str] = field(default_factory=list)
     source_files: list[str] = field(default_factory=list)
@@ -396,9 +399,11 @@ class LintVerification(VerificationStrategy):
                 return "ruff check ."
 
         # Check for ESLint
-        if (self.project_dir / ".eslintrc.js").exists() or \
-           (self.project_dir / ".eslintrc.json").exists() or \
-           (self.project_dir / "eslint.config.js").exists():
+        if (
+            (self.project_dir / ".eslintrc.js").exists()
+            or (self.project_dir / ".eslintrc.json").exists()
+            or (self.project_dir / "eslint.config.js").exists()
+        ):
             return "npm run lint"
 
         # Check for Rust
@@ -500,7 +505,9 @@ class SecurityVerification(VerificationStrategy):
 
         # Parse security results
         issues = self._extract_security_issues(stdout, stderr)
-        passed = return_code == 0 and len([i for i in issues if "HIGH" in i or "CRITICAL" in i]) == 0
+        passed = (
+            return_code == 0 and len([i for i in issues if "HIGH" in i or "CRITICAL" in i]) == 0
+        )
 
         summary = f"{len(issues)} security issues found"
         if passed and not issues:
@@ -524,8 +531,7 @@ class SecurityVerification(VerificationStrategy):
         """Detect security scanner for the project."""
         # Check for Python
         if shutil.which("bandit"):
-            if (self.project_dir / "pyproject.toml").exists() or \
-               any(self.project_dir.glob("*.py")):
+            if (self.project_dir / "pyproject.toml").exists() or any(self.project_dir.glob("*.py")):
                 return "bandit -r . -ll"
 
         # Check for JavaScript

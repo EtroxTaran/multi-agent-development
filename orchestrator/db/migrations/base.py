@@ -213,9 +213,7 @@ class BaseMigration(ABC):
         Raises:
             NotImplementedError: If rollback is not supported
         """
-        raise NotImplementedError(
-            f"Migration {self.version}_{self.name} does not support rollback"
-        )
+        raise NotImplementedError(f"Migration {self.version}_{self.name} does not support rollback")
 
     @property
     def full_name(self) -> str:

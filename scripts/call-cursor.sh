@@ -65,12 +65,34 @@ fi
 # - Prompt is a positional argument at the end
 echo "Calling Cursor CLI..."
 
-cursor-agent --print \
-    --output-format json \
-    --force \
-    $CONTEXT_OPTS \
-    "$PROMPT" \
-    > "$OUTPUT_FILE" 2>&1
+# Function to execute Cursor agent
+run_cursor() {
+    local model="$1"
+    echo "Calling Cursor CLI with model: $model..."
+    cursor-agent --print \
+        --output-format json \
+        --force \
+        --model "$model" \
+        $CONTEXT_OPTS \
+        "$PROMPT" \
+        > "$OUTPUT_FILE" 2>&1
+}
+
+# Initial execution
+run_cursor "$CURSOR_MODEL"
+
+# Check for quota/rate limit errors in output
+# Grep for common error terms: quota, rate limit, 429, too many requests
+if grep -i -qE "quota|rate limit|429|too many requests|exhausted" "$OUTPUT_FILE"; then
+    echo "Warning: Rate limit or quota detected for model $CURSOR_MODEL"
+
+    if [ "$CURSOR_MODEL" != "auto" ]; then
+        echo "Switching to 'auto' model and retrying..."
+        run_cursor "auto"
+    else
+        echo "Error: Quota exhausted even on auto model"
+    fi
+fi
 
 # Check if output was created
 if [ ! -f "$OUTPUT_FILE" ]; then

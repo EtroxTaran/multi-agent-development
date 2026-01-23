@@ -1,0 +1,1 @@
+../skills/git-committer-atomic/SKILL.md

@@ -4,8 +4,8 @@ Validates that PRODUCT.md files have complete, non-placeholder content
 with required sections and proper formatting.
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -16,14 +16,16 @@ logger = logging.getLogger(__name__)
 
 class IssueSeverity(str, Enum):
     """Severity levels for validation issues."""
-    ERROR = "error"      # Blocks workflow
+
+    ERROR = "error"  # Blocks workflow
     WARNING = "warning"  # Logged but doesn't block
-    INFO = "info"        # Suggestion for improvement
+    INFO = "info"  # Suggestion for improvement
 
 
 @dataclass
 class ValidationIssue:
     """A single validation issue."""
+
     section: str
     message: str
     severity: IssueSeverity
@@ -41,6 +43,7 @@ class ValidationIssue:
 @dataclass
 class ProductValidationResult:
     """Result of validating a PRODUCT.md file."""
+
     valid: bool
     score: float  # 0-10 scale
     issues: list[ValidationIssue] = field(default_factory=list)
@@ -163,21 +166,21 @@ class ProductValidator:
         placeholder_count = len(placeholder_matches)
 
         if placeholder_count > 0:
-            issues.append(ValidationIssue(
-                section="general",
-                message=f"Found {placeholder_count} placeholder(s) in content",
-                severity=IssueSeverity.ERROR,
-                suggestion="Replace all placeholders with actual content",
-            ))
+            issues.append(
+                ValidationIssue(
+                    section="general",
+                    message=f"Found {placeholder_count} placeholder(s) in content",
+                    severity=IssueSeverity.ERROR,
+                    suggestion="Replace all placeholders with actual content",
+                )
+            )
 
         # Validate each section
         total_weight = 0.0
         weighted_score = 0.0
 
         for section_name, rules in SECTION_RULES.items():
-            score, section_issues = self._validate_section(
-                content, section_name, rules
-            )
+            score, section_issues = self._validate_section(content, section_name, rules)
             section_scores[section_name] = score
             issues.extend(section_issues)
 
@@ -202,12 +205,14 @@ class ProductValidator:
         if final_score < 4.0:
             valid = False
             if error_count == 0:
-                issues.append(ValidationIssue(
-                    section="overall",
-                    message=f"Overall score {final_score:.1f} is below minimum threshold (4.0)",
-                    severity=IssueSeverity.ERROR,
-                    suggestion="Add more detail to required sections",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        section="overall",
+                        message=f"Overall score {final_score:.1f} is below minimum threshold (4.0)",
+                        severity=IssueSeverity.ERROR,
+                        suggestion="Add more detail to required sections",
+                    )
+                )
 
         return ProductValidationResult(
             valid=valid,
@@ -231,12 +236,14 @@ class ProductValidator:
             return ProductValidationResult(
                 valid=False,
                 score=0.0,
-                issues=[ValidationIssue(
-                    section="file",
-                    message=f"File not found: {path}",
-                    severity=IssueSeverity.ERROR,
-                    suggestion="Create PRODUCT.md with your feature specification",
-                )],
+                issues=[
+                    ValidationIssue(
+                        section="file",
+                        message=f"File not found: {path}",
+                        severity=IssueSeverity.ERROR,
+                        suggestion="Create PRODUCT.md with your feature specification",
+                    )
+                ],
             )
 
         try:
@@ -245,11 +252,13 @@ class ProductValidator:
             return ProductValidationResult(
                 valid=False,
                 score=0.0,
-                issues=[ValidationIssue(
-                    section="file",
-                    message=f"Could not read file: {e}",
-                    severity=IssueSeverity.ERROR,
-                )],
+                issues=[
+                    ValidationIssue(
+                        section="file",
+                        message=f"Could not read file: {e}",
+                        severity=IssueSeverity.ERROR,
+                    )
+                ],
             )
 
         return self.validate(content)
@@ -277,12 +286,14 @@ class ProductValidator:
 
         if section_content is None:
             if rules.get("required", False):
-                issues.append(ValidationIssue(
-                    section=section_name,
-                    message=f"Required section '{section_name}' not found",
-                    severity=IssueSeverity.ERROR,
-                    suggestion=f"Add a '{section_name}' section with relevant content",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        section=section_name,
+                        message=f"Required section '{section_name}' not found",
+                        severity=IssueSeverity.ERROR,
+                        suggestion=f"Add a '{section_name}' section with relevant content",
+                    )
+                )
                 return 0.0, issues
             else:
                 # Optional section missing is fine
@@ -291,12 +302,14 @@ class ProductValidator:
         # Check minimum characters
         min_chars = rules.get("min_chars")
         if min_chars and len(section_content) < min_chars:
-            issues.append(ValidationIssue(
-                section=section_name,
-                message=f"Section '{section_name}' has only {len(section_content)} chars (min: {min_chars})",
-                severity=IssueSeverity.WARNING,
-                suggestion=f"Add more detail to reach at least {min_chars} characters",
-            ))
+            issues.append(
+                ValidationIssue(
+                    section=section_name,
+                    message=f"Section '{section_name}' has only {len(section_content)} chars (min: {min_chars})",
+                    severity=IssueSeverity.WARNING,
+                    suggestion=f"Add more detail to reach at least {min_chars} characters",
+                )
+            )
             # Proportional score based on content length
             char_score = (len(section_content) / min_chars) * 10
             return min(char_score, 10.0), issues
@@ -304,12 +317,14 @@ class ProductValidator:
         # Check maximum characters
         max_chars = rules.get("max_chars")
         if max_chars and len(section_content) > max_chars:
-            issues.append(ValidationIssue(
-                section=section_name,
-                message=f"Section '{section_name}' exceeds max length ({len(section_content)} > {max_chars})",
-                severity=IssueSeverity.INFO,
-                suggestion="Consider being more concise",
-            ))
+            issues.append(
+                ValidationIssue(
+                    section=section_name,
+                    message=f"Section '{section_name}' exceeds max length ({len(section_content)} > {max_chars})",
+                    severity=IssueSeverity.INFO,
+                    suggestion="Consider being more concise",
+                )
+            )
 
         # Check minimum checklist items
         min_checklist = rules.get("min_checklist_items")
@@ -320,12 +335,14 @@ class ProductValidator:
             total_items = max(checklist_count, bullet_count)
 
             if total_items < min_checklist:
-                issues.append(ValidationIssue(
-                    section=section_name,
-                    message=f"Section '{section_name}' has only {total_items} items (min: {min_checklist})",
-                    severity=IssueSeverity.WARNING,
-                    suggestion=f"Add at least {min_checklist} checklist items with '- [ ]' format",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        section=section_name,
+                        message=f"Section '{section_name}' has only {total_items} items (min: {min_checklist})",
+                        severity=IssueSeverity.WARNING,
+                        suggestion=f"Add at least {min_checklist} checklist items with '- [ ]' format",
+                    )
+                )
                 return (total_items / min_checklist) * 10, issues
 
         # Check minimum code blocks
@@ -333,12 +350,14 @@ class ProductValidator:
         if min_code_blocks:
             code_block_count = len(re.findall(r"```[\s\S]*?```", section_content))
             if code_block_count < min_code_blocks:
-                issues.append(ValidationIssue(
-                    section=section_name,
-                    message=f"Section '{section_name}' has only {code_block_count} code blocks (min: {min_code_blocks})",
-                    severity=IssueSeverity.WARNING,
-                    suggestion="Add code examples in fenced code blocks (```)",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        section=section_name,
+                        message=f"Section '{section_name}' has only {code_block_count} code blocks (min: {min_code_blocks})",
+                        severity=IssueSeverity.WARNING,
+                        suggestion="Add code examples in fenced code blocks (```)",
+                    )
+                )
                 if code_block_count == 0:
                     return 3.0, issues  # Partial credit for having the section
                 return (code_block_count / min_code_blocks) * 10, issues
@@ -346,12 +365,14 @@ class ProductValidator:
         # Check for placeholders in section
         section_placeholders = self.placeholder_regex.findall(section_content)
         if section_placeholders:
-            issues.append(ValidationIssue(
-                section=section_name,
-                message=f"Section '{section_name}' contains placeholders",
-                severity=IssueSeverity.ERROR,
-                suggestion="Replace placeholder text with actual content",
-            ))
+            issues.append(
+                ValidationIssue(
+                    section=section_name,
+                    message=f"Section '{section_name}' contains placeholders",
+                    severity=IssueSeverity.ERROR,
+                    suggestion="Replace placeholder text with actual content",
+                )
+            )
             return 3.0, issues  # Heavily penalize
 
         # Section passes all checks

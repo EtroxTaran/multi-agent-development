@@ -154,10 +154,10 @@ class AnalysisResult:
         pattern_score = max(0.0, pattern_score)
 
         return (
-            self.semantic.overall() * weights["semantic"] +
-            self.structural.overall() * weights["structural"] +
-            self.efficiency.overall() * weights["efficiency"] +
-            pattern_score * weights["patterns"]
+            self.semantic.overall() * weights["semantic"]
+            + self.structural.overall() * weights["structural"]
+            + self.efficiency.overall() * weights["efficiency"]
+            + pattern_score * weights["patterns"]
         )
 
 
@@ -166,23 +166,23 @@ class OutputAnalyzer:
 
     # Common verbosity patterns
     VERBOSITY_PATTERNS = [
-        (r'\b(basically|essentially|actually|really|just|simply)\b', "filler words"),
-        (r'\b(in order to)\b', "verbose phrase (use 'to')"),
-        (r'\b(at this point in time)\b', "verbose phrase (use 'now')"),
-        (r'\b(due to the fact that)\b', "verbose phrase (use 'because')"),
-        (r'(.+?)\1{2,}', "repetitive content"),
-        (r'\n{3,}', "excessive newlines"),
-        (r'^\s*#+ .+\n\n^\s*#+ .+', "consecutive headings without content"),
+        (r"\b(basically|essentially|actually|really|just|simply)\b", "filler words"),
+        (r"\b(in order to)\b", "verbose phrase (use 'to')"),
+        (r"\b(at this point in time)\b", "verbose phrase (use 'now')"),
+        (r"\b(due to the fact that)\b", "verbose phrase (use 'because')"),
+        (r"(.+?)\1{2,}", "repetitive content"),
+        (r"\n{3,}", "excessive newlines"),
+        (r"^\s*#+ .+\n\n^\s*#+ .+", "consecutive headings without content"),
     ]
 
     # Structural indicators
     STRUCTURE_PATTERNS = [
-        (r'^\{[\s\S]*\}$', "valid JSON object"),
-        (r'^\[[\s\S]*\]$', "valid JSON array"),
-        (r'^```[\s\S]*```$', "code block"),
-        (r'^#+\s+.+$', "markdown heading", re.MULTILINE),
-        (r'^\d+\.\s+.+$', "numbered list", re.MULTILINE),
-        (r'^[-*]\s+.+$', "bullet list", re.MULTILINE),
+        (r"^\{[\s\S]*\}$", "valid JSON object"),
+        (r"^\[[\s\S]*\]$", "valid JSON array"),
+        (r"^```[\s\S]*```$", "code block"),
+        (r"^#+\s+.+$", "markdown heading", re.MULTILINE),
+        (r"^\d+\.\s+.+$", "numbered list", re.MULTILINE),
+        (r"^[-*]\s+.+$", "bullet list", re.MULTILINE),
     ]
 
     def __init__(self, error_history: Optional[list[dict]] = None):
@@ -317,7 +317,7 @@ class OutputAnalyzer:
                 format_consistency = 0.0
                 errors.append("Expected JSON format but got invalid JSON")
         elif expected_format == "markdown":
-            if not re.search(r'^#+\s+', output, re.MULTILINE):
+            if not re.search(r"^#+\s+", output, re.MULTILINE):
                 format_consistency *= 0.8
                 errors.append("Expected markdown but no headings found")
 
@@ -353,7 +353,7 @@ class OutputAnalyzer:
         # Estimate minimum tokens (remove detected verbosity)
         clean_output = output
         for pattern, _ in self.VERBOSITY_PATTERNS[:6]:  # Only word-level patterns
-            clean_output = re.sub(pattern, '', clean_output, flags=re.IGNORECASE)
+            clean_output = re.sub(pattern, "", clean_output, flags=re.IGNORECASE)
 
         estimated_minimum = len(clean_output) // 4
         estimated_minimum = max(estimated_minimum, output_tokens // 2)  # At least half
@@ -382,56 +382,66 @@ class OutputAnalyzer:
         for pattern, description in self.VERBOSITY_PATTERNS:
             matches = re.findall(pattern, output, re.IGNORECASE | re.MULTILINE)
             if len(matches) > 3:  # Threshold for flagging
-                patterns.append(DetectedPattern(
-                    pattern_type=PatternType.VERBOSITY,
-                    description=f"Excessive {description}",
-                    severity="medium" if len(matches) > 5 else "low",
-                    suggestion=f"Reduce usage of {description}",
-                ))
+                patterns.append(
+                    DetectedPattern(
+                        pattern_type=PatternType.VERBOSITY,
+                        description=f"Excessive {description}",
+                        severity="medium" if len(matches) > 5 else "low",
+                        suggestion=f"Reduce usage of {description}",
+                    )
+                )
 
         # Check for repetition
-        sentences = re.split(r'[.!?]+', output)
+        sentences = re.split(r"[.!?]+", output)
         unique_sentences = set(s.strip().lower() for s in sentences if len(s.strip()) > 20)
         if len(sentences) > 5 and len(unique_sentences) < len(sentences) * 0.7:
-            patterns.append(DetectedPattern(
-                pattern_type=PatternType.REPETITION,
-                description="Significant content repetition detected",
-                severity="high",
-                suggestion="Remove duplicate content and consolidate ideas",
-            ))
+            patterns.append(
+                DetectedPattern(
+                    pattern_type=PatternType.REPETITION,
+                    description="Significant content repetition detected",
+                    severity="high",
+                    suggestion="Remove duplicate content and consolidate ideas",
+                )
+            )
 
         # Check for missing structure in long outputs
         if len(output) > 2000:
-            has_headings = bool(re.search(r'^#+\s+', output, re.MULTILINE))
-            has_lists = bool(re.search(r'^[-*\d]+[.)\s]', output, re.MULTILINE))
+            has_headings = bool(re.search(r"^#+\s+", output, re.MULTILINE))
+            has_lists = bool(re.search(r"^[-*\d]+[.)\s]", output, re.MULTILINE))
             if not has_headings and not has_lists:
-                patterns.append(DetectedPattern(
-                    pattern_type=PatternType.MISSING_STRUCTURE,
-                    description="Long output lacks organizational structure",
-                    severity="medium",
-                    suggestion="Add headings or bullet points to organize content",
-                ))
+                patterns.append(
+                    DetectedPattern(
+                        pattern_type=PatternType.MISSING_STRUCTURE,
+                        description="Long output lacks organizational structure",
+                        severity="medium",
+                        suggestion="Add headings or bullet points to organize content",
+                    )
+                )
 
         # Check for incomplete reasoning
         reasoning_starters = ["because", "therefore", "thus", "since", "due to"]
         has_reasoning = any(word in output.lower() for word in reasoning_starters)
         if len(output) > 500 and not has_reasoning:
-            patterns.append(DetectedPattern(
-                pattern_type=PatternType.INCOMPLETE_REASONING,
-                description="Output lacks explicit reasoning",
-                severity="low",
-                suggestion="Add explanations for decisions and conclusions",
-            ))
+            patterns.append(
+                DetectedPattern(
+                    pattern_type=PatternType.INCOMPLETE_REASONING,
+                    description="Output lacks explicit reasoning",
+                    severity="low",
+                    suggestion="Add explanations for decisions and conclusions",
+                )
+            )
 
         # Check for format errors
-        if output.count('```') % 2 != 0:
-            patterns.append(DetectedPattern(
-                pattern_type=PatternType.FORMAT_ERROR,
-                description="Unclosed code block",
-                severity="medium",
-                location="Code blocks",
-                suggestion="Ensure all code blocks are properly closed",
-            ))
+        if output.count("```") % 2 != 0:
+            patterns.append(
+                DetectedPattern(
+                    pattern_type=PatternType.FORMAT_ERROR,
+                    description="Unclosed code block",
+                    severity="medium",
+                    location="Code blocks",
+                    suggestion="Ensure all code blocks are properly closed",
+                )
+            )
 
         return patterns
 
@@ -502,14 +512,58 @@ class OutputAnalyzer:
             List of keywords
         """
         # Remove common words and extract significant terms
-        stopwords = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
-                     'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-                     'would', 'could', 'should', 'may', 'might', 'must', 'shall',
-                     'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
-                     'as', 'into', 'through', 'during', 'before', 'after', 'and',
-                     'but', 'or', 'not', 'this', 'that', 'these', 'those', 'it'}
+        stopwords = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "and",
+            "but",
+            "or",
+            "not",
+            "this",
+            "that",
+            "these",
+            "those",
+            "it",
+        }
 
-        words = re.findall(r'\b\w{3,}\b', text.lower())
+        words = re.findall(r"\b\w{3,}\b", text.lower())
         return [w for w in words if w not in stopwords][:10]
 
     def _assess_coherence(self, output: str) -> float:
@@ -524,10 +578,25 @@ class OutputAnalyzer:
         score = 1.0
 
         # Check for logical connectors
-        connectors = ['therefore', 'however', 'moreover', 'furthermore',
-                      'because', 'since', 'although', 'while', 'thus',
-                      'consequently', 'additionally', 'finally', 'first',
-                      'second', 'third', 'next', 'then']
+        connectors = [
+            "therefore",
+            "however",
+            "moreover",
+            "furthermore",
+            "because",
+            "since",
+            "although",
+            "while",
+            "thus",
+            "consequently",
+            "additionally",
+            "finally",
+            "first",
+            "second",
+            "third",
+            "next",
+            "then",
+        ]
         connector_count = sum(1 for c in connectors if c in output.lower())
 
         # Long output should have connectors
@@ -536,10 +605,10 @@ class OutputAnalyzer:
 
         # Check for contradictions (simple heuristic)
         contradiction_pairs = [
-            ('always', 'never'),
-            ('all', 'none'),
-            ('true', 'false'),
-            ('yes', 'no'),
+            ("always", "never"),
+            ("all", "none"),
+            ("true", "false"),
+            ("yes", "no"),
         ]
         for word1, word2 in contradiction_pairs:
             if word1 in output.lower() and word2 in output.lower():
@@ -560,17 +629,17 @@ class OutputAnalyzer:
         score = 0.5  # Start at middle
 
         # Check for headings
-        heading_count = len(re.findall(r'^#+\s+', output, re.MULTILINE))
+        heading_count = len(re.findall(r"^#+\s+", output, re.MULTILINE))
         if heading_count > 0:
             score += 0.2
 
         # Check for lists
-        list_count = len(re.findall(r'^[-*\d]+[.)\s]', output, re.MULTILINE))
+        list_count = len(re.findall(r"^[-*\d]+[.)\s]", output, re.MULTILINE))
         if list_count > 0:
             score += 0.15
 
         # Check for code blocks
-        code_block_count = output.count('```')
+        code_block_count = output.count("```")
         if code_block_count >= 2:  # At least one complete block
             score += 0.1
 

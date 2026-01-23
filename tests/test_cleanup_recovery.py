@@ -1,27 +1,12 @@
 """Unit tests for cleanup and recovery modules."""
 
-import pytest
 import json
-from pathlib import Path
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch, AsyncMock
 
-from orchestrator.cleanup import (
-    CleanupManager,
-    CleanupRule,
-    ArtifactLifetime,
-    CleanupResult,
-)
-from orchestrator.recovery import (
-    RecoveryHandler,
-    RecoveryResult,
-    ErrorCategory,
-)
-from orchestrator.recovery.handlers import (
-    ErrorContext,
-    RecoveryAction,
-    EscalationRequest,
-)
+import pytest
+
+from orchestrator.cleanup import ArtifactLifetime, CleanupManager, CleanupRule
+from orchestrator.recovery import ErrorCategory, RecoveryHandler, RecoveryResult
+from orchestrator.recovery.handlers import ErrorContext, EscalationRequest, RecoveryAction
 
 
 class TestCleanupManager:
@@ -181,6 +166,7 @@ class TestRecoveryHandler:
     @pytest.mark.asyncio
     async def test_handle_transient_error_max_retries(self, recovery_handler):
         """Test escalation after max retries."""
+
         async def always_fail():
             raise ConnectionError("Permanent failure")
 
@@ -234,8 +220,10 @@ class TestRecoveryHandler:
 
         assert result.escalation_required is True
         assert result.should_continue is False
-        assert "critical" in str(result.escalation_reason).lower() or \
-               "security" in str(result.escalation_reason).lower()
+        assert (
+            "critical" in str(result.escalation_reason).lower()
+            or "security" in str(result.escalation_reason).lower()
+        )
 
     @pytest.mark.asyncio
     async def test_handle_spec_mismatch_escalation(self, recovery_handler):
@@ -267,9 +255,7 @@ class TestRecoveryHandler:
 
         recovery_handler._write_escalation(escalation)
 
-        escalation_files = list(
-            (project_dir / ".workflow" / "escalations").glob("*.json")
-        )
+        escalation_files = list((project_dir / ".workflow" / "escalations").glob("*.json"))
         assert len(escalation_files) == 1
 
         content = json.loads(escalation_files[0].read_text())

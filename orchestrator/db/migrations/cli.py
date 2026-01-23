@@ -12,7 +12,6 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
@@ -173,7 +172,8 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     # Generate template
     class_name = "".join(word.capitalize() for word in name.split("_"))
-    template = dedent(f'''
+    template = dedent(
+        f'''
         """Migration {next_version}: {name.replace("_", " ").title()}.
 
         TODO: Describe what this migration does.
@@ -205,7 +205,8 @@ def cmd_create(args: argparse.Namespace) -> int:
                 # Example:
                 # await ctx.execute("REMOVE TABLE new_table")
                 raise NotImplementedError("Rollback not implemented")
-    ''').strip()
+    '''
+    ).strip()
 
     filepath.write_text(template + "\n")
     print(f"Created migration: {filepath}")
@@ -222,7 +223,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="SurrealDB migration management for Conductor",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=dedent("""
+        epilog=dedent(
+            """
             Examples:
               # Apply all pending migrations
               python -m orchestrator.db.migrations migrate --project my-app
@@ -241,11 +243,13 @@ def create_parser() -> argparse.ArgumentParser:
 
               # Create new migration
               python -m orchestrator.db.migrations create add_user_preferences
-        """),
+        """
+        ),
     )
 
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose output",
     )
@@ -258,7 +262,8 @@ def create_parser() -> argparse.ArgumentParser:
         help="Apply pending migrations",
     )
     migrate_parser.add_argument(
-        "--project", "-p",
+        "--project",
+        "-p",
         required=True,
         help="Project name",
     )
@@ -278,7 +283,8 @@ def create_parser() -> argparse.ArgumentParser:
         help="Rollback applied migrations",
     )
     rollback_parser.add_argument(
-        "--project", "-p",
+        "--project",
+        "-p",
         required=True,
         help="Project name",
     )
@@ -300,7 +306,8 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show migration status",
     )
     status_parser.add_argument(
-        "--project", "-p",
+        "--project",
+        "-p",
         required=True,
         help="Project name",
     )

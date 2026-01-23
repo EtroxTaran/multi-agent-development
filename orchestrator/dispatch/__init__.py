@@ -3,9 +3,9 @@
 from orchestrator.dispatch.protocol import (
     AgentDispatcher,
     DispatchResult,
-    Task,
-    InvalidTaskAssignment,
     InvalidAgentOutput,
+    InvalidTaskAssignment,
+    Task,
 )
 
 __all__ = [

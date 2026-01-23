@@ -1,0 +1,1 @@
+../skills/call-cursor/SKILL.md

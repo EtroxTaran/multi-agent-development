@@ -4,17 +4,10 @@ NOTE: These tests test both the legacy StateManager (file-based) and the
 WorkflowStorageAdapter (DB-based) interfaces.
 """
 
-import json
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
 
-from orchestrator.utils.state import (
-    StateManager,
-    WorkflowState,
-    PhaseState,
-    PhaseStatus,
-)
+import pytest
+
+from orchestrator.utils.state import PhaseState, PhaseStatus, StateManager, WorkflowState
 
 
 class TestPhaseState:

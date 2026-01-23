@@ -1,3 +1,12 @@
+---
+name: verify-code
+description: Run Phase 4 verification with Cursor and Gemini code review.
+version: 1.1.0
+tags: [verification, review, security]
+owner: orchestration
+status: active
+---
+
 # Verify Code Skill
 
 Run Phase 4 verification with Cursor and Gemini code review.
@@ -18,11 +27,9 @@ This skill coordinates parallel code review of the implementation by:
 
 ## Execution Steps
 
-### 1. Prepare Verification Directory
+### 1. Prepare Verification Storage
 
-```bash
-mkdir -p .workflow/phases/verification
-```
+Ensure verification outputs will be stored in `phase_outputs` and `logs` (no local directories).
 
 ### 2. Gather Implementation Summary
 
@@ -41,10 +48,10 @@ cursor-agent --print --output-format json "
 # Code Review - Security & Quality Audit
 
 ## Implementation Summary
-$(cat .workflow/phases/implementation/summary.json)
+Read: implementation summary from `phase_outputs` (type=implementation_result)
 
 ## Files to Review
-$(find src tests -name '*.py' -o -name '*.ts' -o -name '*.js' | head -50)
+Review files changed by the implementation (focus on changed files first).
 
 ## Your Review Focus
 
@@ -117,7 +124,7 @@ $(find src tests -name '*.py' -o -name '*.ts' -o -name '*.js' | head -50)
 }
 
 IMPORTANT: Any security vulnerability of severity 'high' or 'critical' is automatically blocking.
-" > .workflow/phases/verification/cursor-review.json
+" > cursor-review.json
 ```
 
 **Gemini Code Review**:
@@ -126,10 +133,10 @@ gemini --yolo "
 # Code Review - Architecture & Design Audit
 
 ## Implementation Summary
-$(cat .workflow/phases/implementation/summary.json)
+Read: implementation summary from `phase_outputs` (type=implementation_result)
 
 ## Original Plan
-$(cat .workflow/phases/planning/plan.json)
+Read: plan from `phase_outputs` (type=plan)
 
 ## Your Review Focus
 
@@ -198,7 +205,7 @@ $(cat .workflow/phases/planning/plan.json)
 \`\`\`
 
 Focus on significant issues. Don't block for style preferences.
-" > .workflow/phases/verification/gemini-review.json
+" > gemini-review.json
 ```
 
 ### 4. Parse Results
@@ -242,7 +249,7 @@ If either agent doesn't approve:
 
 ### 7. Create Consolidated Review
 
-Write `.workflow/phases/verification/consolidated-review.json`:
+Write consolidated output to `phase_outputs` (type=verification_consolidated):
 
 ```json
 {
@@ -325,6 +332,15 @@ When issues are found, generate fix tasks:
 - Max verification attempts: 3
 - After 3 failures: Human escalation
 - Document all attempts in state
+
+## Outputs
+
+- `phase_outputs` entries: `cursor_review`, `gemini_review`, `verification_consolidated`.
+
+## Error Handling
+
+- If one agent fails, proceed with the other and mark the consolidation as partial.
+- If both fail, escalate to human review.
 
 ## Related Skills
 

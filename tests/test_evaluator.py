@@ -1,34 +1,24 @@
 """Tests for the agent evaluation system."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.evaluation.metrics import (
-    EvaluationMetric,
-    MetricWeight,
-    EVALUATION_CRITERIA,
-    compute_weighted_score,
-    validate_scores,
-    ScoreThresholds,
-    DEFAULT_THRESHOLDS,
-)
-from orchestrator.evaluation.evaluator import (
-    AgentEvaluator,
-    EvaluationResult,
-)
-from orchestrator.evaluation.g_eval import (
-    GEvalEvaluator,
-    GEvalResult,
-    CriterionEvaluation,
-)
 from orchestrator.evaluation.analyzer import (
+    AnalysisResult,
+    EfficiencyScore,
     OutputAnalyzer,
     PatternType,
-    DetectedPattern,
     SemanticScore,
     StructuralScore,
-    EfficiencyScore,
-    AnalysisResult,
+)
+from orchestrator.evaluation.evaluator import EvaluationResult
+from orchestrator.evaluation.g_eval import CriterionEvaluation, GEvalEvaluator, GEvalResult
+from orchestrator.evaluation.metrics import (
+    DEFAULT_THRESHOLDS,
+    EVALUATION_CRITERIA,
+    EvaluationMetric,
+    MetricWeight,
+    ScoreThresholds,
+    compute_weighted_score,
+    validate_scores,
 )
 
 
@@ -233,13 +223,13 @@ class TestGEvalEvaluator:
         assert evaluator._extract_score_from_text('{"score": 8}') == 8.0
 
         # Natural language
-        assert evaluator._extract_score_from_text('I give this a score: 7') == 7.0
+        assert evaluator._extract_score_from_text("I give this a score: 7") == 7.0
 
         # Fraction format
-        assert evaluator._extract_score_from_text('Rating: 9/10') == 9.0
+        assert evaluator._extract_score_from_text("Rating: 9/10") == 9.0
 
         # No score found
-        assert evaluator._extract_score_from_text('No score here') == 5.0
+        assert evaluator._extract_score_from_text("No score here") == 5.0
 
 
 class TestOutputAnalyzer:

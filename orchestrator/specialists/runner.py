@@ -8,21 +8,21 @@ and iterative (loop) execution modes.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Any, Optional
 
 from ..agents.base import BaseAgent
 from ..agents.claude_agent import ClaudeAgent
 from ..agents.cursor_agent import CursorAgent
 from ..agents.gemini_agent import GeminiAgent
-from ..agents.adapter import AgentType, create_adapter, get_agent_for_task
 from ..langgraph.integrations.unified_loop import (
-    UnifiedLoopRunner,
+    LoopContext,
     UnifiedLoopConfig,
     UnifiedLoopResult,
-    LoopContext,
+    UnifiedLoopRunner,
 )
 
 logger = logging.getLogger(__name__)
+
 
 class SpecialistRunner:
     """Runs a specific specialist agent with its configured context."""
@@ -46,14 +46,14 @@ class SpecialistRunner:
             if path.is_dir() and path.name.startswith(agent_id):
                 agent_dir = path
                 break
-        
+
         if not agent_dir:
             raise ValueError(f"Agent directory not found for ID: {agent_id}")
 
         # Determine agent type and context file
         agent_type = "claude"
         context_file = None
-        
+
         if (agent_dir / "CLAUDE.md").exists():
             agent_type = "claude"
             context_file = agent_dir / "CLAUDE.md"
@@ -63,7 +63,7 @@ class SpecialistRunner:
         elif (agent_dir / "CURSOR-RULES.md").exists():
             agent_type = "cursor"
             context_file = agent_dir / "CURSOR-RULES.md"
-        
+
         # Load tools
         tools = []
         tools_file = agent_dir / "TOOLS.json"
@@ -78,7 +78,7 @@ class SpecialistRunner:
             "type": agent_type,
             "context_file": context_file,
             "tools": tools,
-            "dir": agent_dir
+            "dir": agent_dir,
         }
 
     def create_agent(self, agent_id: str) -> BaseAgent:
@@ -91,35 +91,29 @@ class SpecialistRunner:
             Configured agent instance
         """
         config = self.get_agent_config(agent_id)
-        
+
         if config["type"] == "claude":
             # For Claude, we inject the context file as a system prompt
             # relative path from project root is required by ClaudeAgent
             rel_context = config["context_file"].relative_to(self.project_dir)
             return ClaudeAgent(
-                self.project_dir,
-                allowed_tools=config["tools"],
-                system_prompt_file=str(rel_context)
+                self.project_dir, allowed_tools=config["tools"], system_prompt_file=str(rel_context)
             )
-            
+
         elif config["type"] == "cursor":
             # Cursor agent handles its own rules via .cursor/rules usually,
             # but we can pass instructions in the prompt.
             # For now, we return the standard agent, prompt injection happens at run time.
             return CursorAgent(self.project_dir)
-            
+
         elif config["type"] == "gemini":
             return GeminiAgent(self.project_dir)
-            
+
         else:
             raise ValueError(f"Unknown agent type: {config['type']}")
 
     async def run_specialist(
-        self,
-        agent_id: str,
-        prompt: str,
-        task_id: str = "unknown",
-        **kwargs
+        self, agent_id: str, prompt: str, task_id: str = "unknown", **kwargs
     ) -> dict[str, Any]:
         """Run a specialist agent task.
 
@@ -159,7 +153,7 @@ class SpecialistRunner:
         task_id: str,
         context: Optional[LoopContext] = None,
         config: Optional[UnifiedLoopConfig] = None,
-        **kwargs
+        **kwargs,
     ) -> UnifiedLoopResult:
         """Run a specialist agent in iterative loop mode.
 
@@ -192,7 +186,7 @@ class SpecialistRunner:
                 enable_session=(agent_type == "claude"),
                 enable_error_context=True,
                 enable_budget=True,
-                **kwargs
+                **kwargs,
             )
 
         # Build loop context

@@ -5,7 +5,7 @@ Contains routers for prerequisites, planning, implementation, and completion pha
 
 from typing import Literal
 
-from ..state import WorkflowState, WorkflowDecision, PhaseStatus
+from ..state import PhaseStatus, WorkflowDecision, WorkflowState
 
 
 def prerequisites_router(
@@ -41,8 +41,7 @@ def prerequisites_router(
     if errors:
         # Check if any errors are blocking
         blocking_errors = [
-            e for e in errors
-            if e.get("type") in ("missing_product_md", "no_agents_available")
+            e for e in errors if e.get("type") in ("missing_product_md", "no_agents_available")
         ]
         if blocking_errors:
             return "human_escalation"
@@ -218,6 +217,7 @@ def human_escalation_router(
 
 
 # New routers for risk mitigation nodes
+
 
 def product_validation_router(
     state: WorkflowState,
@@ -404,6 +404,7 @@ def approval_gate_router(
 
 # Discussion and Research phase routers (GSD pattern)
 
+
 def discuss_router(
     state: WorkflowState,
 ) -> Literal["discuss_complete", "human_escalation", "discuss_retry"]:
@@ -468,11 +469,91 @@ def research_router(
     # Check for critical errors
     errors = state.get("errors", [])
     critical_errors = [
-        e for e in errors
-        if e.get("type") == "research_phase_error" and e.get("critical")
+        e for e in errors if e.get("type") == "research_phase_error" and e.get("critical")
     ]
     if critical_errors:
         return "human_escalation"
 
     # Default: research complete (best-effort)
     return "research_complete"
+
+
+def quality_gate_router(
+    state: WorkflowState,
+) -> Literal["cursor_review", "implementation", "human_escalation", "__end__"]:
+    """Route after quality gate checks.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "cursor_review": Quality gate passed, proceed to code review
+        - "implementation": Quality gate failed, retry implementation
+        - "human_escalation": Max retries exceeded
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "cursor_review"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "implementation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Check quality gate result
+    qg_result = state.get("quality_gate_result", {})
+    if qg_result.get("passed"):
+        return "cursor_review"
+
+    # Default to code review (non-blocking by default)
+    return "cursor_review"
+
+
+def dependency_check_router(
+    state: WorkflowState,
+) -> Literal["completion", "implementation", "human_escalation", "__end__"]:
+    """Route after dependency check.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "completion": Dependency check passed/non-blocking, proceed
+        - "implementation": Critical vulnerabilities found, need fixes
+        - "human_escalation": Max retries exceeded or needs approval
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "completion"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "implementation"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Check dependency check result
+    dep_result = state.get("dependency_check_result", {})
+    if dep_result.get("passed"):
+        return "completion"
+
+    # Check for critical vulnerabilities
+    blocking_issues = dep_result.get("blocking_issues", [])
+    if blocking_issues:
+        return "human_escalation"
+
+    # Default to completion
+    return "completion"

@@ -5,7 +5,7 @@ Provides CRUD operations for G-Eval evaluation results.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Optional
 
 from ..connection import get_connection
 from .base import BaseRepository
@@ -27,7 +27,7 @@ class EvaluationRepository(BaseRepository[dict]):
         Returns:
             Saved record
         """
-        data = evaluation.to_dict() if hasattr(evaluation, 'to_dict') else dict(evaluation)
+        data = evaluation.to_dict() if hasattr(evaluation, "to_dict") else dict(evaluation)
         record_id = data.get("evaluation_id", "").replace("eval-", "")
 
         return await self.create(data, record_id)

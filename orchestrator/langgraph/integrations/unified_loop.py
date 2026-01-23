@@ -28,26 +28,14 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Optional
 
-from ...agents.adapter import (
-    AgentType,
-    AgentAdapter,
-    IterationResult,
-    create_adapter,
-    get_agent_capabilities,
-    get_agent_for_task,
-)
-from .verification import (
-    VerificationType,
-    VerificationStrategy,
-    VerificationContext,
-    VerificationResult,
-    create_verifier,
-)
+from ...agents.adapter import IterationResult, create_adapter, get_agent_for_task
+from .verification import VerificationContext, VerificationResult, create_verifier
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +64,7 @@ class UnifiedLoopConfig:
         use_plan_mode: Use plan mode for complex tasks (Claude only)
         fallback_model: Fallback model if primary unavailable
     """
+
     agent_type: str = "claude"
     model: Optional[str] = None
     max_iterations: int = 10
@@ -86,12 +75,23 @@ class UnifiedLoopConfig:
     enable_budget: bool = True
     budget_per_iteration: float = 0.50
     max_budget: float = 5.00
-    allowed_tools: list[str] = field(default_factory=lambda: [
-        "Read", "Write", "Edit", "Glob", "Grep",
-        "Bash(npm*)", "Bash(pytest*)", "Bash(python*)",
-        "Bash(pnpm*)", "Bash(yarn*)", "Bash(bun*)",
-        "Bash(cargo*)", "Bash(go*)",
-    ])
+    allowed_tools: list[str] = field(
+        default_factory=lambda: [
+            "Read",
+            "Write",
+            "Edit",
+            "Glob",
+            "Grep",
+            "Bash(npm*)",
+            "Bash(pytest*)",
+            "Bash(python*)",
+            "Bash(pnpm*)",
+            "Bash(yarn*)",
+            "Bash(bun*)",
+            "Bash(cargo*)",
+            "Bash(go*)",
+        ]
+    )
     max_turns_per_iteration: int = 15
     save_iteration_logs: bool = True
     use_plan_mode: bool = False
@@ -132,6 +132,7 @@ class UnifiedLoopResult:
         error: Error message if failed
         iteration_results: Results from each iteration
     """
+
     success: bool
     iterations: int
     agent_type: str = ""
@@ -175,6 +176,7 @@ class LoopContext:
         test_files: Test files to pass
         previous_failures: Failures from previous runs
     """
+
     task_id: str
     title: str = ""
     user_story: str = ""
@@ -271,6 +273,7 @@ class UnifiedLoopRunner:
         if self._error_context is None and self.config.enable_error_context:
             try:
                 from ...agents.error_context import ErrorContextManager
+
                 self._error_context = ErrorContextManager(self.project_dir)
             except ImportError:
                 logger.debug("ErrorContextManager not available")
@@ -282,6 +285,7 @@ class UnifiedLoopRunner:
         if self._budget_manager is None and self.config.enable_budget:
             try:
                 from ...storage import get_budget_storage
+
                 self._budget_manager = get_budget_storage(self.project_dir)
             except ImportError:
                 logger.debug("BudgetStorageAdapter not available")
@@ -294,6 +298,7 @@ class UnifiedLoopRunner:
             if self.adapter.capabilities.supports_session:
                 try:
                     from ...storage import get_session_storage
+
                     self._session_manager = get_session_storage(self.project_dir)
                 except ImportError:
                     logger.debug("SessionStorageAdapter not available")
@@ -503,10 +508,13 @@ class UnifiedLoopRunner:
 
                 # HITL callback
                 if hitl_callback:
-                    should_continue = hitl_callback(iteration, {
-                        "verification_result": verification_result.to_dict(),
-                        "files_changed": result.files_changed,
-                    })
+                    should_continue = hitl_callback(
+                        iteration,
+                        {
+                            "verification_result": verification_result.to_dict(),
+                            "files_changed": result.files_changed,
+                        },
+                    )
                     if not should_continue:
                         return UnifiedLoopResult(
                             success=False,
@@ -522,12 +530,16 @@ class UnifiedLoopRunner:
 
             except asyncio.TimeoutError:
                 logger.warning(f"Iteration {iteration} timed out")
-                iteration_results.append({
-                    "iteration": iteration,
-                    "success": False,
-                    "error": "timeout",
-                })
-                previous_context = f"PREVIOUS ITERATION {iteration}: Timed out. Continue from where you left off."
+                iteration_results.append(
+                    {
+                        "iteration": iteration,
+                        "success": False,
+                        "error": "timeout",
+                    }
+                )
+                previous_context = (
+                    f"PREVIOUS ITERATION {iteration}: Timed out. Continue from where you left off."
+                )
 
             except asyncio.CancelledError:
                 logger.info("Loop cancelled")
@@ -535,11 +547,13 @@ class UnifiedLoopRunner:
 
             except Exception as e:
                 logger.error(f"Iteration {iteration} failed: {e}")
-                iteration_results.append({
-                    "iteration": iteration,
-                    "success": False,
-                    "error": str(e),
-                })
+                iteration_results.append(
+                    {
+                        "iteration": iteration,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
 
                 if self.error_context:
                     self.error_context.record_error(

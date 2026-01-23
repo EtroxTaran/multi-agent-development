@@ -1,7 +1,7 @@
 """Tests for fixer diagnosis engine."""
 
+
 import pytest
-from pathlib import Path
 
 from orchestrator.fixer.diagnosis import (
     AffectedFile,
@@ -205,7 +205,11 @@ class TestDiagnosisEngineConfigurationErrors:
         )
         result = await engine.diagnose(error, ErrorCategory.CONFIG_ERROR)
         # Falls back to category mapping
-        assert result.root_cause in (RootCause.MISSING_CONFIG, RootCause.INVALID_CONFIG, RootCause.UNKNOWN)
+        assert result.root_cause in (
+            RootCause.MISSING_CONFIG,
+            RootCause.INVALID_CONFIG,
+            RootCause.UNKNOWN,
+        )
 
 
 @pytest.mark.asyncio

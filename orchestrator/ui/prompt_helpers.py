@@ -7,9 +7,8 @@ in the HITL (Human-in-the-Loop) workflow.
 from typing import Optional
 
 from rich.console import Console
-from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.panel import Panel
-from rich.text import Text
+from rich.prompt import Confirm, IntPrompt, Prompt
 
 
 def prompt_menu(
@@ -64,7 +63,7 @@ def prompt_menu(
                 break
             console.print(f"  [red]Please enter a number between 1 and {max_choice}[/red]")
         except (ValueError, TypeError):
-            console.print(f"  [red]Please enter a valid number[/red]")
+            console.print("  [red]Please enter a valid number[/red]")
 
     # Handle custom input
     if allow_custom and choice == len(options) + 1:

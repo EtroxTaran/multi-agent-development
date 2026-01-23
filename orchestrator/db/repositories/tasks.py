@@ -4,9 +4,10 @@ Provides task management with dependency tracking and status queries.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from ..connection import get_connection
 from .base import BaseRepository

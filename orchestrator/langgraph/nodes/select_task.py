@@ -13,16 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import (
-    WorkflowState,
-    Task,
-    TaskStatus,
-    TaskIndex,
-    get_available_tasks,
-    all_tasks_completed,
-)
-from ..integrations.board_sync import sync_board
 from ...config import load_project_config
+from ..integrations.board_sync import sync_board
+from ..state import Task, TaskIndex, TaskStatus, WorkflowState, all_tasks_completed
 
 logger = logging.getLogger(__name__)
 
@@ -74,14 +67,13 @@ async def select_next_task_node(state: WorkflowState) -> dict[str, Any]:
 
     # Get tasks that are ready to execute using O(1) indexed lookup
     # TaskIndex.get_available() is cached after first call
-    available = [
-        task for task in task_index.get_available()
-        if task.get("id") not in in_flight_ids
-    ]
+    available = [task for task in task_index.get_available() if task.get("id") not in in_flight_ids]
 
     if not available:
         # Check for dependency deadlock
-        pending_tasks = [t for t in tasks if t.get("id") not in completed_ids and t.get("id") not in failed_ids]
+        pending_tasks = [
+            t for t in tasks if t.get("id") not in completed_ids and t.get("id") not in failed_ids
+        ]
 
         if pending_tasks:
             # There are pending tasks but none available - deadlock
@@ -90,12 +82,14 @@ async def select_next_task_node(state: WorkflowState) -> dict[str, Any]:
                 "current_task_id": None,
                 "current_task_ids": [],
                 "in_flight_task_ids": [],
-                "errors": [{
-                    "type": "dependency_deadlock",
-                    "message": f"Dependency deadlock: {len(pending_tasks)} tasks pending but none available",
-                    "pending_tasks": [t.get("id") for t in pending_tasks],
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "dependency_deadlock",
+                        "message": f"Dependency deadlock: {len(pending_tasks)} tasks pending but none available",
+                        "pending_tasks": [t.get("id") for t in pending_tasks],
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "next_decision": "escalate",
                 "updated_at": datetime.now().isoformat(),
             }

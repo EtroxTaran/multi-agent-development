@@ -4,9 +4,10 @@ Provides persistent workflow state management with real-time updates.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from ..connection import get_connection
 from .base import BaseRepository
@@ -417,8 +418,7 @@ class WorkflowRepository(BaseRepository[WorkflowState]):
 
         # Calculate phase progress
         completed_phases = sum(
-            1 for p in state.phase_status.values()
-            if p.get("status") == "completed"
+            1 for p in state.phase_status.values() if p.get("status") == "completed"
         )
 
         # Get git commit count
@@ -503,9 +503,7 @@ class WorkflowRepository(BaseRepository[WorkflowState]):
                     {"task_id": task_id},
                 )
             else:
-                results = await conn.query(
-                    "SELECT * FROM git_commits ORDER BY created_at DESC"
-                )
+                results = await conn.query("SELECT * FROM git_commits ORDER BY created_at DESC")
             return results or []
 
     async def reset_to_phase(self, phase_num: int) -> Optional[WorkflowState]:

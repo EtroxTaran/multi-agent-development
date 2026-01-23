@@ -1,3 +1,12 @@
+---
+name: implement-task
+description: Implement individual tasks using Task tool workers with TDD.
+version: 1.1.0
+tags: [implementation, tdd, tasks]
+owner: orchestration
+status: active
+---
+
 # Implement Task Skill
 
 Implement individual tasks using Task tool worker with TDD.
@@ -20,8 +29,8 @@ For a project with 10 tasks: 90,000 tokens saved!
 
 Before implementing, select the next task:
 
-1. Read `.workflow/phases/planning/plan.json`
-2. Read `.workflow/state.json` for task statuses
+1. Read plan from `phase_outputs` (type=plan)
+2. Read `workflow_state` for task statuses
 3. Find tasks where:
    - `status` is "pending" or "in_progress"
    - All `dependencies` are "completed"
@@ -160,7 +169,7 @@ Please fix the issue and ensure all tests pass.
 
 ### During Implementation
 
-Update task status in `.workflow/state.json`:
+Update task status in `workflow_state`:
 
 ```json
 {
@@ -247,12 +256,12 @@ Task(prompt="Implement T5...", run_in_background=true)
 2. Check if dependencies can be reordered
 3. If truly blocked: Escalate to human
 
-## Output Files
+## Outputs
 
 | File | Purpose |
 |------|---------|
-| `.workflow/phases/implementation/task_results/{task_id}.json` | Task completion record |
-| `.workflow/phases/implementation/logs/{task_id}.log` | Worker output log |
+| `phase_outputs` (type=task_result) | Task completion record |
+| `logs` (type=implementation_log) | Worker output log |
 
 ## UAT Document Generation
 
@@ -282,7 +291,7 @@ After task completion, generate UAT document:
 - src/app.py
 ```
 
-Save to `.workflow/phases/implementation/uat/{task_id}.md`
+Save to `logs` (type=uat_document)
 
 ## Related Skills
 

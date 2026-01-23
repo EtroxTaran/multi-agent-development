@@ -3,11 +3,11 @@
  * Tests for viewing and managing tasks
  */
 
-import { test, expect } from '@playwright/test';
-import { ProjectDashboardPage } from './page-objects';
-import { setupApiMocks, mockProjects, mockTasks } from './fixtures';
+import { test, expect } from "@playwright/test";
+import { ProjectDashboardPage } from "./page-objects";
+import { setupApiMocks, mockProjects, mockTasks } from "./fixtures";
 
-test.describe('Task Management', () => {
+test.describe("Task Management", () => {
   test.beforeEach(async ({ page }) => {
     await setupApiMocks(page, {
       projects: mockProjects.single,
@@ -15,55 +15,55 @@ test.describe('Task Management', () => {
     });
   });
 
-  test('should display task board with columns', async ({ page }) => {
+  test("should display task board with columns", async ({ page }) => {
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
-    await dashboardPage.switchToTab('tasks');
+    await dashboardPage.switchToTab("tasks");
 
     // Should show status columns
-    await expect(page.getByText('Pending').first()).toBeVisible();
-    await expect(page.getByText('In Progress').first()).toBeVisible();
-    await expect(page.getByText('Completed').first()).toBeVisible();
+    await expect(page.getByText("Pending").first()).toBeVisible();
+    await expect(page.getByText("In Progress").first()).toBeVisible();
+    await expect(page.getByText("Completed").first()).toBeVisible();
   });
 
-  test('should show task cards with details', async ({ page }) => {
+  test("should show task cards with details", async ({ page }) => {
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
-    await dashboardPage.switchToTab('tasks');
+    await dashboardPage.switchToTab("tasks");
 
     // Check task titles are visible
-    await expect(page.getByText('Set up project structure')).toBeVisible();
-    await expect(page.getByText('Implement core logic')).toBeVisible();
-    await expect(page.getByText('Add documentation')).toBeVisible();
+    await expect(page.getByText("Set up project structure")).toBeVisible();
+    await expect(page.getByText("Implement core logic")).toBeVisible();
+    await expect(page.getByText("Add documentation")).toBeVisible();
   });
 
-  test('should show task counts in header stats', async ({ page }) => {
+  test("should show task counts in header stats", async ({ page }) => {
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
     // Task progress should show completed/total
     const progress = await dashboardPage.getTaskProgress();
-    expect(progress).toBe('1/3');
+    expect(progress).toBe("1/3");
   });
 
-  test('should show task with failure state', async ({ page }) => {
+  test("should show task with failure state", async ({ page }) => {
     await setupApiMocks(page, {
       projects: mockProjects.single,
       tasks: mockTasks.withFailure,
     });
 
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
-    await dashboardPage.switchToTab('tasks');
+    await dashboardPage.switchToTab("tasks");
 
     // Should show failed task
-    await expect(page.getByText('failed')).toBeVisible();
+    await expect(page.getByText("failed")).toBeVisible();
   });
 
-  test('should show empty state when no tasks', async ({ page }) => {
+  test("should show empty state when no tasks", async ({ page }) => {
     await setupApiMocks(page, {
       projects: mockProjects.single,
       tasks: {
@@ -77,9 +77,9 @@ test.describe('Task Management', () => {
     });
 
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
     const progress = await dashboardPage.getTaskProgress();
-    expect(progress).toBe('0/0');
+    expect(progress).toBe("0/0");
   });
 });

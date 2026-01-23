@@ -7,15 +7,16 @@ into a unified view with deduplication and categorization.
 import hashlib
 import json
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 
 
 class ErrorSource(str, Enum):
     """Source of the error."""
+
     ACTION_LOG = "action_log"
     STATE = "state"
     AGENT_OUTPUT = "agent_output"
@@ -26,14 +27,16 @@ class ErrorSource(str, Enum):
 
 class ErrorSeverity(str, Enum):
     """Severity level of an error."""
+
     CRITICAL = "critical"  # Workflow cannot continue
-    ERROR = "error"        # Step failed, may retry
-    WARNING = "warning"    # Non-blocking issue
+    ERROR = "error"  # Step failed, may retry
+    WARNING = "warning"  # Non-blocking issue
 
 
 @dataclass
 class AggregatedError:
     """A consolidated error entry."""
+
     id: str
     timestamp: str
     source: ErrorSource
@@ -117,27 +120,22 @@ ERROR_CATEGORIES = {
     "cli_not_found": ErrorSeverity.CRITICAL,
     "agent_crash": ErrorSeverity.ERROR,
     "rate_limit": ErrorSeverity.WARNING,
-
     # Validation errors
     "validation_failed": ErrorSeverity.ERROR,
     "score_below_threshold": ErrorSeverity.ERROR,
     "blocking_issue": ErrorSeverity.ERROR,
-
     # Implementation errors
     "test_failure": ErrorSeverity.ERROR,
     "build_failure": ErrorSeverity.ERROR,
     "compilation_error": ErrorSeverity.ERROR,
-
     # Security errors
     "security_vulnerability": ErrorSeverity.CRITICAL,
     "secret_exposure": ErrorSeverity.CRITICAL,
-
     # System errors
     "file_not_found": ErrorSeverity.ERROR,
     "permission_denied": ErrorSeverity.ERROR,
     "disk_full": ErrorSeverity.CRITICAL,
     "out_of_memory": ErrorSeverity.CRITICAL,
-
     # Unknown
     "unknown": ErrorSeverity.ERROR,
 }
@@ -181,14 +179,13 @@ class ErrorAggregator:
         """Load unresolved errors from file."""
         if self.unresolved_file.exists():
             try:
-                with open(self.unresolved_file, "r", encoding="utf-8") as f:
+                with open(self.unresolved_file, encoding="utf-8") as f:
                     data = json.load(f)
                     self._unresolved = {
-                        k: AggregatedError.from_dict(v)
-                        for k, v in data.get("errors", {}).items()
+                        k: AggregatedError.from_dict(v) for k, v in data.get("errors", {}).items()
                     }
                     self._fingerprints = data.get("fingerprints", {})
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
 
     def _save_unresolved(self) -> None:
@@ -318,6 +315,7 @@ class ErrorAggregator:
 
             # Create new error
             import uuid
+
             error_id = str(uuid.uuid4())
 
             error = AggregatedError(
@@ -406,7 +404,11 @@ class ErrorAggregator:
             errors = [e for e in errors if e.agent == agent]
 
         # Sort by severity (critical first) then by timestamp (newest first)
-        severity_order = {ErrorSeverity.CRITICAL: 0, ErrorSeverity.ERROR: 1, ErrorSeverity.WARNING: 2}
+        severity_order = {
+            ErrorSeverity.CRITICAL: 0,
+            ErrorSeverity.ERROR: 1,
+            ErrorSeverity.WARNING: 2,
+        }
         errors.sort(key=lambda e: (severity_order.get(e.severity, 3), e.timestamp), reverse=True)
 
         return errors
@@ -429,7 +431,7 @@ class ErrorAggregator:
         file_size = self.all_errors_file.stat().st_size
         if file_size < 100_000:  # 100KB threshold
             # Small file - read all
-            with open(self.all_errors_file, "r", encoding="utf-8") as f:
+            with open(self.all_errors_file, encoding="utf-8") as f:
                 lines = f.readlines()
 
             for line in reversed(lines):
@@ -487,7 +489,7 @@ class ErrorAggregator:
         collected = 0
         seen_ids = set()
 
-        with open(action_log_file, "r", encoding="utf-8") as f:
+        with open(action_log_file, encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -507,7 +509,8 @@ class ErrorAggregator:
                 if (
                     data.get("error")
                     or data.get("status") == "failed"
-                    or data.get("action_type") in ["error", "agent_error", "phase_failed", "task_failed"]
+                    or data.get("action_type")
+                    in ["error", "agent_error", "phase_failed", "task_failed"]
                 ):
                     error_info = data.get("error", {})
                     self.add_error(
@@ -539,15 +542,21 @@ class ErrorAggregator:
         collected = 0
 
         try:
-            with open(state_file, "r", encoding="utf-8") as f:
+            with open(state_file, encoding="utf-8") as f:
                 state = json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return 0
 
         # Check phase errors
         for phase_name, phase_data in state.get("phases", {}).items():
             if phase_data.get("status") == "failed" and phase_data.get("error"):
-                phase_num = {"planning": 1, "validation": 2, "implementation": 3, "verification": 4, "completion": 5}.get(phase_name)
+                phase_num = {
+                    "planning": 1,
+                    "validation": 2,
+                    "implementation": 3,
+                    "verification": 4,
+                    "completion": 5,
+                }.get(phase_name)
                 self.add_error(
                     source=ErrorSource.STATE,
                     error_type="phase_failed",
@@ -563,7 +572,13 @@ class ErrorAggregator:
                     source=ErrorSource.STATE,
                     error_type="blocker",
                     message=blocker,
-                    phase={"planning": 1, "validation": 2, "implementation": 3, "verification": 4, "completion": 5}.get(phase_name),
+                    phase={
+                        "planning": 1,
+                        "validation": 2,
+                        "implementation": 3,
+                        "verification": 4,
+                        "completion": 5,
+                    }.get(phase_name),
                     severity=ErrorSeverity.WARNING,
                 )
                 collected += 1

@@ -1,7 +1,54 @@
-[
-  "Read",
-  "Write",
-  "Edit",
-  "Glob",
-  "Grep"
-]
+{
+  "agent_id": "A01",
+  "agent_name": "Planner",
+  "description": "Tool policy for planning agent (read-only).",
+  "allowed": [
+    "Read",
+    "Glob",
+    "Grep",
+    "mcp__Ref__ref_search_documentation",
+    "mcp__Ref__ref_read_url"
+  ],
+  "forbidden": [
+    "Write",
+    "Edit",
+    "Bash",
+    "NotebookEdit"
+  ],
+  "file_restrictions": {
+    "allowed_paths": ["**/*"],
+    "forbidden_paths": [],
+    "read_only": true
+  },
+  "budget_limits": {
+    "per_invocation_usd": 1.0,
+    "per_task_usd": 2.0,
+    "fallback_model": "sonnet"
+  },
+  "timeout_seconds": 1800,
+  "max_retries": 3,
+  "security_restrictions": {
+    "forbidden_patterns": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(*--force*delete*)"
+    ],
+    "require_confirmation": [
+      "Bash(docker*)",
+      "Bash(kubectl*)",
+      "Bash(terraform*)"
+    ],
+    "secrets_check": true
+  },
+  "completion_signals": {
+    "claude": "<promise>DONE</promise>",
+    "cursor": "{\"status\": \"done\"}",
+    "gemini": "DONE|COMPLETE"
+  },
+  "tool_descriptions": {
+    "Read": "Read product specs and docs.",
+    "Glob": "Locate documentation files.",
+    "Grep": "Search for key terms in docs."
+  },
+  "rationale": "Planner is read-only and focuses on requirements analysis."
+}

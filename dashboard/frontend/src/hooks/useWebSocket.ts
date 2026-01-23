@@ -2,13 +2,13 @@
  * WebSocket hook for real-time updates
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { createWebSocket } from '@/lib/api';
-import type { WebSocketEvent } from '@/types';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { createWebSocket } from "@/lib/api";
+import type { WebSocketEvent } from "@/types";
 
-import { workflowKeys } from './useWorkflow';
-import { taskKeys } from './useTasks';
+import { workflowKeys } from "./useWorkflow";
+import { taskKeys } from "./useTasks";
 
 interface UseWebSocketOptions {
   onEvent?: (event: WebSocketEvent) => void;
@@ -22,7 +22,7 @@ interface UseWebSocketOptions {
  */
 export function useWebSocket(
   projectName: string | undefined,
-  options: UseWebSocketOptions = {}
+  options: UseWebSocketOptions = {},
 ) {
   const {
     onEvent,
@@ -57,24 +57,24 @@ export function useWebSocket(
 
           // Invalidate relevant queries based on event type
           switch (data.type) {
-            case 'state_change':
-            case 'workflow_complete':
-            case 'workflow_error':
+            case "state_change":
+            case "workflow_complete":
+            case "workflow_error":
               queryClient.invalidateQueries({
                 queryKey: workflowKeys.status(projectName),
               });
               break;
-            case 'action':
+            case "action":
               queryClient.invalidateQueries({
                 queryKey: taskKeys.lists(projectName),
               });
               break;
-            case 'escalation':
+            case "escalation":
               // Could trigger a notification
               break;
           }
         } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
+          console.error("Failed to parse WebSocket message:", e);
         }
       };
 
@@ -90,13 +90,13 @@ export function useWebSocket(
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error("WebSocket error:", error);
         onError?.(error);
       };
 
       wsRef.current = ws;
     } catch (e) {
-      console.error('Failed to create WebSocket:', e);
+      console.error("Failed to create WebSocket:", e);
     }
   }, [
     projectName,

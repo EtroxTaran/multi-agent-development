@@ -12,7 +12,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Optional, TypedDict
 
-
 # ============== ERROR CONTEXT ==============
 # Rich error context for the Bugfixer agent
 
@@ -82,13 +81,15 @@ def create_error_context(
     if state:
         # Keep only relevant fields for debugging
         safe_fields = [
-            "current_phase", "current_task_id", "project_name",
-            "next_decision", "fixer_attempts", "iteration_count",
+            "current_phase",
+            "current_task_id",
+            "project_name",
+            "next_decision",
+            "fixer_attempts",
+            "iteration_count",
         ]
         sanitized_state = {
-            k: state.get(k)
-            for k in safe_fields
-            if k in state and state.get(k) is not None
+            k: state.get(k) for k in safe_fields if k in state and state.get(k) is not None
         }
         # Include error summary if exists
         if state.get("errors"):
@@ -641,6 +642,7 @@ def _merge_tasks(
         Merged task list
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     if existing is None:
@@ -728,10 +730,7 @@ def _merge_task_fields(existing: Task, new: Task) -> Task:
                 merged[key] = value
 
     # Take the higher attempt count
-    merged["attempts"] = max(
-        existing.get("attempts", 0),
-        new.get("attempts", 0)
-    )
+    merged["attempts"] = max(existing.get("attempts", 0), new.get("attempts", 0))
 
     return merged
 
@@ -1181,10 +1180,7 @@ def get_pending_tasks(state: WorkflowState) -> list[Task]:
     Returns:
         List of pending tasks
     """
-    return [
-        task for task in state.get("tasks", [])
-        if task.get("status") == TaskStatus.PENDING
-    ]
+    return [task for task in state.get("tasks", []) if task.get("status") == TaskStatus.PENDING]
 
 
 def get_available_tasks(state: WorkflowState) -> list[Task]:
@@ -1355,7 +1351,9 @@ def get_workflow_summary(state: WorkflowState) -> dict:
         "total": len(tasks),
         "completed": len(completed_ids),
         "failed": len(failed_ids),
-        "pending": len([t for t in tasks if t.get("id") not in completed_ids and t.get("id") not in failed_ids]),
+        "pending": len(
+            [t for t in tasks if t.get("id") not in completed_ids and t.get("id") not in failed_ids]
+        ),
         "current_task_id": state.get("current_task_id"),
         "current_task_ids": state.get("current_task_ids", []),
     }

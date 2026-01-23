@@ -1,3 +1,12 @@
+---
+name: call-cursor
+description: Invoke the Cursor CLI for security-focused plan validation and code review.
+version: 1.1.0
+tags: [cursor, security, review, validation]
+owner: orchestration
+status: active
+---
+
 # Call Cursor Skill
 
 Wrapper for invoking Cursor agent via CLI for code review and security analysis.
@@ -10,6 +19,10 @@ Cursor is specialized for:
 - OWASP Top 10 compliance
 - Best practices enforcement
 
+## Prerequisites
+
+- `cursor-agent` CLI installed and accessible on PATH.
+
 ## Expertise Weights
 
 | Area | Weight | Description |
@@ -17,6 +30,12 @@ Cursor is specialized for:
 | Security | 0.8 | SQL injection, XSS, auth issues |
 | Code Quality | 0.7 | Style, maintainability, clarity |
 | Testing | 0.7 | Coverage, test quality |
+
+## Usage
+
+```
+/call-cursor
+```
 
 ## CLI Invocation
 
@@ -42,7 +61,7 @@ cursor-agent --print --output-format json "<prompt>"
 cursor-agent --print --output-format json "
 You are reviewing an implementation plan for security and code quality.
 
-Read the plan at: .workflow/phases/planning/plan.json
+Read the plan JSON provided by the orchestrator (phase_outputs export).
 
 Evaluate for:
 1. Security vulnerabilities in proposed changes
@@ -125,6 +144,10 @@ Be thorough. Security issues are blocking by default.
 "
 ```
 
+## Outputs
+
+- JSON review payload for validation or verification phases.
+
 ## Output Parsing
 
 Cursor returns JSON. Parse with:
@@ -157,12 +180,24 @@ blocking = result.get("blocking_issues", [])
 
 1. **Phase 2 (Validation)**:
    - Run in parallel with Gemini
-   - Save output to `.workflow/phases/validation/cursor-feedback.json`
+   - Store output in `phase_outputs` as `cursor_feedback`
    - Weight: 0.8 for security concerns
 
 2. **Phase 4 (Verification)**:
    - Run in parallel with Gemini
-   - Save output to `.workflow/phases/verification/cursor-review.json`
+   - Store output in `phase_outputs` as `cursor_review`
+
+## Examples
+
+```bash
+cursor-agent --print --output-format json "Review the plan JSON provided in this prompt."
+```
+
+## Related Skills
+
+- `/validate` - Plan validation workflow
+- `/verify` - Code review workflow
+- `/resolve-conflict` - Merge Cursor and Gemini feedback
    - Must approve for workflow to complete
 
 ## Approval Thresholds
@@ -179,10 +214,10 @@ blocking = result.get("blocking_issues", [])
 cd projects/my-app
 
 # Run validation
-cursor-agent --print --output-format json "Review plan at .workflow/phases/planning/plan.json for security..." > .workflow/phases/validation/cursor-feedback.json
+cursor-agent --print --output-format json "Review the plan JSON provided in this prompt for security..." > cursor-feedback.json
 
 # Check result
-cat .workflow/phases/validation/cursor-feedback.json | jq '.approved, .score'
+cat cursor-feedback.json | jq '.approved, .score'
 ```
 
 ## Conflict Resolution

@@ -3,10 +3,26 @@
  */
 
 // Enums
-export type WorkflowStatus = 'not_started' | 'in_progress' | 'paused' | 'completed' | 'failed';
-export type PhaseStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'skipped';
-export type AgentType = 'claude' | 'cursor' | 'gemini';
+export type WorkflowStatus =
+  | "not_started"
+  | "in_progress"
+  | "paused"
+  | "completed"
+  | "failed";
+export type PhaseStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failed"
+  | "skipped";
+export type TaskStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "failed"
+  | "blocked"
+  | "skipped";
+export type AgentType = "claude" | "cursor" | "gemini";
 
 // Project types
 export interface ProjectSummary {
@@ -203,7 +219,7 @@ export interface EscalationQuestion {
 
 // Chat types
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp?: string;
 }

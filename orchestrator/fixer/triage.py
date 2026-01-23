@@ -12,9 +12,8 @@ The triage node runs before diagnosis to quickly determine:
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +68,8 @@ class TriageDecision(str, Enum):
     """Decisions from triage."""
 
     ATTEMPT_FIX = "attempt_fix"  # Fixer should attempt to fix
-    ESCALATE = "escalate"       # Escalate to human immediately
-    SKIP = "skip"               # Skip this error (low priority or already fixed)
+    ESCALATE = "escalate"  # Escalate to human immediately
+    SKIP = "skip"  # Skip this error (low priority or already fixed)
     RETRY_LATER = "retry_later"  # Retry after other fixes
 
 
@@ -410,13 +409,11 @@ class ErrorTriage:
             # Critical - security issues
             ErrorCategory.SECURITY_VULNERABILITY: 1,
             ErrorCategory.SECRET_EXPOSURE: 1,
-
             # High - blocking issues
             ErrorCategory.BUILD_FAILURE: 2,
             ErrorCategory.TEST_FAILURE: 2,
             ErrorCategory.COMPILATION_ERROR: 2,
             ErrorCategory.AGENT_CRASH: 2,
-
             # Medium - common fixable issues
             ErrorCategory.IMPORT_ERROR: 3,
             ErrorCategory.SYNTAX_ERROR: 3,
@@ -424,13 +421,11 @@ class ErrorTriage:
             ErrorCategory.MISSING_PACKAGE: 3,
             ErrorCategory.TYPE_ERROR: 3,
             ErrorCategory.NAME_ERROR: 3,
-
             # Lower - less critical
             ErrorCategory.ATTRIBUTE_ERROR: 4,
             ErrorCategory.CONFIG_ERROR: 4,
             ErrorCategory.TIMEOUT_ERROR: 4,
             ErrorCategory.LINT_ERROR: 4,
-
             # Lowest - minor issues
             ErrorCategory.RATE_LIMIT: 5,
             ErrorCategory.PERMISSION_ERROR: 5,
@@ -562,10 +557,7 @@ class ErrorTriage:
 
         # Check fix history for repeated failures
         if fix_history:
-            same_error_fixes = [
-                f for f in fix_history
-                if f.get("error_id") == error.error_id
-            ]
+            same_error_fixes = [f for f in fix_history if f.get("error_id") == error.error_id]
             failed_fixes = [f for f in same_error_fixes if not f.get("success")]
             if len(failed_fixes) >= self.max_attempts_per_error:
                 return TriageResult(
@@ -627,8 +619,7 @@ class ErrorTriage:
             List of TriageResults sorted by priority
         """
         results = [
-            self.triage(error, fixer_enabled, circuit_breaker_open, fix_history)
-            for error in errors
+            self.triage(error, fixer_enabled, circuit_breaker_open, fix_history) for error in errors
         ]
 
         # Sort by priority (1=highest) then by confidence (highest first)

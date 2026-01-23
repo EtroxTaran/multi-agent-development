@@ -1,16 +1,12 @@
 """Tests for workflow endpoints."""
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 
 class TestGetWorkflowStatus:
     """Tests for GET /projects/{project_name}/workflow/status endpoint."""
 
-    def test_get_status_not_started(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_get_status_not_started(self, test_client, mock_project_manager, mock_orchestrator):
         """Get status should return not_started for new project."""
         mock_orchestrator.status_langgraph = AsyncMock(
             return_value={
@@ -23,17 +19,13 @@ class TestGetWorkflowStatus:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/status"
-                )
+                response = test_client.get("/projects/test-project/workflow/status")
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "not_started"
 
-    def test_get_status_in_progress(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_get_status_in_progress(self, test_client, mock_project_manager, mock_orchestrator):
         """Get status should return in_progress with phase info."""
         mock_orchestrator.status_langgraph = AsyncMock(
             return_value={
@@ -47,18 +39,14 @@ class TestGetWorkflowStatus:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/status"
-                )
+                response = test_client.get("/projects/test-project/workflow/status")
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "in_progress"
         assert data["current_phase"] == 2
 
-    def test_get_status_paused(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_get_status_paused(self, test_client, mock_project_manager, mock_orchestrator):
         """Get status should return paused with interrupt info."""
         mock_orchestrator.status_langgraph = AsyncMock(
             return_value={
@@ -75,9 +63,7 @@ class TestGetWorkflowStatus:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/status"
-                )
+                response = test_client.get("/projects/test-project/workflow/status")
 
         assert response.status_code == 200
         data = response.json()
@@ -95,9 +81,7 @@ class TestGetWorkflowStatus:
                 mock_get_dir.side_effect = HTTPException(
                     status_code=404, detail="Project not found"
                 )
-                response = test_client.get(
-                    "/projects/nonexistent/workflow/status"
-                )
+                response = test_client.get("/projects/nonexistent/workflow/status")
 
         assert response.status_code == 404
 
@@ -105,15 +89,11 @@ class TestGetWorkflowStatus:
 class TestGetWorkflowHealth:
     """Tests for GET /projects/{project_name}/workflow/health endpoint."""
 
-    def test_get_health_healthy(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_get_health_healthy(self, test_client, mock_project_manager, mock_orchestrator):
         """Get health should return healthy status."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/health"
-                )
+                response = test_client.get("/projects/test-project/workflow/health")
 
         assert response.status_code == 200
         data = response.json()
@@ -126,18 +106,14 @@ class TestGetWorkflowHealth:
         """Get health should include iteration count and commits."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/health"
-                )
+                response = test_client.get("/projects/test-project/workflow/health")
 
         assert response.status_code == 200
         data = response.json()
         assert "iteration_count" in data
         assert "total_commits" in data
 
-    def test_get_health_degraded(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_get_health_degraded(self, test_client, mock_project_manager, mock_orchestrator):
         """Get health should return degraded when agent unavailable."""
         mock_orchestrator.health_check.return_value = {
             "status": "degraded",
@@ -146,9 +122,7 @@ class TestGetWorkflowHealth:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/health"
-                )
+                response = test_client.get("/projects/test-project/workflow/health")
 
         assert response.status_code == 200
         data = response.json()
@@ -164,9 +138,7 @@ class TestGetWorkflowGraph:
         """Get graph should return nodes and edges."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.get(
-                    "/projects/test-project/workflow/graph"
-                )
+                response = test_client.get("/projects/test-project/workflow/graph")
 
         assert response.status_code == 200
         data = response.json()
@@ -178,9 +150,7 @@ class TestGetWorkflowGraph:
 class TestStartWorkflow:
     """Tests for POST /projects/{project_name}/workflow/start endpoint."""
 
-    def test_start_workflow_success(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_start_workflow_success(self, test_client, mock_project_manager, mock_orchestrator):
         """Start workflow should return success."""
         mock_orchestrator.run_langgraph = AsyncMock()
 
@@ -252,25 +222,19 @@ class TestStartWorkflow:
 class TestResumeWorkflow:
     """Tests for POST /projects/{project_name}/workflow/resume endpoint."""
 
-    def test_resume_workflow_success(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_resume_workflow_success(self, test_client, mock_project_manager, mock_orchestrator):
         """Resume workflow should return success."""
         mock_orchestrator.resume_langgraph = AsyncMock()
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.post(
-                    "/projects/test-project/workflow/resume"
-                )
+                response = test_client.post("/projects/test-project/workflow/resume")
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
 
-    def test_resume_workflow_autonomous(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_resume_workflow_autonomous(self, test_client, mock_project_manager, mock_orchestrator):
         """Resume workflow should accept autonomous flag."""
         mock_orchestrator.resume_langgraph = AsyncMock()
 
@@ -286,15 +250,11 @@ class TestResumeWorkflow:
 class TestRollbackWorkflow:
     """Tests for POST /projects/{project_name}/workflow/rollback/{phase} endpoint."""
 
-    def test_rollback_success(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_rollback_success(self, test_client, mock_project_manager, mock_orchestrator):
         """Rollback should return success."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.post(
-                    "/projects/test-project/workflow/rollback/2"
-                )
+                response = test_client.post("/projects/test-project/workflow/rollback/2")
 
         assert response.status_code == 200
         data = response.json()
@@ -303,18 +263,14 @@ class TestRollbackWorkflow:
     def test_rollback_invalid_phase_low(self, test_client, mock_project_manager):
         """Rollback should return 400 for phase < 1."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
-            response = test_client.post(
-                "/projects/test-project/workflow/rollback/0"
-            )
+            response = test_client.post("/projects/test-project/workflow/rollback/0")
 
         assert response.status_code == 400
 
     def test_rollback_invalid_phase_high(self, test_client, mock_project_manager):
         """Rollback should return 400 for phase > 5."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
-            response = test_client.post(
-                "/projects/test-project/workflow/rollback/6"
-            )
+            response = test_client.post("/projects/test-project/workflow/rollback/6")
 
         assert response.status_code == 400
 
@@ -322,15 +278,11 @@ class TestRollbackWorkflow:
 class TestResetWorkflow:
     """Tests for POST /projects/{project_name}/workflow/reset endpoint."""
 
-    def test_reset_success(
-        self, test_client, mock_project_manager, mock_orchestrator
-    ):
+    def test_reset_success(self, test_client, mock_project_manager, mock_orchestrator):
         """Reset should return success message."""
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.Orchestrator", return_value=mock_orchestrator):
-                response = test_client.post(
-                    "/projects/test-project/workflow/reset"
-                )
+                response = test_client.post("/projects/test-project/workflow/reset")
 
         assert response.status_code == 200
         data = response.json()

@@ -18,15 +18,13 @@ Usage:
 import asyncio
 import json
 import logging
-import subprocess
 import tempfile
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from orchestrator.registry import AGENT_REGISTRY, get_agent, AgentConfig
+from orchestrator.registry import AgentConfig, get_agent
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,7 @@ class InvalidTaskAssignment(DispatchError):
 class InvalidAgentOutput(DispatchError):
     """Raised when agent output doesn't match expected schema."""
 
-    def __init__(self, agent_id: str, errors: List[str]):
+    def __init__(self, agent_id: str, errors: list[str]):
         self.agent_id = agent_id
         self.errors = errors
         super().__init__(f"Agent {agent_id} output invalid: {', '.join(errors)}")
@@ -75,13 +73,13 @@ class Task:
     id: str
     title: str
     description: str
-    acceptance_criteria: List[str]
-    input_files: List[str] = field(default_factory=list)
-    expected_output_files: List[str] = field(default_factory=list)
-    test_files: List[str] = field(default_factory=list)
+    acceptance_criteria: list[str]
+    input_files: list[str] = field(default_factory=list)
+    expected_output_files: list[str] = field(default_factory=list)
+    test_files: list[str] = field(default_factory=list)
     iteration: int = 1
-    previous_feedback: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    previous_feedback: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -91,9 +89,9 @@ class DispatchResult:
     task_id: str
     agent_id: str
     status: str  # "completed", "failed", "blocked", "needs_review"
-    output: Dict[str, Any]
-    files_created: List[str] = field(default_factory=list)
-    files_modified: List[str] = field(default_factory=list)
+    output: dict[str, Any]
+    files_created: list[str] = field(default_factory=list)
+    files_modified: list[str] = field(default_factory=list)
     execution_time_seconds: float = 0.0
     cli_used: str = ""
     iteration: int = 1
@@ -101,7 +99,7 @@ class DispatchResult:
     needs_review: bool = True
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_id": self.task_id,
@@ -142,7 +140,7 @@ class AgentDispatcher:
         """
         self.project_dir = Path(project_dir)
         self.conductor_root = conductor_root or self._find_conductor_root()
-        self._execution_log: List[Dict[str, Any]] = []
+        self._execution_log: list[dict[str, Any]] = []
 
     def _find_conductor_root(self) -> Path:
         """Find the Conductor root directory."""
@@ -172,7 +170,7 @@ class AgentDispatcher:
 
         return context_path.read_text()
 
-    def load_agent_tools(self, agent: AgentConfig) -> Dict[str, Any]:
+    def load_agent_tools(self, agent: AgentConfig) -> dict[str, Any]:
         """Load tool restrictions for an agent.
 
         Args:
@@ -352,7 +350,7 @@ class AgentDispatcher:
         agent: AgentConfig,
         prompt: str,
         timeout: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute an agent using the specified CLI.
 
         Args:
@@ -374,9 +372,7 @@ class AgentDispatcher:
         # Build CLI command
         if cli == "claude":
             # Write prompt to temp file for claude (handles special chars better)
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".txt", delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
                 f.write(prompt)
                 prompt_file = f.name
 
@@ -461,9 +457,9 @@ class AgentDispatcher:
 
     def validate_output(
         self,
-        output: Dict[str, Any],
+        output: dict[str, Any],
         schema_path: Optional[str],
-    ) -> List[str]:
+    ) -> list[str]:
         """Validate agent output against schema.
 
         Args:
@@ -590,15 +586,17 @@ class AgentDispatcher:
             status = "completed"
 
         # Log execution
-        self._execution_log.append({
-            "task_id": task.id,
-            "agent_id": agent_id,
-            "cli": cli,
-            "iteration": task.iteration,
-            "status": status,
-            "execution_time": execution_time,
-            "timestamp": start_time.isoformat(),
-        })
+        self._execution_log.append(
+            {
+                "task_id": task.id,
+                "agent_id": agent_id,
+                "cli": cli,
+                "iteration": task.iteration,
+                "status": status,
+                "execution_time": execution_time,
+                "timestamp": start_time.isoformat(),
+            }
+        )
 
         return DispatchResult(
             task_id=task.id,
@@ -617,8 +615,8 @@ class AgentDispatcher:
     async def dispatch_reviewer(
         self,
         reviewer_id: str,
-        work_to_review: Dict[str, Any],
-        review_checklist: List[str],
+        work_to_review: dict[str, Any],
+        review_checklist: list[str],
     ) -> DispatchResult:
         """Dispatch a review request to a reviewer agent.
 
@@ -649,7 +647,7 @@ class AgentDispatcher:
 
         return await self.dispatch(reviewer_id, task)
 
-    def get_execution_log(self) -> List[Dict[str, Any]]:
+    def get_execution_log(self) -> list[dict[str, Any]]:
         """Get the execution log for this dispatcher session.
 
         Returns:
@@ -664,9 +662,9 @@ class AgentDispatcher:
 
 async def dispatch_parallel(
     dispatcher: AgentDispatcher,
-    agent_ids: List[str],
-    tasks: List[Task],
-) -> List[DispatchResult]:
+    agent_ids: list[str],
+    tasks: list[Task],
+) -> list[DispatchResult]:
     """Dispatch multiple tasks to agents in parallel.
 
     Args:
@@ -682,7 +680,7 @@ async def dispatch_parallel(
 
     coroutines = [
         dispatcher.dispatch(agent_id, task)
-        for agent_id, task in zip(agent_ids, tasks)
+        for agent_id, task in zip(agent_ids, tasks, strict=False)
     ]
 
     results = await asyncio.gather(*coroutines, return_exceptions=True)

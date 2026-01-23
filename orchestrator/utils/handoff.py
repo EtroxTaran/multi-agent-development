@@ -9,10 +9,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 
-from .action_log import ActionEntry, ActionLog, get_action_log
-from .error_aggregator import AggregatedError, ErrorAggregator, get_error_aggregator
+from .action_log import get_action_log
+from .error_aggregator import AggregatedError, get_error_aggregator
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HandoffBrief:
     """Context for resuming a workflow session."""
+
     generated_at: str
     project: str
 
@@ -75,12 +76,12 @@ class HandoffBrief:
         """Generate a human-readable markdown version."""
         lines = [
             f"# Handoff Brief: {self.project}",
-            f"",
+            "",
             f"**Generated:** {self.generated_at}",
             f"**Last Activity:** {self.last_activity or 'Unknown'}",
-            f"",
-            f"## Current State",
-            f"",
+            "",
+            "## Current State",
+            "",
             f"**Phase:** {self.current_phase}/5",
         ]
 
@@ -89,26 +90,48 @@ class HandoffBrief:
 
         if self.total_tasks > 0:
             progress = len(self.completed_tasks) / self.total_tasks * 100
-            lines.append(f"**Task Progress:** {len(self.completed_tasks)}/{self.total_tasks} ({progress:.0f}%)")
+            lines.append(
+                f"**Task Progress:** {len(self.completed_tasks)}/{self.total_tasks} ({progress:.0f}%)"
+            )
 
-        lines.extend([
-            f"",
-            f"### Phase Status",
-            f"",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Phase Status",
+                "",
+            ]
+        )
 
-        phase_names = ["1. Planning", "2. Validation", "3. Implementation", "4. Verification", "5. Completion"]
+        phase_names = [
+            "1. Planning",
+            "2. Validation",
+            "3. Implementation",
+            "4. Verification",
+            "5. Completion",
+        ]
         for i, name in enumerate(phase_names, 1):
-            status = self.phase_status.get(str(i), self.phase_status.get(["planning", "validation", "implementation", "verification", "completion"][i-1], "pending"))
-            emoji = {"completed": "✅", "in_progress": "🔄", "failed": "❌", "blocked": "🚫"}.get(status, "⏳")
+            status = self.phase_status.get(
+                str(i),
+                self.phase_status.get(
+                    ["planning", "validation", "implementation", "verification", "completion"][
+                        i - 1
+                    ],
+                    "pending",
+                ),
+            )
+            emoji = {"completed": "✅", "in_progress": "🔄", "failed": "❌", "blocked": "🚫"}.get(
+                status, "⏳"
+            )
             lines.append(f"- {emoji} {name}: {status}")
 
         if self.last_actions:
-            lines.extend([
-                f"",
-                f"## Recent Actions",
-                f"",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Recent Actions",
+                    "",
+                ]
+            )
             for action in self.last_actions[:10]:
                 timestamp = action.get("timestamp", "")
                 if timestamp:
@@ -118,11 +141,13 @@ class HandoffBrief:
                 lines.append(f"- {timestamp} {phase} {agent} {action.get('message', '')}")
 
         if self.unresolved_errors:
-            lines.extend([
-                f"",
-                f"## Unresolved Errors ({len(self.unresolved_errors)})",
-                f"",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"## Unresolved Errors ({len(self.unresolved_errors)})",
+                    "",
+                ]
+            )
             for error in self.unresolved_errors[:5]:
                 severity = error.get("severity", "error")
                 emoji = {"critical": "🔴", "error": "🟠", "warning": "🟡"}.get(severity, "⚪")
@@ -132,45 +157,55 @@ class HandoffBrief:
                 lines.append(f"- {emoji} {location} {error.get('message', '')[:100]}")
 
         if self.blockers:
-            lines.extend([
-                f"",
-                f"## Blockers",
-                f"",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Blockers",
+                    "",
+                ]
+            )
             for blocker in self.blockers:
                 lines.append(f"- 🚫 {blocker}")
 
         if self.pending_work:
-            lines.extend([
-                f"",
-                f"## Pending Work",
-                f"",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Pending Work",
+                    "",
+                ]
+            )
             for work in self.pending_work:
                 lines.append(f"- [ ] {work}")
 
         if self.open_questions:
-            lines.extend([
-                f"",
-                f"## Open Questions",
-                f"",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Open Questions",
+                    "",
+                ]
+            )
             for question in self.open_questions:
                 lines.append(f"- ❓ {question}")
 
-        lines.extend([
-            f"",
-            f"## Next Action",
-            f"",
-            f"**{self.next_action}**",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Next Action",
+                "",
+                f"**{self.next_action}**",
+            ]
+        )
 
         if self.files_in_progress:
-            lines.extend([
-                f"",
-                f"### Files in Progress",
-                f"",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "### Files in Progress",
+                    "",
+                ]
+            )
             for file in self.files_in_progress:
                 lines.append(f"- `{file}`")
 
@@ -322,7 +357,9 @@ class HandoffGenerator:
 
         return pending[:10]  # Limit to 10 items
 
-    def _get_files_in_progress(self, tasks: list[dict], current_task_id: Optional[str]) -> list[str]:
+    def _get_files_in_progress(
+        self, tasks: list[dict], current_task_id: Optional[str]
+    ) -> list[str]:
         """Get files currently being worked on."""
         files = set()
 
@@ -398,7 +435,13 @@ class HandoffGenerator:
         phase_status = {}
         phases = state.get("phases", {})
         for phase_name, phase_data in phases.items():
-            phase_num = {"planning": "1", "validation": "2", "implementation": "3", "verification": "4", "completion": "5"}.get(phase_name)
+            phase_num = {
+                "planning": "1",
+                "validation": "2",
+                "implementation": "3",
+                "verification": "4",
+                "completion": "5",
+            }.get(phase_name)
             if phase_num:
                 phase_status[phase_num] = phase_data.get("status", "pending")
 
@@ -479,10 +522,10 @@ class HandoffGenerator:
             return None
 
         try:
-            with open(self.handoff_file, "r", encoding="utf-8") as f:
+            with open(self.handoff_file, encoding="utf-8") as f:
                 data = json.load(f)
             return HandoffBrief.from_dict(data)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load handoff brief: {e}")
             return None
 

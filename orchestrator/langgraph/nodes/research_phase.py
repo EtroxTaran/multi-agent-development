@@ -13,14 +13,13 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from ...agents.prompts import format_prompt, load_prompt
 from ..state import WorkflowState
-from ...agents.prompts import load_prompt, format_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -186,14 +185,16 @@ async def research_phase_node(state: WorkflowState) -> dict[str, Any]:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results
-        for agent, result in zip(RESEARCH_AGENTS, results):
+        for agent, result in zip(RESEARCH_AGENTS, results, strict=False):
             if isinstance(result, Exception):
                 logger.warning(f"Research agent {agent.id} failed: {result}")
-                findings.errors.append({
-                    "agent": agent.id,
-                    "error": str(result),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                findings.errors.append(
+                    {
+                        "agent": agent.id,
+                        "error": str(result),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             else:
                 # Store result
                 if agent.id == "tech_stack":
@@ -224,11 +225,13 @@ async def research_phase_node(state: WorkflowState) -> dict[str, Any]:
         logger.error(f"Research phase failed: {e}")
         return {
             "research_complete": False,
-            "errors": [{
-                "type": "research_phase_error",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "research_phase_error",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "updated_at": datetime.now().isoformat(),
         }
 
@@ -301,7 +304,9 @@ async def _run_research_agent(
         from ...storage.async_utils import run_async
 
         repo = get_logs_repository(project_name)
-        run_async(repo.create_log(log_type="research", content={"agent_id": agent.id, "findings": parsed}))
+        run_async(
+            repo.create_log(log_type="research", content={"agent_id": agent.id, "findings": parsed})
+        )
         logger.info(f"Research agent {agent.id} saved results to database")
 
         return parsed
@@ -379,6 +384,7 @@ def _parse_research_output(output: str) -> dict:
 
     # Look for JSON block in output
     import re
+
     json_match = re.search(r"\{[\s\S]*\}", output)
     if json_match:
         try:
@@ -625,7 +631,9 @@ def _quick_tech_stack_analysis(project_dir: Path) -> dict:
     if package_json.exists():
         try:
             pkg = json.loads(package_json.read_text())
-            result["languages"].append("javascript" if "typescript" not in str(pkg) else "typescript")
+            result["languages"].append(
+                "javascript" if "typescript" not in str(pkg) else "typescript"
+            )
 
             deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
 
@@ -728,7 +736,9 @@ def _quick_pattern_analysis(project_dir: Path) -> dict:
         elif "services" in found_dirs:
             result["architecture"] = "Service-oriented"
 
-        result["folder_structure"] = "feature-based" if (src_dir / "features").exists() else "layer-based"
+        result["folder_structure"] = (
+            "feature-based" if (src_dir / "features").exists() else "layer-based"
+        )
 
     # Detect testing structure
     tests_dir = project_dir / "tests"

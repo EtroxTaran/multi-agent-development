@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
-import { BudgetController } from './budget.controller';
-import { BudgetService } from './budget.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { BudgetController } from "./budget.controller";
+import { BudgetService } from "./budget.service";
+import { createBudgetStatus } from "../testing/factories";
 
-describe('BudgetController', () => {
+describe("BudgetController", () => {
   let controller: BudgetController;
   let budgetService: jest.Mocked<BudgetService>;
 
@@ -24,27 +24,30 @@ describe('BudgetController', () => {
     budgetService = module.get(BudgetService);
   });
 
-  describe('getBudget', () => {
-    it('should return budget status', async () => {
-      const budget = { totalSpentUsd: 5.0, enabled: true };
+  describe("getBudget", () => {
+    it("should return budget status", async () => {
+      const budget = createBudgetStatus({ totalSpentUsd: 5.0, enabled: true });
       budgetService.getBudget.mockResolvedValueOnce(budget);
 
-      const result = await controller.getBudget('test');
+      const result = await controller.getBudget("test");
 
       expect(result).toEqual(budget);
-      expect(budgetService.getBudget).toHaveBeenCalledWith('test');
+      expect(budgetService.getBudget).toHaveBeenCalledWith("test");
     });
   });
 
-  describe('getReport', () => {
-    it('should return budget report', async () => {
-      const report = { status: {}, taskSpending: [] };
+  describe("getReport", () => {
+    it("should return budget report", async () => {
+      const report = {
+        status: createBudgetStatus(),
+        taskSpending: [],
+      };
       budgetService.getReport.mockResolvedValueOnce(report);
 
-      const result = await controller.getReport('test');
+      const result = await controller.getReport("test");
 
       expect(result).toEqual(report);
-      expect(budgetService.getReport).toHaveBeenCalledWith('test');
+      expect(budgetService.getReport).toHaveBeenCalledWith("test");
     });
   });
 });

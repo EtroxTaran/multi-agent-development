@@ -1,20 +1,15 @@
 """Tests for universal node wrapper."""
 
 import asyncio
-import pytest
-from unittest.mock import AsyncMock, patch
 
-from orchestrator.langgraph.state import (
-    WorkflowState,
-    create_initial_state,
-    ErrorContext,
-    AgentExecution,
-)
+import pytest
+
+from orchestrator.langgraph.state import create_initial_state
 from orchestrator.langgraph.wrappers import (
-    wrapped_node,
-    NodeWrapper,
     AGENT_NODES,
+    NodeWrapper,
     get_node_metadata,
+    wrapped_node,
 )
 
 
@@ -242,9 +237,7 @@ class TestErrorContext:
         async def error_node(state):
             raise RuntimeError("Test error")
 
-        result = asyncio.get_event_loop().run_until_complete(
-            error_node(initial_state)
-        )
+        result = asyncio.get_event_loop().run_until_complete(error_node(initial_state))
 
         error_ctx = result["error_context"]
 
@@ -268,9 +261,7 @@ class TestErrorContext:
         async def error_node(state):
             raise ValueError("Test")
 
-        result = asyncio.get_event_loop().run_until_complete(
-            error_node(initial_state)
-        )
+        result = asyncio.get_event_loop().run_until_complete(error_node(initial_state))
 
         # State snapshot should only have safe fields
         snapshot = result["error_context"]["state_snapshot"]

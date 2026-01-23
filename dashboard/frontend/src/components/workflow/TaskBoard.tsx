@@ -2,7 +2,7 @@
  * Task board component
  */
 
-import { useTasks } from '@/hooks';
+import { useTasks } from "@/hooks";
 import {
   Badge,
   Card,
@@ -11,9 +11,10 @@ import {
   CardHeader,
   CardTitle,
   ScrollArea,
-} from '@/components/ui';
-import { cn, getStatusColor } from '@/lib/utils';
-import type { TaskInfo } from '@/types';
+  Guidance,
+} from "@/components/ui";
+import { cn, getStatusColor } from "@/lib/utils";
+import type { TaskInfo } from "@/types";
 
 interface TaskBoardProps {
   projectName: string;
@@ -25,7 +26,7 @@ function TaskCard({ task }: { task: TaskInfo }) {
       <CardHeader className="py-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">{task.title}</CardTitle>
-          <Badge className={cn('text-xs', getStatusColor(task.status))}>
+          <Badge className={cn("text-xs", getStatusColor(task.status))}>
             {task.status}
           </Badge>
         </div>
@@ -34,7 +35,9 @@ function TaskCard({ task }: { task: TaskInfo }) {
       {(task.description || task.files_to_modify.length > 0) && (
         <CardContent className="py-2">
           {task.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {task.description}
+            </p>
           )}
           {task.files_to_modify.length > 0 && (
             <div className="mt-2">
@@ -44,10 +47,14 @@ function TaskCard({ task }: { task: TaskInfo }) {
             </div>
           )}
           {task.complexity_score !== undefined && (
-            <div className="mt-1">
+            <div className="mt-1 flex items-center gap-1">
               <span className="text-xs text-muted-foreground">
                 Complexity: {task.complexity_score.toFixed(1)}
               </span>
+              <Guidance
+                content="Estimated complexity score (1-10) based on task description and file changes."
+                className="h-3 w-3"
+              />
             </div>
           )}
         </CardContent>
@@ -76,10 +83,12 @@ export function TaskBoard({ projectName }: TaskBoardProps) {
   }
 
   const tasks = data?.tasks || [];
-  const pendingTasks = tasks.filter((t) => t.status === 'pending' || t.status === 'blocked');
-  const inProgressTasks = tasks.filter((t) => t.status === 'in_progress');
-  const completedTasks = tasks.filter((t) => t.status === 'completed');
-  const failedTasks = tasks.filter((t) => t.status === 'failed');
+  const pendingTasks = tasks.filter(
+    (t) => t.status === "pending" || t.status === "blocked",
+  );
+  const inProgressTasks = tasks.filter((t) => t.status === "in_progress");
+  const completedTasks = tasks.filter((t) => t.status === "completed");
+  const failedTasks = tasks.filter((t) => t.status === "failed");
 
   return (
     <div className="grid gap-4 md:grid-cols-4">
@@ -110,7 +119,9 @@ export function TaskBoard({ projectName }: TaskBoardProps) {
             <TaskCard key={task.id} task={task} />
           ))}
           {inProgressTasks.length === 0 && (
-            <p className="text-sm text-muted-foreground">No tasks in progress</p>
+            <p className="text-sm text-muted-foreground">
+              No tasks in progress
+            </p>
           )}
         </ScrollArea>
       </div>

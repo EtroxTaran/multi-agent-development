@@ -598,6 +598,21 @@ Declarative skills for high-level workflow orchestration.
 | SKILL-12 | Add Lesson | `/add-lesson` | Add to lessons learned |
 | SKILL-13 | Discover | `/discover` | Read docs, create PRODUCT.md |
 | SKILL-14 | Status | `/status` | Show current workflow status |
+| SKILL-15 | Git Atomic | `/git-atomic` | Create atomic commits by dependency |
+| SKILL-16 | Git Conventional | `/git-msg` | Create conventional commit messages |
+| SKILL-17 | Git Helper | `/git-help` | Handle rebase/merge/hooks |
+| SKILL-18 | TDD Overnight | `/tdd-run` | Autonomous TDD loop |
+| SKILL-19 | Write Test | `/write-test` | Generate unit/integration tests |
+| SKILL-20 | E2E Test | `/e2e-test` | Generate E2E tests |
+| SKILL-21 | Refactor Safe | `/refactor` | Safe refactoring workflow |
+| SKILL-22 | Visualize | `/visualize` | Visual architecture explanation |
+| SKILL-23 | TS Guardian | `/ts-check` | Enforce strict TypeScript rules |
+| SKILL-24 | API Contract | `/make-contract` | Create Zod contracts |
+| SKILL-25 | Frontend Guides | n/a | Frontend patterns reference |
+| SKILL-26 | Debug Action | `/debug-action` | Debug GitHub Actions |
+| SKILL-27 | Changelog | `/changelog` | Generate release notes |
+| SKILL-28 | New Skill | `/new-skill` | Scaffold new skills |
+| SKILL-29 | Eval Skill | `/eval-skill` | Evaluate skill performance |
 
 ### SKILL-01: Orchestrate
 

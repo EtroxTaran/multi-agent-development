@@ -2,7 +2,7 @@
  * Base page object with common functionality
  */
 
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator } from "@playwright/test";
 
 export class BasePage {
   constructor(protected page: Page) {}
@@ -11,14 +11,14 @@ export class BasePage {
    * Wait for page to be loaded (network idle)
    */
   async waitForPageLoad() {
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState("networkidle");
   }
 
   /**
    * Wait for an element to be visible
    */
   async waitForElement(selector: string, timeout = 5000) {
-    await this.page.waitForSelector(selector, { state: 'visible', timeout });
+    await this.page.waitForSelector(selector, { state: "visible", timeout });
   }
 
   /**
@@ -31,7 +31,10 @@ export class BasePage {
   /**
    * Get element by role
    */
-  getByRole(role: Parameters<Page['getByRole']>[0], options?: Parameters<Page['getByRole']>[1]): Locator {
+  getByRole(
+    role: Parameters<Page["getByRole"]>[0],
+    options?: Parameters<Page["getByRole"]>[1],
+  ): Locator {
     return this.page.getByRole(role, options);
   }
 
@@ -47,7 +50,10 @@ export class BasePage {
    */
   async isVisible(selector: string): Promise<boolean> {
     try {
-      await this.page.waitForSelector(selector, { state: 'visible', timeout: 2000 });
+      await this.page.waitForSelector(selector, {
+        state: "visible",
+        timeout: 2000,
+      });
       return true;
     } catch {
       return false;

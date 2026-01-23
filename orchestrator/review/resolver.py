@@ -5,27 +5,32 @@ using weighted authority based on domain expertise.
 """
 
 import logging
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ReviewResult:
     """Standardized review result."""
+
     approved: bool
     score: float
-    blocking_issues: List[str]
+    blocking_issues: list[str]
     agent_id: str
+
 
 @dataclass
 class ResolutionResult:
     """Result of conflict resolution."""
+
     approved: bool
     final_score: float
     decision_reason: str
-    blocking_issues: List[Dict[str, Any]]
+    blocking_issues: list[dict[str, Any]]
     action: str  # "approve", "reject", "escalate"
+
 
 class ConflictResolver:
     """Resolves verification conflicts using weighted domain expertise."""
@@ -42,10 +47,10 @@ class ConflictResolver:
     # NOTE: Only actual vulnerabilities trigger veto, not process/documentation gaps
     DOMAIN_AUTHORITY = {
         "vulnerability": "cursor",
-        "injection": "cursor",     # SQL/Command injection
-        "xss": "cursor",           # Cross-site scripting
-        "csrf": "cursor",          # Cross-site request forgery
-        "rce": "cursor",           # Remote code execution
+        "injection": "cursor",  # SQL/Command injection
+        "xss": "cursor",  # Cross-site scripting
+        "csrf": "cursor",  # Cross-site request forgery
+        "rce": "cursor",  # Remote code execution
         "authentication bypass": "cursor",
         "authorization bypass": "cursor",
         "privilege escalation": "cursor",
@@ -65,13 +70,13 @@ class ConflictResolver:
         "unclear",
     ]
 
-    def __init__(self, weights: Optional[Dict[str, float]] = None):
+    def __init__(self, weights: Optional[dict[str, float]] = None):
         self.weights = weights or self.DEFAULT_WEIGHTS
 
     def resolve(
         self,
-        cursor_review: Dict[str, Any],
-        gemini_review: Dict[str, Any],
+        cursor_review: dict[str, Any],
+        gemini_review: dict[str, Any],
         cursor_weight: Optional[float] = None,
         gemini_weight: Optional[float] = None,
     ) -> ResolutionResult:
@@ -106,7 +111,7 @@ class ConflictResolver:
                 final_score=0.0,
                 decision_reason=f"Authority Veto: {authority_veto}",
                 blocking_issues=all_blockers,
-                action="reject"
+                action="reject",
             )
 
         # 3. Calculate Weighted Score
@@ -117,7 +122,7 @@ class ConflictResolver:
         # Use provided weights (role dispatch) or fall back to defaults
         w1 = cursor_weight if cursor_weight is not None else self.weights.get("cursor", 0.5)
         w2 = gemini_weight if gemini_weight is not None else self.weights.get("gemini", 0.5)
-        
+
         # Re-normalize weights to sum to 1.0
         total_w = w1 + w2
         w1 = w1 / total_w
@@ -133,8 +138,7 @@ class ConflictResolver:
         # Filter out process gaps from blocking issues
         # Process gaps are important feedback but shouldn't block validation
         real_blockers = [
-            b for b in all_blockers
-            if not self._is_process_gap(str(b["issue"]).lower())
+            b for b in all_blockers if not self._is_process_gap(str(b["issue"]).lower())
         ]
 
         # If real blockers exist (actual vulnerabilities), reject regardless of score
@@ -144,7 +148,7 @@ class ConflictResolver:
                 final_score=weighted_score,
                 decision_reason=f"Rejected due to {len(real_blockers)} blocking issues (actual vulnerabilities)",
                 blocking_issues=real_blockers,
-                action="reject"
+                action="reject",
             )
 
         # Log process gap warnings (they're feedback, not blockers)
@@ -162,7 +166,7 @@ class ConflictResolver:
                 final_score=weighted_score,
                 decision_reason=f"High disagreement (Diff: {abs(s1-s2):.1f}). Cursor={s1}, Gemini={s2}",
                 blocking_issues=[],
-                action="escalate"
+                action="escalate",
             )
 
         # If score is too low, reject
@@ -172,7 +176,7 @@ class ConflictResolver:
                 final_score=weighted_score,
                 decision_reason=f"Score {weighted_score:.1f} below threshold {MIN_SCORE}",
                 blocking_issues=[],
-                action="reject"
+                action="reject",
             )
 
         # Approved
@@ -181,29 +185,29 @@ class ConflictResolver:
             final_score=weighted_score,
             decision_reason="Approved by weighted consensus",
             blocking_issues=[],
-            action="approve"
+            action="approve",
         )
 
-    def _parse_review(self, data: Dict[str, Any], agent_id: str) -> ReviewResult:
+    def _parse_review(self, data: dict[str, Any], agent_id: str) -> ReviewResult:
         """Extract standardized fields from review data."""
         # Handle AgentFeedback object (dict representation) or raw dict
-        if hasattr(data, "score"): # It's an object
+        if hasattr(data, "score"):  # It's an object
             return ReviewResult(
                 approved=data.approved,
                 score=data.score,
                 blocking_issues=data.blocking_issues,
-                agent_id=agent_id
+                agent_id=agent_id,
             )
-        
+
         # It's a dict
         return ReviewResult(
             approved=data.get("approved", False),
             score=float(data.get("score", 0.0)),
             blocking_issues=data.get("blocking_issues", []),
-            agent_id=agent_id
+            agent_id=agent_id,
         )
 
-    def _check_authority_veto(self, blockers: List[Dict[str, Any]]) -> Optional[str]:
+    def _check_authority_veto(self, blockers: list[dict[str, Any]]) -> Optional[str]:
         """Check if any blocker is from the authority for that domain.
 
         Only triggers veto for actual vulnerabilities, not process/documentation gaps.

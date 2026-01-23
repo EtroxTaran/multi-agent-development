@@ -22,21 +22,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from orchestrator.db import (
-    is_surrealdb_enabled,
-    get_config,
     ensure_schema,
-    get_connection,
     get_audit_repository,
-    get_workflow_repository,
-    get_task_repository,
     get_budget_repository,
+    get_config,
+    get_connection,
+    get_task_repository,
+    get_workflow_repository,
+    is_surrealdb_enabled,
 )
 from orchestrator.db.migrate import (
-    migrate_project,
-    migrate_all_projects,
-    migrate_sessions,
-    migrate_budget,
     MigrationResult,
+    migrate_all_projects,
+    migrate_budget,
+    migrate_project,
+    migrate_sessions,
 )
 
 logging.basicConfig(
@@ -56,7 +56,7 @@ async def cmd_status(args):
         return 1
 
     config = get_config()
-    print(f"✅ SurrealDB is enabled")
+    print("✅ SurrealDB is enabled")
     print(f"   URL: {config.url}")
     print(f"   Namespace: {config.namespace}")
     print(f"   Default Database: {config.default_database}")
@@ -68,12 +68,12 @@ async def cmd_status(args):
     # Validate config
     errors = config.validate()
     if errors:
-        print(f"\n⚠️  Configuration Warnings:")
+        print("\n⚠️  Configuration Warnings:")
         for error in errors:
             print(f"   - {error}")
 
     # Test connection
-    print(f"\n📡 Testing connection...")
+    print("\n📡 Testing connection...")
     try:
         async with get_connection() as conn:
             result = await conn.query("SELECT * FROM schema_version LIMIT 1")
@@ -81,7 +81,7 @@ async def cmd_status(args):
                 version = result[0].get("version", "unknown")
                 print(f"✅ Connected successfully (schema v{version})")
             else:
-                print(f"✅ Connected successfully (no schema applied)")
+                print("✅ Connected successfully (no schema applied)")
     except Exception as e:
         print(f"❌ Connection failed: {e}")
         return 1
@@ -116,7 +116,7 @@ async def cmd_migrate(args):
 
 async def cmd_migrate_all(args):
     """Migrate all projects from JSON to SurrealDB."""
-    print(f"\n=== Migrating All Projects ===\n")
+    print("\n=== Migrating All Projects ===\n")
 
     if not is_surrealdb_enabled():
         print("❌ SurrealDB is not enabled")
@@ -215,7 +215,9 @@ async def cmd_stats(args):
         budget_summary = await budget_repo.get_summary()
         print("Budget:")
         print(f"  Total Cost: ${budget_summary.total_cost_usd:.4f}")
-        print(f"  Total Tokens: {budget_summary.total_tokens_input + budget_summary.total_tokens_output:,}")
+        print(
+            f"  Total Tokens: {budget_summary.total_tokens_input + budget_summary.total_tokens_output:,}"
+        )
         print(f"  By Agent: {budget_summary.by_agent}")
 
     except Exception as e:
@@ -238,7 +240,7 @@ async def cmd_init_schema(args):
         if success:
             print(f"✅ Schema initialized for {args.project}")
         else:
-            print(f"❌ Schema initialization failed")
+            print("❌ Schema initialization failed")
             return 1
     except Exception as e:
         print(f"❌ Failed to initialize schema: {e}")
@@ -353,6 +355,7 @@ async def cmd_validate(args):
             db_state = await workflow_repo.get_state()
 
             import json
+
             file_state = json.loads(state_file.read_text())
 
             if db_state:
@@ -376,9 +379,7 @@ async def cmd_validate(args):
             file_tasks = json.loads(state_file.read_text()).get("tasks", [])
 
             if len(db_tasks) != len(file_tasks):
-                warnings.append(
-                    f"Task count mismatch: DB={len(db_tasks)}, File={len(file_tasks)}"
-                )
+                warnings.append(f"Task count mismatch: DB={len(db_tasks)}, File={len(file_tasks)}")
             else:
                 print(f"✅ Task count matches: {len(file_tasks)}")
 
@@ -389,15 +390,13 @@ async def cmd_validate(args):
             db_stats = await audit_repo.get_statistics()
 
             file_count = 0
-            with open(audit_file, "r") as f:
+            with open(audit_file) as f:
                 for line in f:
                     if line.strip():
                         file_count += 1
 
             if db_stats.total != file_count:
-                warnings.append(
-                    f"Audit count mismatch: DB={db_stats.total}, File={file_count}"
-                )
+                warnings.append(f"Audit count mismatch: DB={db_stats.total}, File={file_count}")
             else:
                 print(f"✅ Audit entry count matches: {file_count}")
 
@@ -475,7 +474,9 @@ def main():
     init_parser.add_argument("--project", "-p", required=True, help="Project name")
 
     # migrate-sessions
-    migrate_sessions_parser = subparsers.add_parser("migrate-sessions", help="Migrate session files")
+    migrate_sessions_parser = subparsers.add_parser(
+        "migrate-sessions", help="Migrate session files"
+    )
     migrate_sessions_parser.add_argument("--project", "-p", required=True, help="Project name")
     migrate_sessions_parser.add_argument("--project-dir", "-d", help="Project directory")
     migrate_sessions_parser.add_argument("--dry-run", action="store_true", help="Validate only")

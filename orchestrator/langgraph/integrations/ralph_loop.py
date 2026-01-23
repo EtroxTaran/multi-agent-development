@@ -24,11 +24,12 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +96,14 @@ class TokenMetrics:
     model: str = "claude-sonnet-4"
 
     # Pricing per 1M tokens (2026 rates - approximate)
-    PRICING: dict[str, dict[str, float]] = field(default_factory=lambda: {
-        "claude-sonnet-4": {"input": 3.0, "output": 15.0},
-        "claude-opus-4": {"input": 15.0, "output": 75.0},
-        "claude-opus-4-5": {"input": 15.0, "output": 75.0},
-        "claude-haiku-3-5": {"input": 0.25, "output": 1.25},
-    })
+    PRICING: dict[str, dict[str, float]] = field(
+        default_factory=lambda: {
+            "claude-sonnet-4": {"input": 3.0, "output": 15.0},
+            "claude-opus-4": {"input": 15.0, "output": 75.0},
+            "claude-opus-4-5": {"input": 15.0, "output": 75.0},
+            "claude-haiku-3-5": {"input": 0.25, "output": 1.25},
+        }
+    )
 
     def calculate_cost(self) -> float:
         """Calculate estimated cost based on token usage and model pricing."""
@@ -184,21 +187,23 @@ class RalphLoopConfig:
     iteration_timeout: int = 300  # 5 minutes per iteration
     test_command: str = "pytest"
     completion_pattern: str = COMPLETION_PROMISE
-    allowed_tools: list[str] = field(default_factory=lambda: [
-        "Read",
-        "Write",
-        "Edit",
-        "Glob",
-        "Grep",
-        "Bash(npm*)",
-        "Bash(pytest*)",
-        "Bash(python*)",
-        "Bash(pnpm*)",
-        "Bash(yarn*)",
-        "Bash(bun*)",
-        "Bash(cargo*)",
-        "Bash(go*)",
-    ])
+    allowed_tools: list[str] = field(
+        default_factory=lambda: [
+            "Read",
+            "Write",
+            "Edit",
+            "Glob",
+            "Grep",
+            "Bash(npm*)",
+            "Bash(pytest*)",
+            "Bash(python*)",
+            "Bash(pnpm*)",
+            "Bash(yarn*)",
+            "Bash(bun*)",
+            "Bash(cargo*)",
+            "Bash(go*)",
+        ]
+    )
     max_turns_per_iteration: int = 15
     save_iteration_logs: bool = True
 
@@ -349,9 +354,13 @@ async def run_ralph_loop(
     previous_context = ""
 
     # Initialize token tracking
-    token_tracker = TokenUsageTracker(max_cost_usd=config.max_cost_usd) if config.track_tokens else None
+    token_tracker = (
+        TokenUsageTracker(max_cost_usd=config.max_cost_usd) if config.track_tokens else None
+    )
 
-    logger.info(f"Starting Ralph Wiggum loop for task {task_id} (mode: {config.execution_mode.value})")
+    logger.info(
+        f"Starting Ralph Wiggum loop for task {task_id} (mode: {config.execution_mode.value})"
+    )
 
     while iteration < config.max_iterations:
         iteration += 1
@@ -451,11 +460,13 @@ async def run_ralph_loop(
 
             # Check if tests pass
             test_result = await _run_tests(project_dir, test_files, config)
-            test_results.append({
-                "iteration": iteration,
-                "passed": test_result["all_passed"],
-                "summary": test_result.get("summary", ""),
-            })
+            test_results.append(
+                {
+                    "iteration": iteration,
+                    "passed": test_result["all_passed"],
+                    "summary": test_result.get("summary", ""),
+                }
+            )
 
             if test_result["all_passed"]:
                 elapsed = (datetime.now() - start_time).total_seconds()
@@ -497,10 +508,13 @@ async def run_ralph_loop(
             # HITL mode: Pause for human review
             if config.execution_mode == ExecutionMode.HITL:
                 if hitl_callback:
-                    should_continue = hitl_callback(iteration, {
-                        "test_result": test_result,
-                        "files_changed": result.get("files_changed", []),
-                    })
+                    should_continue = hitl_callback(
+                        iteration,
+                        {
+                            "test_result": test_result,
+                            "files_changed": result.get("files_changed", []),
+                        },
+                    )
                     if not should_continue:
                         elapsed = (datetime.now() - start_time).total_seconds()
                         logger.info(f"Ralph loop paused by human at iteration {iteration}")
@@ -536,20 +550,24 @@ async def run_ralph_loop(
 
         except asyncio.TimeoutError:
             logger.warning(f"Ralph loop iteration {iteration} timed out")
-            test_results.append({
-                "iteration": iteration,
-                "passed": False,
-                "summary": "Iteration timed out",
-            })
+            test_results.append(
+                {
+                    "iteration": iteration,
+                    "passed": False,
+                    "summary": "Iteration timed out",
+                }
+            )
             previous_context = f"PREVIOUS ITERATION {iteration}: Timed out. Please continue from where you left off."
 
         except Exception as e:
             logger.error(f"Ralph loop iteration {iteration} failed: {e}")
-            test_results.append({
-                "iteration": iteration,
-                "passed": False,
-                "summary": str(e),
-            })
+            test_results.append(
+                {
+                    "iteration": iteration,
+                    "passed": False,
+                    "summary": str(e),
+                }
+            )
             previous_context = f"PREVIOUS ITERATION {iteration}: Error occurred: {e}. Please try a different approach."
 
     # Max iterations reached
@@ -630,7 +648,9 @@ async def _run_single_iteration(
         parsed_output = _parse_iteration_output(output_text)
 
         # Extract list of changed files from output (if any)
-        files_changed = parsed_output.get("files_modified", []) + parsed_output.get("files_created", [])
+        files_changed = parsed_output.get("files_modified", []) + parsed_output.get(
+            "files_created", []
+        )
 
         return {
             "iteration": iteration,
@@ -647,7 +667,7 @@ async def _run_single_iteration(
             await _terminate_process(process)
         raise
 
-    except Exception as e:
+    except Exception:
         # Ensure cleanup on any error
         if process is not None:
             await _terminate_process(process)
@@ -962,6 +982,7 @@ def detect_test_framework(project_dir: Path) -> str:
 
 # --- Hook Support ---
 
+
 async def _run_hook(
     hook_path: Path,
     config: HookConfig,
@@ -1029,6 +1050,7 @@ async def _run_hook(
 
 
 # --- Token Tracking ---
+
 
 def _extract_token_metrics(result: dict, iteration: int) -> Optional[TokenMetrics]:
     """Extract token usage metrics from iteration result.
@@ -1105,6 +1127,7 @@ def _check_context_warning(tracker: TokenUsageTracker, config: RalphLoopConfig) 
 
 # --- Convenience Functions ---
 
+
 def create_ralph_config(
     project_dir: Path,
     execution_mode: str = "afk",
@@ -1133,9 +1156,15 @@ def create_ralph_config(
         hooks_dir = project_dir / ".workflow" / "hooks"
         if hooks_dir.exists():
             hooks = HookConfig(
-                pre_iteration=hooks_dir / "pre-iteration.sh" if (hooks_dir / "pre-iteration.sh").exists() else None,
-                post_iteration=hooks_dir / "post-iteration.sh" if (hooks_dir / "post-iteration.sh").exists() else None,
-                stop_check=hooks_dir / "stop-check.sh" if (hooks_dir / "stop-check.sh").exists() else None,
+                pre_iteration=hooks_dir / "pre-iteration.sh"
+                if (hooks_dir / "pre-iteration.sh").exists()
+                else None,
+                post_iteration=hooks_dir / "post-iteration.sh"
+                if (hooks_dir / "post-iteration.sh").exists()
+                else None,
+                stop_check=hooks_dir / "stop-check.sh"
+                if (hooks_dir / "stop-check.sh").exists()
+                else None,
             )
 
     return RalphLoopConfig(

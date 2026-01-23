@@ -16,13 +16,11 @@ Usage:
 """
 
 import argparse
-import json
 import re
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
 
 # Agent metadata from registry
 AGENT_METADATA = {
@@ -312,12 +310,16 @@ def compile_agent_prompt(
 
     # Extract input/output specs from type template
     input_spec = ""
-    input_match = re.search(r"## Input Specification.*?\n(.+?)(?=\n## |$)", type_template, re.DOTALL)
+    input_match = re.search(
+        r"## Input Specification.*?\n(.+?)(?=\n## |$)", type_template, re.DOTALL
+    )
     if input_match:
         input_spec = f"# Input Specification\n{input_match.group(1)}"
 
     output_spec = ""
-    output_match = re.search(r"## Output Specification.*?\n(.+?)(?=\n## |$)", type_template, re.DOTALL)
+    output_match = re.search(
+        r"## Output Specification.*?\n(.+?)(?=\n## |$)", type_template, re.DOTALL
+    )
     if output_match:
         output_spec = f"# Output Specification\n{output_match.group(1)}"
 
@@ -361,7 +363,7 @@ def compile_agent_prompt(
     sections = [
         f"# {agent_id} {metadata['name']} Agent",
         "",
-        f"<!-- AUTO-GENERATED: Do not edit directly -->",
+        "<!-- AUTO-GENERATED: Do not edit directly -->",
         f"<!-- Template: {template_type} -->",
         f"<!-- Last compiled: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -->",
         "",
@@ -490,7 +492,9 @@ def main():
         if compile_and_write(agent_id, templates_dir, agents_dir, args.check):
             success_count += 1
 
-    print(f"\n{'Checked' if args.check else 'Compiled'} {success_count}/{len(agents_to_compile)} agents successfully")
+    print(
+        f"\n{'Checked' if args.check else 'Compiled'} {success_count}/{len(agents_to_compile)} agents successfully"
+    )
 
     if success_count < len(agents_to_compile):
         sys.exit(1)

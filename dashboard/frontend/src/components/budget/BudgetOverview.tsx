@@ -2,8 +2,8 @@
  * Budget overview component
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { budgetApi } from '@/lib/api';
+import { useQuery } from "@tanstack/react-query";
+import { budgetApi } from "@/lib/api";
 import {
   Badge,
   Card,
@@ -13,9 +13,9 @@ import {
   CardTitle,
   Progress,
   ScrollArea,
-} from '@/components/ui';
-import { formatCost, formatPercent } from '@/lib/utils';
-import type { TaskSpending } from '@/types';
+} from "@/components/ui";
+import { formatCost, formatPercent } from "@/lib/utils";
+import type { TaskSpending } from "@/types";
 
 interface BudgetOverviewProps {
   projectName: string;
@@ -41,10 +41,10 @@ function SpendingRow({ spending }: { spending: TaskSpending }) {
           <Badge
             variant={
               spending.used_percent >= 90
-                ? 'destructive'
+                ? "destructive"
                 : spending.used_percent >= 70
-                ? 'warning'
-                : 'secondary'
+                  ? "warning"
+                  : "secondary"
             }
           >
             {formatPercent(spending.used_percent)}
@@ -57,7 +57,7 @@ function SpendingRow({ spending }: { spending: TaskSpending }) {
 
 export function BudgetOverview({ projectName }: BudgetOverviewProps) {
   const { data: report, isLoading } = useQuery({
-    queryKey: ['budget', 'report', projectName],
+    queryKey: ["budget", "report", projectName],
     queryFn: () => budgetApi.getReport(projectName),
     refetchInterval: 10000,
   });
@@ -98,7 +98,7 @@ export function BudgetOverview({ projectName }: BudgetOverviewProps) {
             <div className="text-3xl font-bold">
               {status?.project_remaining_usd !== undefined
                 ? formatCost(status.project_remaining_usd)
-                : 'Unlimited'}
+                : "Unlimited"}
             </div>
           </CardContent>
         </Card>
@@ -108,7 +108,9 @@ export function BudgetOverview({ projectName }: BudgetOverviewProps) {
             <CardDescription>Budget Used</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{formatPercent(usedPercent)}</div>
+            <div className="text-3xl font-bold">
+              {formatPercent(usedPercent)}
+            </div>
             {status?.project_budget_usd !== undefined && (
               <Progress value={usedPercent} className="mt-2" />
             )}
@@ -122,7 +124,8 @@ export function BudgetOverview({ projectName }: BudgetOverviewProps) {
           <CardHeader>
             <CardTitle>Project Budget</CardTitle>
             <CardDescription>
-              {formatCost(status.total_spent_usd)} of {formatCost(status.project_budget_usd)} used
+              {formatCost(status.total_spent_usd)} of{" "}
+              {formatCost(status.project_budget_usd)} used
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -130,10 +133,10 @@ export function BudgetOverview({ projectName }: BudgetOverviewProps) {
               value={usedPercent}
               className={
                 usedPercent >= 90
-                  ? '[&>div]:bg-red-500'
+                  ? "[&>div]:bg-red-500"
                   : usedPercent >= 70
-                  ? '[&>div]:bg-yellow-500'
-                  : ''
+                    ? "[&>div]:bg-yellow-500"
+                    : ""
               }
             />
           </CardContent>
@@ -152,7 +155,9 @@ export function BudgetOverview({ projectName }: BudgetOverviewProps) {
               <SpendingRow key={spending.task_id} spending={spending} />
             ))}
             {taskSpending.length === 0 && (
-              <p className="text-sm text-muted-foreground">No spending recorded</p>
+              <p className="text-sm text-muted-foreground">
+                No spending recorded
+              </p>
             )}
           </ScrollArea>
         </CardContent>

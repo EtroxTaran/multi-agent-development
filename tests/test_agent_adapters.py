@@ -5,27 +5,31 @@ to work with any agent (Claude, Cursor, Gemini).
 """
 
 import asyncio
-import pytest
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from orchestrator.config.models import (
-    CLAUDE_MODELS, CLAUDE_SONNET, CLAUDE_OPUS, CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL,
-    GEMINI_MODELS, GEMINI_FLASH, GEMINI_PRO, DEFAULT_GEMINI_MODEL,
-    CURSOR_MODELS, CURSOR_CODEX, CURSOR_COMPOSER, DEFAULT_CURSOR_MODEL
-)
+import pytest
+
 from orchestrator.agents.adapter import (
-    AgentType,
     AgentCapabilities,
-    IterationResult,
-    AgentAdapter,
+    AgentType,
     ClaudeAdapter,
     CursorAdapter,
     GeminiAdapter,
+    IterationResult,
     create_adapter,
     get_agent_capabilities,
-    get_available_agents,
     get_agent_for_task,
+    get_available_agents,
+)
+from orchestrator.config.models import (
+    CLAUDE_HAIKU,
+    CLAUDE_OPUS,
+    CLAUDE_SONNET,
+    CURSOR_CODEX,
+    CURSOR_COMPOSER,
+    DEFAULT_CURSOR_MODEL,
+    GEMINI_FLASH,
+    GEMINI_PRO,
 )
 
 
@@ -386,10 +390,12 @@ class TestGetAgentForTask:
 
     def test_invalid_model_fallback(self):
         """Test fallback when model is invalid for agent."""
-        agent_type, model = get_agent_for_task({
-            "agent_type": "cursor",
-            "model": CLAUDE_OPUS,  # Claude model, not valid for Cursor
-        })
+        agent_type, model = get_agent_for_task(
+            {
+                "agent_type": "cursor",
+                "model": CLAUDE_OPUS,  # Claude model, not valid for Cursor
+            }
+        )
         assert agent_type == AgentType.CURSOR
         # Should fall back to default cursor model
         assert model == DEFAULT_CURSOR_MODEL

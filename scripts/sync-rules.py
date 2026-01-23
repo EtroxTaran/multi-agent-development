@@ -19,7 +19,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
 # Configuration
 SHARED_RULES_DIR = Path("shared-rules")
 AGENT_OVERRIDES_DIR = SHARED_RULES_DIR / "agent-overrides"
@@ -48,9 +47,9 @@ AGENTS = {
         "description": "Instructions for Gemini as architecture reviewer.",
     },
     "cursor": {
-        "output": Path(".cursor/rules"),
+        "output": Path(".cursor/rules/00-general.mdc"),
         "override": AGENT_OVERRIDES_DIR / "cursor.md",
-        "header": "# Cursor Agent Rules\n\n",
+        "header": "# Cursor Agent Rules\n\nglobs: **/*\n\n",
         "description": "Instructions for Cursor as code quality reviewer.",
     },
 }
@@ -92,6 +91,147 @@ def load_agent_override(agent: str) -> str:
         return override_path.read_text().strip()
     return ""
 
+    return "\n".join(parts)
+
+
+def load_skills() -> str:
+    """Load and format skills from .claude/skills directory."""
+    skills_dir = Path(".claude/skills")
+    if not skills_dir.exists():
+        return ""
+
+    skills = []
+    for skill_path in skills_dir.glob("*/SKILL.md"):
+        content = skill_path.read_text()
+        lines = content.splitlines()
+
+        # Parse frontmatter
+        meta = {}
+        if lines[0] == "---":
+            for line in lines[1:]:
+                if line == "---":
+                    break
+                if ":" in line:
+                    key, val = line.split(":", 1)
+                    meta[key.strip()] = val.strip().strip('"').strip("'")
+
+        # Fallback if no frontmatter or missing keys
+        name = meta.get("name", skill_path.parent.name)
+        desc = meta.get("description", "No description provided")
+
+        # Infer command from name if not explicit
+        # We assume command is /<name> for now, or check typical patterns
+        command = f"/{name}"
+        if name == "frontend-dev-guidelines":
+            command = "n/a"
+
+        skills.append(f"| {name.upper()} | {command} | {desc} |")
+
+    if not skills:
+        return ""
+
+    # Sort by name
+    skills.sort()
+
+    header = [
+        "\n## Available Skills\n",
+        "The following skills are available for use via the specified commands:\n",
+        "| Skill | Command | Description |",
+        "|-------|---------|-------------|",
+    ]
+
+    return "\n".join(header + skills) + "\n"
+
+
+def sync_cursor_rules(dry_run: bool = False) -> int:
+    """Generate .mdc rule files for Cursor."""
+    skills_dir = Path(".claude/skills")
+    cursor_rules_dir = Path(".cursor/rules/generated-skills")
+
+    if not skills_dir.exists():
+        return 0
+
+    if not dry_run:
+        cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+        # Clear existing generated rules to handle renames/deletions
+        for existing in cursor_rules_dir.glob("*.mdc"):
+            existing.unlink()
+
+    count = 0
+    for skill_path in skills_dir.glob("*/SKILL.md"):
+        content = skill_path.read_text()
+
+        # Parse frontmatter to get description for Cursor routing
+        description = "Agent Skill"
+        lines = content.splitlines()
+        if lines[0] == "---":
+            for line in lines[1:]:
+                if line == "---":
+                    break
+                if line.startswith("description:"):
+                    description = line.split(":", 1)[1].strip()
+
+        # Create MDC content with Cursor-specific frontmatter
+        skill_name = skill_path.parent.name
+
+        # We wrap the content in a new MDC format
+        # glob: **/* means it's available everywhere, but description helps routing
+        mdc_content = f"""---
+description: {description}
+globs: **/*
+---
+<!-- AUTO-GENERATED from .claude/skills/{skill_name}/SKILL.md -->
+{content}
+"""
+        target_path = cursor_rules_dir / f"{skill_name}.mdc"
+
+        if dry_run:
+            print(f"  cursor: Would generate {target_path}")
+        else:
+            target_path.write_text(mdc_content)
+
+        count += 1
+
+    return count
+
+
+def sync_claude_commands(dry_run: bool = False) -> int:
+    """Generate symlinks for Claude Code slash commands."""
+    skills_dir = Path(".claude/skills")
+    commands_dir = Path(".claude/commands")
+
+    if not skills_dir.exists():
+        return 0
+
+    if not dry_run:
+        commands_dir.mkdir(parents=True, exist_ok=True)
+        # We don't clear everything here to assume user might have manual commands
+        # But we should really separate generated ones? For now, we overwrite namesakes.
+
+    count = 0
+    # Current script runs from root, so relative path is needed for symlink
+    # Link: .claude/commands/<name>.md -> ../skills/<name>/SKILL.md
+
+    for skill_path in skills_dir.glob("*/SKILL.md"):
+        skill_name = skill_path.parent.name
+        target_link = commands_dir / f"{skill_name}.md"
+
+        # Calculate relative path: ../skills/<name>/SKILL.md
+        rel_path = Path("..") / "skills" / skill_name / "SKILL.md"
+
+        if dry_run:
+            print(f"  claude: Would link {target_link} -> {rel_path}")
+            count += 1
+            continue
+
+        if target_link.exists() or target_link.is_symlink():
+            target_link.unlink()
+
+        target_link.symlink_to(rel_path)
+        count += 1
+
+    return count
+
 
 def generate_agent_file(agent: str, shared_rules: str) -> str:
     """Generate the complete agent context file."""
@@ -101,9 +241,9 @@ def generate_agent_file(agent: str, shared_rules: str) -> str:
     # Build the file
     parts = [
         config["header"],
-        f"<!-- AUTO-GENERATED from shared-rules/ -->",
+        "<!-- AUTO-GENERATED from shared-rules/ -->",
         f"<!-- Last synced: {timestamp} -->",
-        f"<!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->",
+        "<!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->",
         f"\n{config['description']}\n",
     ]
 
@@ -111,6 +251,11 @@ def generate_agent_file(agent: str, shared_rules: str) -> str:
     agent_override = load_agent_override(agent)
     if agent_override:
         parts.append(f"\n{agent_override}\n")
+
+    # Add Skills Registry
+    skills_section = load_skills()
+    if skills_section:
+        parts.append(skills_section)
 
     # Add shared rules section
     parts.append("\n---\n")
@@ -200,9 +345,7 @@ def validate_rules() -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Sync shared rules to agent context files"
-    )
+    parser = argparse.ArgumentParser(description="Sync shared rules to agent context files")
     parser.add_argument(
         "--agent",
         choices=list(AGENTS.keys()),
@@ -243,6 +386,24 @@ def main():
     for agent in agents_to_sync:
         if sync_agent(agent, shared_rules, args.dry_run):
             updated += 1
+
+    # Sync Skills (Cursor MDC + Claude Commands)
+    # We always do this unless a specific agent is requested (optional, but let's just do it)
+    if not args.agent or args.agent == "cursor":
+        print("\nSyncing Cursor Rules (.mdc)...")
+        cursor_count = sync_cursor_rules(args.dry_run)
+        if args.dry_run:
+            print(f"  Would generate {cursor_count} .mdc files")
+        else:
+            print(f"  Generated {cursor_count} .mdc files")
+
+    if not args.agent or args.agent == "claude":
+        print("\nSyncing Claude Commands (symlinks)...")
+        claude_count = sync_claude_commands(args.dry_run)
+        if args.dry_run:
+            print(f"  Would create {claude_count} symlinks")
+        else:
+            print(f"  Created {claude_count} symlinks")
 
     # Summary
     print()

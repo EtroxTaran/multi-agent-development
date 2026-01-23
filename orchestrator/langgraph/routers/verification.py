@@ -5,7 +5,7 @@ Routes after the verification fan-in node based on review results.
 
 from typing import Literal
 
-from ..state import WorkflowState, WorkflowDecision
+from ..state import WorkflowDecision, WorkflowState
 
 
 def verification_router(

@@ -2,9 +2,13 @@
  * Chat panel component with Claude integration
  */
 
-import { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, Trash2, AlertCircle } from 'lucide-react';
-import { useStreamingChat, useWorkflowStatus, useResumeWorkflow } from '@/hooks';
+import { useState, useRef, useEffect } from "react";
+import { Send, StopCircle, Trash2, AlertCircle } from "lucide-react";
+import {
+  useStreamingChat,
+  useWorkflowStatus,
+  useResumeWorkflow,
+} from "@/hooks";
 import {
   Button,
   Card,
@@ -12,23 +16,23 @@ import {
   CardHeader,
   CardTitle,
   ScrollArea,
-} from '@/components/ui';
-import { cn } from '@/lib/utils';
-import type { ChatMessage } from '@/types';
+} from "@/components/ui";
+import { cn } from "@/lib/utils";
+import type { ChatMessage } from "@/types";
 
 interface ChatPanelProps {
   projectName: string;
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
 
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          'max-w-[80%] rounded-lg px-4 py-2',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
+          "max-w-[80%] rounded-lg px-4 py-2",
+          isUser ? "bg-primary text-primary-foreground" : "bg-muted",
         )}
       >
         <p className="whitespace-pre-wrap text-sm">{message.content}</p>
@@ -38,7 +42,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 }
 
 export function ChatPanel({ projectName }: ChatPanelProps) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     messages,
@@ -48,11 +52,11 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
     stopStreaming,
     clearMessages,
   } = useStreamingChat(projectName);
-  
+
   // HITL Integration
   const { data: status } = useWorkflowStatus(projectName);
   const resumeWorkflow = useResumeWorkflow(projectName);
-  const isPaused = status?.status === 'paused';
+  const isPaused = status?.status === "paused";
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -72,14 +76,14 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
       // We'll send generic structure:
       const humanResponse = { response: input, action: "continue" };
       resumeWorkflow.mutate(humanResponse as any); // Type cast if needed
-      setInput('');
+      setInput("");
       return;
     }
 
     if (isStreaming) return;
 
     sendMessage(input);
-    setInput('');
+    setInput("");
   };
 
   return (
@@ -110,19 +114,22 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
             {isStreaming && currentResponse && (
               <MessageBubble
                 message={{
-                  role: 'assistant',
-                  content: currentResponse + '...',
+                  role: "assistant",
+                  content: currentResponse + "...",
                 }}
               />
             )}
-            
+
             {/* System Message for Pause */}
             {isPaused && (
               <div className="flex justify-start">
-                 <div className="max-w-[80%] rounded-lg px-4 py-2 bg-yellow-50 border border-yellow-200 text-yellow-800">
-                    <p className="font-semibold text-sm mb-1">Workflow Paused</p>
-                    <p className="text-sm">The workflow requires your input to continue. Please provide your response below.</p>
-                 </div>
+                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-yellow-50 border border-yellow-200 text-yellow-800">
+                  <p className="font-semibold text-sm mb-1">Workflow Paused</p>
+                  <p className="text-sm">
+                    The workflow requires your input to continue. Please provide
+                    your response below.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -138,29 +145,32 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
         </ScrollArea>
 
         {/* Input */}
-        <form onSubmit={handleSubmit} className="flex items-center space-x-2 mt-4">
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center space-x-2 mt-4"
+        >
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isPaused ? "Enter your response to continue..." : "Type a message..."}
+            placeholder={
+              isPaused
+                ? "Enter your response to continue..."
+                : "Type a message..."
+            }
             className={cn(
               "flex-1 px-3 py-2 border rounded-md transition-colors",
-              isPaused && "border-yellow-400 focus:ring-yellow-400"
+              isPaused && "border-yellow-400 focus:ring-yellow-400",
             )}
             disabled={isStreaming && !isPaused}
           />
           {isStreaming && !isPaused ? (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={stopStreaming}
-            >
+            <Button type="button" variant="destructive" onClick={stopStreaming}>
               <StopCircle className="h-4 w-4" />
             </Button>
           ) : (
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={!input.trim()}
               className={cn(isPaused && "bg-yellow-600 hover:bg-yellow-700")}
             >

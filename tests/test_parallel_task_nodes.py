@@ -1,7 +1,7 @@
 """Tests for parallel task implementation and verification nodes."""
 
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -54,9 +54,9 @@ async def test_implement_tasks_parallel_node_success(temp_project_dir):
         {"success": True, "output": '{"task_id":"T2","status":"completed"}', "error": None},
     ]
 
-    with patch.object(task_nodes, "WorktreeManager", DummyWorktreeManager), \
-        patch.object(task_nodes, "_run_task_in_worktree", side_effect=outputs), \
-        patch.object(task_nodes, "_check_budget_before_task", return_value=None):
+    with patch.object(task_nodes, "WorktreeManager", DummyWorktreeManager), patch.object(
+        task_nodes, "_run_task_in_worktree", side_effect=outputs
+    ), patch.object(task_nodes, "_check_budget_before_task", return_value=None):
         result = await implement_module.implement_tasks_parallel_node(state)
 
     assert result["next_decision"] == "continue"

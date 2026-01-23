@@ -1,0 +1,1 @@
+../skills/e2e-webapp-testing/SKILL.md

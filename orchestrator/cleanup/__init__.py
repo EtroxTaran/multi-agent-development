@@ -1,10 +1,10 @@
 """Cleanup protocol module for artifact lifecycle management."""
 
 from orchestrator.cleanup.manager import (
-    CleanupManager,
-    CleanupRule,
     ArtifactLifetime,
+    CleanupManager,
     CleanupResult,
+    CleanupRule,
 )
 
 __all__ = [

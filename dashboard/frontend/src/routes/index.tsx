@@ -2,15 +2,11 @@
  * TanStack Router route tree
  */
 
-import {
-  createRootRoute,
-  createRoute,
-  Outlet,
-} from '@tanstack/react-router';
-import { Layout } from '@/components/Layout';
-import { ProjectsPage } from './ProjectsPage';
-import { ProjectDashboard } from './ProjectDashboard';
-import { SettingsPage } from './SettingsPage';
+import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
+import { Layout } from "@/components/Layout";
+import { ProjectsPage } from "./ProjectsPage";
+import { ProjectDashboard } from "./ProjectDashboard";
+import { SettingsPage } from "./SettingsPage";
 
 // Root route with layout
 const rootRoute = createRootRoute({
@@ -24,21 +20,21 @@ const rootRoute = createRootRoute({
 // Index route (project list)
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/',
+  path: "/",
   component: ProjectsPage,
 });
 
 // Project dashboard route
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/project/$name',
+  path: "/project/$name",
   component: ProjectDashboard,
 });
 
 // Settings route
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/settings',
+  path: "/settings",
   component: SettingsPage,
 });
 

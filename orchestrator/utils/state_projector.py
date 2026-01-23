@@ -105,6 +105,7 @@ class StateProjector:
         if loop is not None:
             # We're in an async context, create a new task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 future = pool.submit(asyncio.run, self.project_state(thread_id))
                 return future.result()
@@ -123,8 +124,8 @@ class StateProjector:
         Returns:
             LangGraph state dict or None
         """
-        from ..langgraph.surrealdb_saver import SurrealDBSaver
         from ..db.config import is_surrealdb_enabled
+        from ..langgraph.surrealdb_saver import SurrealDBSaver
 
         if not is_surrealdb_enabled():
             logger.debug("SurrealDB not enabled - cannot load checkpoint")
@@ -151,7 +152,7 @@ class StateProjector:
 
             # Extract the checkpoint state
             checkpoint = checkpoint_tuple.checkpoint
-            
+
             # LangGraph v0.2.x uses 'channel_values' in the checkpoint dict
             # or it might be the checkpoint object itself if it has channel_values attribute
             if hasattr(checkpoint, "channel_values"):
@@ -298,9 +299,9 @@ class StateProjector:
             return None
 
         try:
-            with open(self.state_file, "r") as f:
+            with open(self.state_file) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load fallback state: {e}")
             return None
 

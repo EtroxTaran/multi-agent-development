@@ -1,23 +1,18 @@
 """Tests for the database migration system."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from orchestrator.db.migrations.base import (
     BaseMigration,
     MigrationContext,
+    MigrationError,
     MigrationRecord,
     MigrationStatus,
-    MigrationError,
 )
-from orchestrator.db.migrations.registry import (
-    MigrationRegistry,
-    discover_migrations,
-)
-from orchestrator.db.migrations.runner import (
-    MigrationRunner,
-    MigrationResult,
-)
+from orchestrator.db.migrations.registry import MigrationRegistry, discover_migrations
+from orchestrator.db.migrations.runner import MigrationRunner
 
 
 # Test Migrations for unit tests
@@ -68,18 +63,22 @@ class TestBaseMigration:
     def test_migration_requires_version(self):
         """Test that migrations must define version."""
         with pytest.raises(TypeError, match="must define 'version'"):
+
             class BadMigration(BaseMigration):
                 name = "bad"
 
-                async def up(self, ctx): pass
+                async def up(self, ctx):
+                    pass
 
     def test_migration_requires_name(self):
         """Test that migrations must define name."""
         with pytest.raises(TypeError, match="must define 'name'"):
+
             class BadMigration(BaseMigration):
                 version = "0001"
 
-                async def up(self, ctx): pass
+                async def up(self, ctx):
+                    pass
 
     def test_full_name(self):
         """Test full_name property."""
@@ -204,7 +203,9 @@ class TestMigrationRegistry:
         class DuplicateMigration(BaseMigration):
             version = "0001"
             name = "duplicate"
-            async def up(self, ctx): pass
+
+            async def up(self, ctx):
+                pass
 
         with pytest.raises(MigrationError, match="Duplicate migration version"):
             registry.register(DuplicateMigration())
@@ -235,17 +236,22 @@ class TestMigrationRegistry:
 
     def test_circular_dependency_detection(self):
         """Test that circular dependencies are detected."""
+
         class CyclicA(BaseMigration):
             version = "A"
             name = "cyclic_a"
             dependencies = ["B"]
-            async def up(self, ctx): pass
+
+            async def up(self, ctx):
+                pass
 
         class CyclicB(BaseMigration):
             version = "B"
             name = "cyclic_b"
             dependencies = ["A"]
-            async def up(self, ctx): pass
+
+            async def up(self, ctx):
+                pass
 
         registry = MigrationRegistry()
         registry.register(CyclicA())
@@ -276,7 +282,7 @@ class TestMigrationRunner:
     @pytest.mark.asyncio
     async def test_get_pending_migrations(self, mock_registry, mock_conn):
         """Test getting pending migrations."""
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -290,7 +296,7 @@ class TestMigrationRunner:
     @pytest.mark.asyncio
     async def test_apply_migrations(self, mock_registry, mock_conn):
         """Test applying migrations."""
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -305,7 +311,7 @@ class TestMigrationRunner:
     @pytest.mark.asyncio
     async def test_apply_dry_run(self, mock_registry, mock_conn):
         """Test dry-run mode."""
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -319,7 +325,7 @@ class TestMigrationRunner:
     @pytest.mark.asyncio
     async def test_apply_with_target_version(self, mock_registry, mock_conn):
         """Test applying up to target version."""
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -338,7 +344,7 @@ class TestMigrationRunner:
             {"version": "0002", "name": "test_second", "status": "applied"},
         ]
 
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -362,7 +368,7 @@ class TestMigrationRunner:
             {"version": "0003", "name": "test_no_rollback", "status": "applied"},
         ]
 
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -377,6 +383,7 @@ class TestMigrationRunner:
     @pytest.mark.asyncio
     async def test_migration_failure_handling(self, mock_conn):
         """Test handling of migration failures."""
+
         class FailingMigration(BaseMigration):
             version = "0001"
             name = "failing"
@@ -388,7 +395,7 @@ class TestMigrationRunner:
         registry = MigrationRegistry()
         registry.register(FailingMigration())
 
-        with patch('orchestrator.db.migrations.runner.get_connection') as mock_get_conn:
+        with patch("orchestrator.db.migrations.runner.get_connection") as mock_get_conn:
             mock_get_conn.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_get_conn.return_value.__aexit__ = AsyncMock(return_value=None)
 

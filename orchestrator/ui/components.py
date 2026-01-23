@@ -1,6 +1,6 @@
 """UI rendering components for workflow display."""
 
-from typing import Any, Optional
+from typing import Any
 
 from orchestrator.ui.state_adapter import UIStateSnapshot
 
@@ -45,7 +45,9 @@ def render_header(snapshot: UIStateSnapshot) -> Any:
 
         header_text = Text()
         header_text.append(f"Project: {snapshot.project_name}", style="bold cyan")
-        header_text.append(f"  |  Phase {snapshot.current_phase}/{snapshot.total_phases}: {snapshot.phase_name}")
+        header_text.append(
+            f"  |  Phase {snapshot.current_phase}/{snapshot.total_phases}: {snapshot.phase_name}"
+        )
         header_text.append(f"  |  Elapsed: {format_duration(snapshot.elapsed_seconds)}")
         header_text.append(f"  |  Status: {snapshot.status.upper()}")
 
@@ -72,7 +74,7 @@ def render_phase_bar(snapshot: UIStateSnapshot) -> Any:
         Renderable object
     """
     try:
-        from rich.progress import Progress, BarColumn, TextColumn, TaskProgressColumn
+        from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 
         progress = Progress(
             TextColumn("[bold blue]{task.description}"),
@@ -103,8 +105,8 @@ def render_task_tree(snapshot: UIStateSnapshot) -> Any:
         Renderable object
     """
     try:
-        from rich.tree import Tree
         from rich.text import Text
+        from rich.tree import Tree
 
         tree = Tree(f"[bold]Tasks ({snapshot.tasks_completed}/{snapshot.tasks_total})[/bold]")
 
@@ -128,7 +130,10 @@ def render_task_tree(snapshot: UIStateSnapshot) -> Any:
 
             task_text = Text()
             task_text.append(f"{icon} ", style=color)
-            task_text.append(f"{task.id}: {task.title}", style=color if task.status != "in_progress" else "bold yellow")
+            task_text.append(
+                f"{task.id}: {task.title}",
+                style=color if task.status != "in_progress" else "bold yellow",
+            )
 
             # Add iteration info if in progress
             if task.status == "in_progress" and task.max_iterations > 0:

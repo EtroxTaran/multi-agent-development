@@ -3,22 +3,19 @@
 import os
 import sys
 from datetime import datetime
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from orchestrator.ui import (
+    PlaintextDisplay,
+    ProgressCallback,
+    UICallbackHandler,
+    UIState,
+    WorkflowDisplay,
     create_display,
     is_interactive,
-    PlaintextDisplay,
-    WorkflowDisplay,
-    UIState,
-    UICallbackHandler,
-    ProgressCallback,
 )
-from orchestrator.ui.state_adapter import TaskUIInfo, EventLogEntry, UIStateSnapshot
 from orchestrator.ui.callbacks import NullCallback
+from orchestrator.ui.state_adapter import EventLogEntry, TaskUIInfo, UIStateSnapshot
 
 
 class TestIsInteractive:
@@ -46,11 +43,24 @@ class TestIsInteractive:
         """Non-TTY stdout should trigger non-interactive."""
         with patch.object(sys.stdout, "isatty", return_value=False):
             # Need to also ensure no CI vars are set
-            env = {k: v for k, v in os.environ.items() if k not in [
-                "CI", "CONTINUOUS_INTEGRATION", "GITHUB_ACTIONS",
-                "GITLAB_CI", "CIRCLECI", "JENKINS_URL", "BUILDKITE",
-                "TRAVIS", "TF_BUILD", "NO_COLOR", "ORCHESTRATOR_PLAIN_OUTPUT"
-            ]}
+            env = {
+                k: v
+                for k, v in os.environ.items()
+                if k
+                not in [
+                    "CI",
+                    "CONTINUOUS_INTEGRATION",
+                    "GITHUB_ACTIONS",
+                    "GITLAB_CI",
+                    "CIRCLECI",
+                    "JENKINS_URL",
+                    "BUILDKITE",
+                    "TRAVIS",
+                    "TF_BUILD",
+                    "NO_COLOR",
+                    "ORCHESTRATOR_PLAIN_OUTPUT",
+                ]
+            }
             with patch.dict(os.environ, env, clear=True):
                 assert is_interactive() is False
 
@@ -100,7 +110,7 @@ class TestPlaintextDisplay:
         levels = ["info", "warning", "error", "success"]
         expected = ["INFO", "WARN", "ERROR", "OK"]
 
-        for level, expected_text in zip(levels, expected):
+        for level, expected_text in zip(levels, expected, strict=False):
             display.log_event(f"Message {level}", level)
             captured = capsys.readouterr()
             assert f"[{expected_text}]" in captured.out
@@ -388,7 +398,9 @@ class TestUIComponents:
 
         tasks = [
             TaskUIInfo(id="T1", title="Task 1", status="completed"),
-            TaskUIInfo(id="T2", title="Task 2", status="in_progress", iteration=2, max_iterations=10),
+            TaskUIInfo(
+                id="T2", title="Task 2", status="in_progress", iteration=2, max_iterations=10
+            ),
             TaskUIInfo(id="T3", title="Task 3", status="pending"),
         ]
 

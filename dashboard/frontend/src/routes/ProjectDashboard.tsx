@@ -2,8 +2,8 @@
  * Project dashboard page
  */
 
-import { useParams } from '@tanstack/react-router';
-import { RefreshCw, Pause } from 'lucide-react';
+import { useParams } from "@tanstack/react-router";
+import { RefreshCw, Pause } from "lucide-react";
 import {
   useProject,
   useWorkflowStatus,
@@ -12,7 +12,7 @@ import {
   useWebSocket,
   useResumeWorkflow,
   usePauseWorkflow,
-} from '@/hooks';
+} from "@/hooks";
 import {
   Badge,
   Button,
@@ -20,28 +20,32 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-
   Progress,
   Separator,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from '@/components/ui';
-import { StartWorkflowDialog } from '@/components/workflow/StartWorkflowDialog';
-import { PhaseProgress } from '@/components/workflow/PhaseProgress';
-import { TaskBoard } from '@/components/workflow/TaskBoard';
-import { WorkflowGraph } from '@/components/workflow/WorkflowGraph';
-import { AgentFeed } from '@/components/agents/AgentFeed';
-import { BudgetOverview } from '@/components/budget/BudgetOverview';
-import { ChatPanel } from '@/components/chat/ChatPanel';
-import { ErrorPanel } from '@/components/errors/ErrorPanel';
-import { cn, getStatusColor, getPhaseName } from '@/lib/utils';
+  Guidance,
+} from "@/components/ui";
+import { StartWorkflowDialog } from "@/components/workflow/StartWorkflowDialog";
+import { PhaseProgress } from "@/components/workflow/PhaseProgress";
+import { TaskBoard } from "@/components/workflow/TaskBoard";
+import { WorkflowGraph } from "@/components/workflow/WorkflowGraph";
+import { AgentFeed } from "@/components/agents/AgentFeed";
+import { BudgetOverview } from "@/components/budget/BudgetOverview";
+import { ChatPanel } from "@/components/chat/ChatPanel";
+import { ErrorPanel } from "@/components/errors/ErrorPanel";
+import { cn, getStatusColor, getPhaseName } from "@/lib/utils";
 
 export function ProjectDashboard() {
-  const { name } = useParams({ from: '/project/$name' });
+  const { name } = useParams({ from: "/project/$name" });
 
-  const { data: project, isLoading: projectLoading, error: projectError } = useProject(name);
+  const {
+    data: project,
+    isLoading: projectLoading,
+    error: projectError,
+  } = useProject(name);
   const { data: status, isLoading: statusLoading } = useWorkflowStatus(name);
   const { data: health } = useWorkflowHealth(name);
   const { data: tasks } = useTasks(name);
@@ -62,7 +66,9 @@ export function ProjectDashboard() {
   if (projectError) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <p className="text-destructive">Failed to load project: {projectError.message}</p>
+        <p className="text-destructive">
+          Failed to load project: {projectError.message}
+        </p>
       </div>
     );
   }
@@ -77,7 +83,8 @@ export function ProjectDashboard() {
 
   const completedTasks = tasks?.completed || 0;
   const totalTasks = tasks?.total || 0;
-  const progressPercent = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+  const progressPercent =
+    totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -86,8 +93,10 @@ export function ProjectDashboard() {
         <div>
           <div className="flex items-center space-x-3">
             <h1 className="text-3xl font-bold">{project.name}</h1>
-            <Badge className={cn(getStatusColor(status?.status || 'not_started'))}>
-              {status?.status || 'Not Started'}
+            <Badge
+              className={cn(getStatusColor(status?.status || "not_started"))}
+            >
+              {status?.status || "Not Started"}
             </Badge>
             {isConnected && (
               <Badge variant="outline" className="text-green-600">
@@ -98,43 +107,56 @@ export function ProjectDashboard() {
           <p className="text-muted-foreground">{project.path}</p>
         </div>
         <div className="flex items-center space-x-2">
-          {status?.status === 'paused' && (
+          {status?.status === "paused" && (
             <Button
               size="sm"
               onClick={() => resumeWorkflow.mutate(false)}
               disabled={resumeWorkflow.isPending}
             >
-              <RefreshCw className={cn("h-4 w-4 mr-2", resumeWorkflow.isPending && "animate-spin")} />
+              <RefreshCw
+                className={cn(
+                  "h-4 w-4 mr-2",
+                  resumeWorkflow.isPending && "animate-spin",
+                )}
+              />
               Resume
             </Button>
           )}
-          {status?.status === 'in_progress' && (
+          {status?.status === "in_progress" && (
             <Button
               size="sm"
               variant="outline"
               onClick={() => pauseWorkflow.mutate()}
               disabled={pauseWorkflow.isPending}
             >
-              <Pause className={cn("h-4 w-4 mr-2", pauseWorkflow.isPending && "animate-spin")} />
+              <Pause
+                className={cn(
+                  "h-4 w-4 mr-2",
+                  pauseWorkflow.isPending && "animate-spin",
+                )}
+              />
               Pause
             </Button>
           )}
-          {status?.status !== 'in_progress' && status?.status !== 'paused' && (
+          {status?.status !== "in_progress" && status?.status !== "paused" && (
             <StartWorkflowDialog projectName={name} />
           )}
           {health && (
-            <Badge
-              variant="outline"
-              className={cn(
-                health.status === 'healthy'
-                  ? 'text-green-600 border-green-600'
-                  : health.status === 'degraded'
-                    ? 'text-yellow-600 border-yellow-600'
-                    : 'text-red-600 border-red-600'
-              )}
-            >
-              {health.status}
-            </Badge>
+            <div className="flex items-center gap-1">
+              <Badge
+                variant="outline"
+                className={cn(
+                  health.status === "healthy"
+                    ? "text-green-600 border-green-600"
+                    : health.status === "degraded"
+                      ? "text-yellow-600 border-yellow-600"
+                      : "text-red-600 border-red-600",
+                )}
+              >
+                {health.status}
+              </Badge>
+              <Guidance content="System health status based on agent availability and workflow errors." />
+            </div>
           )}
         </div>
       </div>
@@ -155,7 +177,7 @@ export function ProjectDashboard() {
                   </span>
                 </>
               ) : (
-                'Not Started'
+                "Not Started"
               )}
             </div>
           </CardContent>
@@ -179,14 +201,15 @@ export function ProjectDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex space-x-2">
-              {health?.agents && Object.entries(health.agents).map(([agent, available]) => (
-                <Badge
-                  key={agent}
-                  variant={available ? 'success' : 'destructive'}
-                >
-                  {agent}
-                </Badge>
-              ))}
+              {health?.agents &&
+                Object.entries(health.agents).map(([agent, available]) => (
+                  <Badge
+                    key={agent}
+                    variant={available ? "success" : "destructive"}
+                  >
+                    {agent}
+                  </Badge>
+                ))}
             </div>
           </CardContent>
         </Card>
@@ -196,7 +219,9 @@ export function ProjectDashboard() {
             <CardDescription>Commits</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{health?.total_commits || 0}</div>
+            <div className="text-2xl font-bold">
+              {health?.total_commits || 0}
+            </div>
           </CardContent>
         </Card>
       </div>

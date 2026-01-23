@@ -69,10 +69,38 @@ TEMP_OUTPUT=$(mktemp)
 trap "rm -f $TEMP_OUTPUT" EXIT
 
 # Run Gemini CLI (note: no --output-format flag available)
-gemini --model "$GEMINI_MODEL" \
-    --yolo \
-    "$PROMPT" \
-    > "$TEMP_OUTPUT" 2>&1
+run_gemini() {
+    gemini --model "$GEMINI_MODEL" \
+        --yolo \
+        "$PROMPT" \
+        > "$TEMP_OUTPUT" 2>&1
+}
+
+run_gemini
+
+# Check for rate limits and fallback to Claude if needed
+if grep -i -qE "rate limit|429|quota|too many requests|resource exhausted" "$TEMP_OUTPUT"; then
+    echo "Warning: Gemini rate limit/quota detected"
+
+    if command -v claude &> /dev/null; then
+        echo "Falling back to Claude CLI (second best option)..."
+
+        # Claude fallback - use Opus for best quality
+        # Note: We use the same prompt file content
+        claude -p "$PROMPT" \
+            --output-format json \
+            --fallback-model claude-4-5-opus \
+            > "$TEMP_OUTPUT" 2>&1
+
+        if [ $? -eq 0 ]; then
+            echo "Fallback to Claude successful"
+        else
+            echo "Fallback to Claude failed"
+        fi
+    else
+        echo "Claude CLI not available for fallback"
+    fi
+fi
 
 # Check if output is valid JSON, if not wrap it - use env vars to avoid shell injection
 export _TEMP_OUTPUT="$TEMP_OUTPUT"

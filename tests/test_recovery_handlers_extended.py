@@ -14,18 +14,16 @@ Tests cover additional scenarios beyond the basic tests in test_cleanup_recovery
 
 import asyncio
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from orchestrator.recovery.handlers import (
-    RecoveryHandler,
-    RecoveryResult,
-    RecoveryAction,
-    ErrorContext,
     ErrorCategory,
+    ErrorContext,
     EscalationRequest,
+    RecoveryAction,
+    RecoveryHandler,
 )
 
 
@@ -110,7 +108,7 @@ class TestTransientErrorBackoff:
 
         # Check all sleep times have reasonable jitter (0-1s added)
         for i, sleep_time in enumerate(sleep_times):
-            base_backoff = 1.0 * (2 ** i)
+            base_backoff = 1.0 * (2**i)
             # Sleep should be base + jitter where jitter is 0-1
             assert base_backoff <= sleep_time <= base_backoff + 1.0
 
@@ -193,6 +191,7 @@ class TestAgentFailureRecovery:
     @pytest.mark.asyncio
     async def test_agent_failure_escalates_on_backup_fail(self, recovery_handler):
         """Test escalation when backup CLI also fails."""
+
         async def failing_backup():
             raise RuntimeError("Backup also failed")
 
@@ -323,9 +322,7 @@ class TestEscalationFileWriting:
             context,
         )
 
-        escalation_files = list(
-            (project_dir / ".workflow" / "escalations").glob("task-42_*.json")
-        )
+        escalation_files = list((project_dir / ".workflow" / "escalations").glob("task-42_*.json"))
         assert len(escalation_files) == 1
 
         content = json.loads(escalation_files[0].read_text())
@@ -385,7 +382,10 @@ class TestErrorRouting:
         """Test that handle_error routes to correct handler by category."""
         test_cases = [
             # TRANSIENT without retry_operation returns RETRY (manual retry hint)
-            (ErrorCategory.TRANSIENT, [RecoveryAction.RETRY, RecoveryAction.RETRY_WITH_BACKOFF, RecoveryAction.ESCALATE]),
+            (
+                ErrorCategory.TRANSIENT,
+                [RecoveryAction.RETRY, RecoveryAction.RETRY_WITH_BACKOFF, RecoveryAction.ESCALATE],
+            ),
             (ErrorCategory.AGENT_FAILURE, [RecoveryAction.USE_BACKUP, RecoveryAction.ESCALATE]),
             (ErrorCategory.BLOCKING_SECURITY, [RecoveryAction.ESCALATE]),
             (ErrorCategory.TIMEOUT, [RecoveryAction.RETRY, RecoveryAction.ESCALATE]),
@@ -407,8 +407,9 @@ class TestErrorRouting:
             )
 
             # Verify routing by checking action matches one of expected actions
-            assert result.action_taken in expected_actions, \
-                f"Category {category.value} should route to one of {[a.value for a in expected_actions]}, got {result.action_taken.value}"
+            assert (
+                result.action_taken in expected_actions
+            ), f"Category {category.value} should route to one of {[a.value for a in expected_actions]}, got {result.action_taken.value}"
 
 
 class TestReviewConflictHandling:
@@ -524,6 +525,7 @@ class TestEscalationCallback:
     @pytest.mark.asyncio
     async def test_escalation_callback_error_handled(self, project_dir):
         """Test that callback errors don't break escalation."""
+
         def failing_callback(escalation: EscalationRequest):
             raise RuntimeError("Callback failed")
 

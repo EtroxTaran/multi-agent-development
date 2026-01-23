@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class Severity(str, Enum):
     """Severity levels for security findings."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -26,6 +27,7 @@ class Severity(str, Enum):
 @dataclass
 class SecurityFinding:
     """A single security finding."""
+
     rule_id: str
     severity: Severity
     message: str
@@ -51,6 +53,7 @@ class SecurityFinding:
 @dataclass
 class SecurityScanResult:
     """Result of security scan."""
+
     passed: bool
     total_findings: int
     findings_by_severity: dict[Severity, int] = field(default_factory=dict)
@@ -348,7 +351,9 @@ class SecurityScanner:
         blocking_count = 0
 
         for finding in findings:
-            findings_by_severity[finding.severity] = findings_by_severity.get(finding.severity, 0) + 1
+            findings_by_severity[finding.severity] = (
+                findings_by_severity.get(finding.severity, 0) + 1
+            )
             if finding.severity in self.blocking_severities:
                 blocking_count += 1
 
@@ -428,7 +433,11 @@ class SecurityScanner:
                 for i, line in enumerate(lines, start=1):
                     # Skip comment lines (basic check)
                     stripped = line.strip()
-                    if stripped.startswith("//") or stripped.startswith("#") or stripped.startswith("*"):
+                    if (
+                        stripped.startswith("//")
+                        or stripped.startswith("#")
+                        or stripped.startswith("*")
+                    ):
                         continue
 
                     if regex.search(line):
@@ -438,16 +447,18 @@ class SecurityScanner:
                         except ValueError:
                             rel_path = str(file_path)
 
-                        findings.append(SecurityFinding(
-                            rule_id=rule["id"],
-                            severity=rule["severity"],
-                            message=rule["message"],
-                            file_path=rel_path,
-                            line_number=i,
-                            line_content=line.strip(),
-                            suggestion=rule.get("suggestion"),
-                            cwe_id=rule.get("cwe"),
-                        ))
+                        findings.append(
+                            SecurityFinding(
+                                rule_id=rule["id"],
+                                severity=rule["severity"],
+                                message=rule["message"],
+                                file_path=rel_path,
+                                line_number=i,
+                                line_content=line.strip(),
+                                suggestion=rule.get("suggestion"),
+                                cwe_id=rule.get("cwe"),
+                            )
+                        )
 
             except re.error as e:
                 logger.warning(f"Invalid regex for rule {rule['id']}: {e}")
@@ -481,16 +492,18 @@ class SecurityScanner:
                         continue
 
                     if regex.search(line):
-                        findings.append(SecurityFinding(
-                            rule_id=rule["id"],
-                            severity=rule["severity"],
-                            message=rule["message"],
-                            file_path=filename,
-                            line_number=i,
-                            line_content=line.strip(),
-                            suggestion=rule.get("suggestion"),
-                            cwe_id=rule.get("cwe"),
-                        ))
+                        findings.append(
+                            SecurityFinding(
+                                rule_id=rule["id"],
+                                severity=rule["severity"],
+                                message=rule["message"],
+                                file_path=filename,
+                                line_number=i,
+                                line_content=line.strip(),
+                                suggestion=rule.get("suggestion"),
+                                cwe_id=rule.get("cwe"),
+                            )
+                        )
 
             except re.error:
                 pass

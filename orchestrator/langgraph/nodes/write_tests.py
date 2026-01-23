@@ -10,16 +10,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import (
-    WorkflowState,
-    Task,
-    TaskStatus,
-    get_task_by_id,
-)
 from ...specialists.runner import SpecialistRunner
 from ..integrations.board_sync import sync_board
+from ..state import WorkflowState, get_task_by_id
 
 logger = logging.getLogger(__name__)
+
 
 async def write_tests_node(state: WorkflowState) -> dict[str, Any]:
     """Write failing tests for the current task.
@@ -33,32 +29,36 @@ async def write_tests_node(state: WorkflowState) -> dict[str, Any]:
     task_id = state.get("current_task_id")
     if not task_id:
         return {
-            "errors": [{
-                "type": "write_tests_error",
-                "message": "No task selected for test writing",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "write_tests_error",
+                    "message": "No task selected for test writing",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
     task = get_task_by_id(state, task_id)
     if not task:
         return {
-            "errors": [{
-                "type": "write_tests_error",
-                "message": f"Task {task_id} not found",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "write_tests_error",
+                    "message": f"Task {task_id} not found",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
     # Check if tests are already defined/written or if task type requires it
     # For now, we assume all implementation tasks need tests unless explicit
     # refactoring tasks might use existing tests.
-    
+
     # If test files already exist and we are retrying, we might skip or update.
     # But A03's job is to ensure they exist and fail.
-    
+
     logger.info(f"Writing tests for task: {task_id} - {task.get('title', 'Unknown')}")
     project_dir = Path(state["project_dir"])
 
@@ -83,18 +83,15 @@ EXISTING TEST FILES:
 
     try:
         runner = SpecialistRunner(project_dir)
-        
+
         # Run A03-test-writer
-        result = await asyncio.to_thread(
-            runner.create_agent("A03-test-writer").run,
-            prompt
-        )
+        result = await asyncio.to_thread(runner.create_agent("A03-test-writer").run, prompt)
 
         if not result.success:
             raise Exception(result.error or "Test writing failed")
 
         output = _parse_output(result.output)
-        
+
         # Update task with new test files if any
         updated_task = dict(task)
         tests_written = output.get("tests_written", [])
@@ -116,26 +113,30 @@ EXISTING TEST FILES:
 
         return {
             "tasks": [updated_task],
-            "next_decision": "continue", # Move to implement_task
+            "next_decision": "continue",  # Move to implement_task
             "updated_at": datetime.now().isoformat(),
         }
 
     except Exception as e:
         logger.error(f"Test writing failed: {e}")
         return {
-            "errors": [{
-                "type": "test_writing_failed",
-                "task_id": task_id,
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
-            "next_decision": "escalate", # Or maybe skip to implementation? No, TDD requires tests.
+            "errors": [
+                {
+                    "type": "test_writing_failed",
+                    "task_id": task_id,
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
+            "next_decision": "escalate",  # Or maybe skip to implementation? No, TDD requires tests.
         }
+
 
 def _format_list(items: list[str]) -> str:
     if not items:
         return "- None"
     return "\n".join(f"- {i}" for i in items)
+
 
 def _parse_output(stdout: str) -> dict:
     """Parse JSON output from agent."""
@@ -144,6 +145,7 @@ def _parse_output(stdout: str) -> dict:
             return {}
         # Try finding JSON block
         import re
+
         json_match = re.search(r"{[\s\S]*}", stdout)
         if json_match:
             return json.loads(json_match.group(0))

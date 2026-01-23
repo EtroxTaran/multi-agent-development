@@ -3,26 +3,44 @@
 Routes after the validation fan-in node based on approval results.
 """
 
+
 from typing import Literal
 
-from ..state import WorkflowState, WorkflowDecision
+from langchain_core.runnables import RunnableConfig
+
+from ..state import WorkflowDecision, WorkflowState
 
 
 def validation_router(
     state: WorkflowState,
+    config: RunnableConfig,
 ) -> Literal["implementation", "planning", "human_escalation", "__end__"]:
     """Route after validation based on results.
 
     Args:
         state: Current workflow state
+        config: LangChain config containing potential callbacks
 
     Returns:
-        Next node name:
-        - "implementation": Validation passed, proceed
-        - "planning": Validation failed, need to revise plan
-        - "human_escalation": Max retries exceeded, escalate
-        - "__end__": Abort workflow
+        Next node name
     """
+    decision = _get_decision(state)
+
+    # Emit path decision event if emitter is provided
+    if config and "configurable" in config:
+        emitter = config["configurable"].get("path_emitter")
+        if emitter and callable(emitter):
+            try:
+                emitter(router="validation_router", decision=decision, state=state)
+            except Exception:
+                # Don't fail workflow if emission fails
+                pass
+
+    return decision
+
+
+def _get_decision(state: WorkflowState) -> str:
+    """Determine the next step."""
     decision = state.get("next_decision")
 
     if decision == WorkflowDecision.CONTINUE or decision == "continue":

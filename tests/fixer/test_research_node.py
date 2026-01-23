@@ -1,7 +1,7 @@
 """Tests for fixer research node."""
 
-import sys
 import asyncio
+import sys
 from unittest.mock import MagicMock
 
 # Create a mock package for langgraph
@@ -18,13 +18,14 @@ sys.modules["langgraph.checkpoint.memory"] = mock_checkpoint
 sys.modules["langgraph.graph"] = mock_graph
 sys.modules["langgraph.types"] = mock_types
 
-import json
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
+from orchestrator.fixer.diagnosis import DiagnosisConfidence, DiagnosisResult, RootCause
+from orchestrator.fixer.triage import ErrorCategory, FixerError
 from orchestrator.langgraph.nodes.fixer_research import fixer_research_node
-from orchestrator.fixer.diagnosis import DiagnosisResult, RootCause, DiagnosisConfidence
-from orchestrator.fixer.triage import FixerError, ErrorCategory
+
 
 @pytest.fixture
 def mock_researcher():
@@ -49,32 +50,29 @@ def mock_researcher():
 """
     return agent
 
+
 def test_fixer_research_node_success(tmp_path, mock_researcher):
     # Setup state
-    error = FixerError(
-        error_id="e1", 
-        error_type="Error", 
-        message="msg",
-        source="test"
-    )
+    error = FixerError(error_id="e1", error_type="Error", message="msg", source="test")
     diagnosis = DiagnosisResult(
         error=error,
         root_cause=RootCause.API_MISUSE,
         confidence=DiagnosisConfidence.HIGH,
-        category=ErrorCategory.UNKNOWN
+        category=ErrorCategory.UNKNOWN,
     )
-    
+
     state = {
         "project_dir": str(tmp_path),
-        "current_fix_attempt": {
-            "diagnosis": diagnosis.to_dict()
-        }
+        "current_fix_attempt": {"diagnosis": diagnosis.to_dict()},
     }
-    
+
     async def run_test():
-        with patch("orchestrator.langgraph.nodes.fixer_research.create_adapter", return_value=mock_researcher):
+        with patch(
+            "orchestrator.langgraph.nodes.fixer_research.create_adapter",
+            return_value=mock_researcher,
+        ):
             result = await fixer_research_node(state)
-            
+
         assert result["next_decision"] == "validate"
         assert "plan" in result["current_fix_attempt"]
         plan = result["current_fix_attempt"]["plan"]
@@ -83,12 +81,10 @@ def test_fixer_research_node_success(tmp_path, mock_researcher):
 
     asyncio.run(run_test())
 
+
 def test_fixer_research_node_no_diagnosis(tmp_path):
-    state = {
-        "project_dir": str(tmp_path),
-        "current_fix_attempt": {} # Missing diagnosis
-    }
-    
+    state = {"project_dir": str(tmp_path), "current_fix_attempt": {}}  # Missing diagnosis
+
     async def run_test():
         result = await fixer_research_node(state)
         assert result["next_decision"] == "escalate"

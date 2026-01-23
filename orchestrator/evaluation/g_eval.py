@@ -11,13 +11,9 @@ import logging
 import os
 import subprocess
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Optional
 
-from .metrics import (
-    EvaluationMetric,
-    EVALUATION_CRITERIA,
-    compute_weighted_score,
-)
+from .metrics import EVALUATION_CRITERIA, EvaluationMetric, compute_weighted_score
 
 logger = logging.getLogger(__name__)
 
@@ -156,12 +152,14 @@ class GEvalEvaluator:
                 logger.warning(f"Failed to evaluate criterion {metric.value}: {e}")
                 # Use neutral score on failure
                 scores[metric.value] = 5.0
-                evaluations.append(CriterionEvaluation(
-                    criterion=metric.value,
-                    score=5.0,
-                    reasoning=f"Evaluation failed: {e}",
-                    feedback="Unable to evaluate this criterion",
-                ))
+                evaluations.append(
+                    CriterionEvaluation(
+                        criterion=metric.value,
+                        score=5.0,
+                        reasoning=f"Evaluation failed: {e}",
+                        feedback="Unable to evaluate this criterion",
+                    )
+                )
 
         # Compute weighted overall score
         overall_score = compute_weighted_score(scores)
@@ -262,9 +260,12 @@ class GEvalEvaluator:
             # Use Claude CLI for evaluation
             cmd = [
                 "claude",
-                "-p", prompt,
-                "--output-format", "text",
-                "--max-turns", "1",
+                "-p",
+                prompt,
+                "--output-format",
+                "text",
+                "--max-turns",
+                "1",
             ]
 
             # Add model specification if not default
@@ -318,25 +319,17 @@ class GEvalEvaluator:
         # Find low-scoring criteria
         for evaluation in evaluations:
             if evaluation.score < 6.0:
-                weight_config = EVALUATION_CRITERIA.get(
-                    EvaluationMetric(evaluation.criterion)
-                )
+                weight_config = EVALUATION_CRITERIA.get(EvaluationMetric(evaluation.criterion))
                 if weight_config:
-                    suggestions.append(
-                        f"Improve {evaluation.criterion}: {evaluation.feedback}"
-                    )
+                    suggestions.append(f"Improve {evaluation.criterion}: {evaluation.feedback}")
 
         # Add overall suggestions based on patterns
         low_scores = [e for e in evaluations if e.score < 5.0]
         if len(low_scores) >= 3:
-            suggestions.append(
-                "Multiple criteria scored poorly - consider prompt restructuring"
-            )
+            suggestions.append("Multiple criteria scored poorly - consider prompt restructuring")
 
         if overall_score < 5.0:
-            suggestions.append(
-                "Overall score very low - fundamental prompt issues likely"
-            )
+            suggestions.append("Overall score very low - fundamental prompt issues likely")
 
         return suggestions
 
@@ -392,9 +385,9 @@ class GEvalEvaluator:
         # Look for patterns like "score: 7" or "7/10"
         patterns = [
             r'"score":\s*(\d+(?:\.\d+)?)',
-            r'score[:\s]+(\d+(?:\.\d+)?)',
-            r'(\d+(?:\.\d+)?)/10',
-            r'(\d+(?:\.\d+)?)\s+out\s+of\s+10',
+            r"score[:\s]+(\d+(?:\.\d+)?)",
+            r"(\d+(?:\.\d+)?)/10",
+            r"(\d+(?:\.\d+)?)\s+out\s+of\s+10",
         ]
 
         for pattern in patterns:

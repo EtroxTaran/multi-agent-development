@@ -11,19 +11,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ..state import (
-    WorkflowState,
-    Task,
-    TaskStatus,
-    get_task_by_id,
-)
-from ..integrations import (
-    create_linear_adapter,
-    load_issue_mapping,
-    create_markdown_tracker,
-)
+from orchestrator.utils.uat_generator import create_uat_generator
+
+from ..integrations import create_linear_adapter, create_markdown_tracker, load_issue_mapping
 from ..integrations.board_sync import sync_board
-from orchestrator.utils.uat_generator import UATGenerator, create_uat_generator
+from ..state import Task, TaskStatus, WorkflowState, get_task_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,22 +41,26 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
     task_id = state.get("current_task_id")
     if not task_id:
         return {
-            "errors": [{
-                "type": "verify_task_error",
-                "message": "No task selected for verification",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verify_task_error",
+                    "message": "No task selected for verification",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
     task = get_task_by_id(state, task_id)
     if not task:
         return {
-            "errors": [{
-                "type": "verify_task_error",
-                "message": f"Task {task_id} not found",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verify_task_error",
+                    "message": f"Task {task_id} not found",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -102,11 +98,16 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
         updated_task["status"] = TaskStatus.COMPLETED
 
         # Save verification result
-        _save_verification_result(project_dir, task_id, {
-            "files_check": files_check,
-            "test_result": test_result,
-            "verified_at": datetime.now().isoformat(),
-        }, state["project_name"])
+        _save_verification_result(
+            project_dir,
+            task_id,
+            {
+                "files_check": files_check,
+                "test_result": test_result,
+                "verified_at": datetime.now().isoformat(),
+            },
+            state["project_name"],
+        )
 
         # Generate UAT document (GSD pattern)
         _generate_task_uat(
@@ -162,11 +163,13 @@ async def verify_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
     task_ids = state.get("current_task_ids", [])
     if not task_ids:
         return {
-            "errors": [{
-                "type": "verify_task_error",
-                "message": "No task batch selected for verification",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verify_task_error",
+                    "message": "No task batch selected for verification",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -181,11 +184,13 @@ async def verify_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
     for task_id in task_ids:
         task = get_task_by_id(state, task_id)
         if not task:
-            errors.append({
-                "type": "verify_task_error",
-                "message": f"Task {task_id} not found",
-                "timestamp": datetime.now().isoformat(),
-            })
+            errors.append(
+                {
+                    "type": "verify_task_error",
+                    "message": f"Task {task_id} not found",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             should_escalate = True
             continue
 
@@ -231,11 +236,16 @@ async def verify_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
             updated_task["status"] = TaskStatus.COMPLETED
             completed_task_ids.append(task_id)
 
-            _save_verification_result(project_dir, task_id, {
-                "files_check": files_check,
-                "test_result": test_result,
-                "verified_at": datetime.now().isoformat(),
-            }, state["project_name"])
+            _save_verification_result(
+                project_dir,
+                task_id,
+                {
+                    "files_check": files_check,
+                    "test_result": test_result,
+                    "verified_at": datetime.now().isoformat(),
+                },
+                state["project_name"],
+            )
 
             # Generate UAT document (GSD pattern)
             _generate_task_uat(
@@ -268,7 +278,9 @@ async def verify_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
     try:
         tasks = state.get("tasks", [])
         updated_task_ids = set(updated_tasks_map.keys())
-        updated_tasks_list = [t for t in tasks if t["id"] not in updated_task_ids] + list(updated_tasks_map.values())
+        updated_tasks_list = [t for t in tasks if t["id"] not in updated_task_ids] + list(
+            updated_tasks_map.values()
+        )
         sync_state = dict(state)
         sync_state["tasks"] = updated_tasks_list
         sync_board(sync_state)
@@ -504,7 +516,9 @@ async def _run_command(project_dir: Path, cmd_parts: list[str]) -> dict:
         }
 
 
-def _save_verification_result(project_dir: Path, task_id: str, result: dict, project_name: str) -> None:
+def _save_verification_result(
+    project_dir: Path, task_id: str, result: dict, project_name: str
+) -> None:
     """Save task verification result to database.
 
     Args:
@@ -517,7 +531,9 @@ def _save_verification_result(project_dir: Path, task_id: str, result: dict, pro
     from ...storage.async_utils import run_async
 
     repo = get_phase_output_repository(project_name)
-    run_async(repo.save_output(phase=4, output_type="task_verification", content=result, task_id=task_id))
+    run_async(
+        repo.save_output(phase=4, output_type="task_verification", content=result, task_id=task_id)
+    )
 
 
 def _handle_verification_failure(
@@ -556,29 +572,35 @@ def _handle_verification_failure(
             "tasks": [task],
             "failed_task_ids": [task_id],
             "current_task_id": None,
-            "errors": [{
-                "type": "task_verification_failed",
-                "task_id": task_id,
-                "message": f"Task failed after {attempts} attempts: {error_message}",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "task_verification_failed",
+                    "task_id": task_id,
+                    "message": f"Task failed after {attempts} attempts: {error_message}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }
     else:
         # Can retry - go back to implement_task
         task["status"] = TaskStatus.PENDING
-        logger.warning(f"Task {task_id} verification failed, will retry (attempt {attempts}/{max_attempts})")
+        logger.warning(
+            f"Task {task_id} verification failed, will retry (attempt {attempts}/{max_attempts})"
+        )
 
         return {
             "tasks": [task],
-            "errors": [{
-                "type": "task_verification_failed",
-                "task_id": task_id,
-                "message": error_message,
-                "attempt": attempts,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "task_verification_failed",
+                    "task_id": task_id,
+                    "message": error_message,
+                    "attempt": attempts,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",  # Retry the same task
             "updated_at": datetime.now().isoformat(),
         }
@@ -664,7 +686,13 @@ def _generate_task_uat(
 
         task_id = task.get("id", "unknown")
         repo = get_logs_repository(project_name or project_dir.name)
-        run_async(repo.create_log(log_type="uat_document", task_id=task_id, content=uat.to_dict() if hasattr(uat, "to_dict") else uat))
+        run_async(
+            repo.create_log(
+                log_type="uat_document",
+                task_id=task_id,
+                content=uat.to_dict() if hasattr(uat, "to_dict") else uat,
+            )
+        )
 
         logger.info(f"Generated UAT document for task {task_id} saved to database")
 

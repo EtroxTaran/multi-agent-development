@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +61,10 @@ class CleanupRule:
 class CleanupResult:
     """Result of a cleanup operation."""
 
-    files_deleted: List[str] = field(default_factory=list)
-    directories_deleted: List[str] = field(default_factory=list)
+    files_deleted: list[str] = field(default_factory=list)
+    directories_deleted: list[str] = field(default_factory=list)
     bytes_freed: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
     @property
@@ -77,7 +77,7 @@ class CleanupResult:
         """Whether cleanup completed without errors."""
         return len(self.errors) == 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "files_deleted": self.files_deleted,
@@ -153,7 +153,7 @@ class CleanupManager:
     def __init__(
         self,
         project_dir: Path,
-        rules: Optional[List[CleanupRule]] = None,
+        rules: Optional[list[CleanupRule]] = None,
         dry_run: bool = False,
     ):
         """Initialize cleanup manager.
@@ -166,9 +166,9 @@ class CleanupManager:
         self.project_dir = Path(project_dir)
         self.rules = rules or DEFAULT_CLEANUP_RULES.copy()
         self.dry_run = dry_run
-        self._cleanup_log: List[CleanupResult] = []
-        self._registered_temp_files: Dict[str, Set[str]] = {}  # task_id -> files
-        self._registered_session_files: Dict[str, Set[str]] = {}  # task_id -> files
+        self._cleanup_log: list[CleanupResult] = []
+        self._registered_temp_files: dict[str, set[str]] = {}  # task_id -> files
+        self._registered_session_files: dict[str, set[str]] = {}  # task_id -> files
 
     def _ensure_directories(self) -> None:
         """Ensure required directories exist."""
@@ -484,10 +484,12 @@ class CleanupManager:
         if session_dir.exists():
             for f in session_dir.rglob("*.json"):
                 try:
-                    summary["files_found"].append({
-                        "name": f.name,
-                        "size": f.stat().st_size,
-                    })
+                    summary["files_found"].append(
+                        {
+                            "name": f.name,
+                            "size": f.stat().st_size,
+                        }
+                    )
                 except Exception:
                     pass
 
@@ -497,7 +499,7 @@ class CleanupManager:
             archive_file.write_text(json.dumps(summary, indent=2))
             logger.debug(f"Archived task summary: {archive_file}")
 
-    def get_cleanup_log(self) -> List[Dict[str, Any]]:
+    def get_cleanup_log(self) -> list[dict[str, Any]]:
         """Get the cleanup log.
 
         Returns:
@@ -505,7 +507,7 @@ class CleanupManager:
         """
         return [r.to_dict() for r in self._cleanup_log]
 
-    def get_disk_usage(self) -> Dict[str, int]:
+    def get_disk_usage(self) -> dict[str, int]:
         """Get disk usage for workflow directories.
 
         Returns:
@@ -518,9 +520,7 @@ class CleanupManager:
             for subdir in ["temp", "sessions", "history", "audit", "messages", "phases"]:
                 subdir_path = workflow_dir / subdir
                 if subdir_path.exists():
-                    total = sum(
-                        f.stat().st_size for f in subdir_path.rglob("*") if f.is_file()
-                    )
+                    total = sum(f.stat().st_size for f in subdir_path.rglob("*") if f.is_file())
                     usage[subdir] = total
 
         return usage

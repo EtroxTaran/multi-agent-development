@@ -3,13 +3,20 @@
  * Tests for error states and recovery
  */
 
-import { test, expect } from '@playwright/test';
-import { ProjectsPage, ProjectDashboardPage } from './page-objects';
-import { setupApiMocks, failApiMock, timeoutApiMock, mockProjects } from './fixtures';
+import { test, expect } from "@playwright/test";
+import { ProjectsPage, ProjectDashboardPage } from "./page-objects";
+import {
+  setupApiMocks,
+  failApiMock,
+  timeoutApiMock,
+  mockProjects,
+} from "./fixtures";
 
-test.describe('Error Handling', () => {
-  test('should show error message when projects API fails', async ({ page }) => {
-    await failApiMock(page, '/api/projects', 500, 'Server error');
+test.describe("Error Handling", () => {
+  test("should show error message when projects API fails", async ({
+    page,
+  }) => {
+    await failApiMock(page, "/api/projects", 500, "Server error");
 
     const projectsPage = new ProjectsPage(page);
     await projectsPage.goto();
@@ -18,13 +25,13 @@ test.describe('Error Handling', () => {
     await expect(projectsPage.retryButton).toBeVisible();
   });
 
-  test('should retry loading projects on click', async ({ page }) => {
+  test("should retry loading projects on click", async ({ page }) => {
     // First request fails
     let requestCount = 0;
-    await page.route('/api/projects', async (route) => {
+    await page.route("/api/projects", async (route) => {
       requestCount++;
       if (requestCount === 1) {
-        await route.fulfill({ status: 500, json: { error: 'Server error' } });
+        await route.fulfill({ status: 500, json: { error: "Server error" } });
       } else {
         await route.fulfill({ json: mockProjects.single });
       }
@@ -40,36 +47,50 @@ test.describe('Error Handling', () => {
     await projectsPage.retryButton.click();
 
     // Should show project list after retry
-    await expect(page.getByText('test-project')).toBeVisible();
+    await expect(page.getByText("test-project")).toBeVisible();
   });
 
-  test('should show project not found on dashboard', async ({ page }) => {
+  test("should show project not found on dashboard", async ({ page }) => {
     await setupApiMocks(page, { projects: mockProjects.single });
-    await failApiMock(page, '/api/projects/nonexistent', 404, 'Project not found');
+    await failApiMock(
+      page,
+      "/api/projects/nonexistent",
+      404,
+      "Project not found",
+    );
 
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('nonexistent');
+    await dashboardPage.goto("nonexistent");
 
     await expect(dashboardPage.errorMessage).toBeVisible();
   });
 
-  test('should handle workflow status API failure gracefully', async ({ page }) => {
+  test("should handle workflow status API failure gracefully", async ({
+    page,
+  }) => {
     await setupApiMocks(page, { projects: mockProjects.single });
-    await failApiMock(page, '/api/projects/*/workflow/status', 500, 'Workflow error');
+    await failApiMock(
+      page,
+      "/api/projects/*/workflow/status",
+      500,
+      "Workflow error",
+    );
 
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
     // Dashboard should still load, but may show error state
     await expect(dashboardPage.projectTitle).toBeVisible();
   });
 
-  test('should show degraded state when agent unavailable', async ({ page }) => {
+  test("should show degraded state when agent unavailable", async ({
+    page,
+  }) => {
     await setupApiMocks(page, {
       projects: mockProjects.single,
       workflowHealth: {
-        status: 'degraded',
-        project: 'test-project',
+        status: "degraded",
+        project: "test-project",
         current_phase: 2,
         agents: { claude: true, cursor: false, gemini: true },
         langgraph_enabled: true,
@@ -79,19 +100,24 @@ test.describe('Error Handling', () => {
     });
 
     const dashboardPage = new ProjectDashboardPage(page);
-    await dashboardPage.goto('test-project');
+    await dashboardPage.goto("test-project");
 
-    await expect(page.getByText('degraded')).toBeVisible();
+    await expect(page.getByText("degraded")).toBeVisible();
   });
 
-  test('should handle project creation failure', async ({ page }) => {
+  test("should handle project creation failure", async ({ page }) => {
     await setupApiMocks(page, { projects: mockProjects.single });
-    await failApiMock(page, '/api/projects/*/init', 400, 'Project already exists');
+    await failApiMock(
+      page,
+      "/api/projects/*/init",
+      400,
+      "Project already exists",
+    );
 
     const projectsPage = new ProjectsPage(page);
     await projectsPage.goto();
 
-    await projectsPage.createProject('existing-project');
+    await projectsPage.createProject("existing-project");
 
     // Should show error message
     await expect(page.getByText(/Failed|exists/i)).toBeVisible();

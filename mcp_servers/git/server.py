@@ -10,15 +10,11 @@ import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import (
-    Tool,
-    TextContent,
-    Resource,
-)
+from mcp.types import Resource, TextContent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +102,7 @@ def create_server() -> Server:
             Tool(
                 name="list_changes",
                 description=(
-                    "List changed files in a project. "
-                    "Shows modified, added, and deleted files."
+                    "List changed files in a project. " "Shows modified, added, and deleted files."
                 ),
                 inputSchema={
                     "type": "object",
@@ -158,10 +153,7 @@ def create_server() -> Server:
             ),
             Tool(
                 name="get_blame",
-                description=(
-                    "Get git blame for a file. "
-                    "Shows who last modified each line."
-                ),
+                description=("Get git blame for a file. " "Shows who last modified each line."),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -188,8 +180,7 @@ def create_server() -> Server:
             Tool(
                 name="get_branch_info",
                 description=(
-                    "Get information about branches. "
-                    "Shows current branch and list of branches."
+                    "Get information about branches. " "Shows current branch and list of branches."
                 ),
                 inputSchema={
                     "type": "object",
@@ -209,10 +200,7 @@ def create_server() -> Server:
             ),
             Tool(
                 name="compare_commits",
-                description=(
-                    "Compare two commits. "
-                    "Shows files changed and summary of changes."
-                ),
+                description=("Compare two commits. " "Shows files changed and summary of changes."),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -458,13 +446,15 @@ async def get_history(
 
         parts = line.split("|", 4)
         if len(parts) >= 5:
-            commits.append({
-                "hash": parts[0],
-                "author": parts[1],
-                "email": parts[2],
-                "timestamp": int(parts[3]),
-                "message": parts[4],
-            })
+            commits.append(
+                {
+                    "hash": parts[0],
+                    "author": parts[1],
+                    "email": parts[2],
+                    "timestamp": int(parts[3]),
+                    "message": parts[4],
+                }
+            )
 
     return {
         "project": project,
@@ -603,11 +593,13 @@ async def get_blame(
         elif line.startswith("author "):
             current_author = line[7:]
         elif line.startswith("\t"):
-            lines.append({
-                "commit": current_commit[:8] if current_commit else None,
-                "author": current_author,
-                "content": line[1:],
-            })
+            lines.append(
+                {
+                    "commit": current_commit[:8] if current_commit else None,
+                    "author": current_author,
+                    "content": line[1:],
+                }
+            )
 
     return {
         "project": project,
@@ -649,11 +641,13 @@ async def get_branch_info(
             continue
 
         parts = line.split("|")
-        branches.append({
-            "name": parts[0],
-            "upstream": parts[1] if len(parts) > 1 and parts[1] else None,
-            "tracking": parts[2] if len(parts) > 2 and parts[2] else None,
-        })
+        branches.append(
+            {
+                "name": parts[0],
+                "upstream": parts[1] if len(parts) > 1 and parts[1] else None,
+                "tracking": parts[2] if len(parts) > 2 and parts[2] else None,
+            }
+        )
 
     return {
         "project": project,
@@ -688,10 +682,12 @@ async def compare_commits(
             continue
         parts = line.split("\t")
         if len(parts) >= 2:
-            files.append({
-                "status": parts[0],
-                "path": parts[1],
-            })
+            files.append(
+                {
+                    "status": parts[0],
+                    "path": parts[1],
+                }
+            )
 
     # Get stats
     success, stat_output = _run_git(project, "diff", "--stat", base, target)

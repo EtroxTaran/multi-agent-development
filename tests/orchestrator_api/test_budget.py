@@ -1,7 +1,6 @@
 """Tests for budget endpoints."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestGetBudget:

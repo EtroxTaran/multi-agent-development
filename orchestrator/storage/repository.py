@@ -6,10 +6,7 @@ storage backends (e.g. SurrealDB, FileSystem, Memory).
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Any
-from pathlib import Path
-
-from ..models import PhaseStatus
+from typing import Any, Optional
 
 
 class StorageRepository(ABC):
@@ -18,7 +15,7 @@ class StorageRepository(ABC):
     @abstractmethod
     def get_state(self) -> Optional[Any]:
         """Retrieve the current workflow state.
-        
+
         Returns:
             Workflow state object or None if not found.
         """
@@ -27,7 +24,7 @@ class StorageRepository(ABC):
     @abstractmethod
     def save_state(self, state: Any) -> None:
         """Save the workflow state.
-        
+
         Args:
             state: Workflow state object to save.
         """
@@ -36,7 +33,7 @@ class StorageRepository(ABC):
     @abstractmethod
     def get_summary(self) -> dict:
         """Get a summary of the workflow status.
-        
+
         Returns:
             Dictionary with project status summary.
         """
@@ -50,7 +47,7 @@ class StorageRepository(ABC):
     @abstractmethod
     def reset_to_phase(self, phase: int) -> None:
         """Reset workflow state to the beginning of a specific phase.
-        
+
         Args:
             phase: Phase number (1-5) to reset to.
         """
@@ -59,7 +56,7 @@ class StorageRepository(ABC):
     @abstractmethod
     def record_git_commit(self, phase: int, commit_hash: str, message: str) -> None:
         """Record a git commit associated with a phase.
-        
+
         Args:
             phase: Phase number.
             commit_hash: Git commit hash.
@@ -70,7 +67,7 @@ class StorageRepository(ABC):
     @abstractmethod
     def get_git_commits(self) -> list[dict]:
         """Retrieve history of recorded git commits.
-        
+
         Returns:
             List of commit dictionaries.
         """

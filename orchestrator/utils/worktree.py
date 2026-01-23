@@ -120,8 +120,7 @@ class WorktreeManager:
         # Verify it's a git repository
         if not self._is_git_repo():
             raise WorktreeError(
-                f"'{self.project_dir}' is not a git repository. "
-                "Worktrees require git."
+                f"'{self.project_dir}' is not a git repository. " "Worktrees require git."
             )
 
     def _is_git_repo(self) -> bool:
@@ -202,13 +201,13 @@ class WorktreeManager:
                 return worktree_path
 
             except subprocess.CalledProcessError as e:
-                raise WorktreeError(
-                    f"Failed to create worktree: {e.stderr}"
-                ) from e
+                raise WorktreeError(f"Failed to create worktree: {e.stderr}") from e
             except Exception as e:
                 # Clean up orphaned worktree if creation succeeded but setup failed
                 if worktree_created and worktree_path.exists():
-                    logger.warning(f"Cleaning up orphaned worktree after setup failure: {worktree_path}")
+                    logger.warning(
+                        f"Cleaning up orphaned worktree after setup failure: {worktree_path}"
+                    )
                     try:
                         subprocess.run(
                             ["git", "worktree", "remove", "--force", str(worktree_path)],
@@ -247,10 +246,7 @@ class WorktreeManager:
 
             # Remove from tracked list (thread-safe)
             with self._lock:
-                self.worktrees = [
-                    wt for wt in self.worktrees
-                    if wt.path != worktree_path
-                ]
+                self.worktrees = [wt for wt in self.worktrees if wt.path != worktree_path]
 
             logger.info(f"Removed worktree at {worktree_path}")
             return True
@@ -381,11 +377,12 @@ class WorktreeManager:
                         cwd=str(self.project_dir),
                         capture_output=True,
                     )
-                    logger.info(
-                        f"Worktree {worktree_path.name} had no unique changes to merge"
-                    )
+                    logger.info(f"Worktree {worktree_path.name} had no unique changes to merge")
                     return commit_hash  # Still return the commit hash
-                elif "conflict" in cherry_pick_result.stderr.lower() or "conflict" in cherry_pick_result.stdout.lower():
+                elif (
+                    "conflict" in cherry_pick_result.stderr.lower()
+                    or "conflict" in cherry_pick_result.stdout.lower()
+                ):
                     # Handle conflict based on strategy
                     return self._handle_conflict(
                         worktree_path=worktree_path,
@@ -394,20 +391,13 @@ class WorktreeManager:
                         stderr=cherry_pick_result.stderr,
                     )
                 else:
-                    raise WorktreeError(
-                        f"Failed to cherry-pick: {cherry_pick_result.stderr}"
-                    )
+                    raise WorktreeError(f"Failed to cherry-pick: {cherry_pick_result.stderr}")
 
-            logger.info(
-                f"Merged worktree {worktree_path.name} "
-                f"(commit: {commit_hash[:8]})"
-            )
+            logger.info(f"Merged worktree {worktree_path.name} " f"(commit: {commit_hash[:8]})")
             return commit_hash
 
         except subprocess.CalledProcessError as e:
-            raise WorktreeError(
-                f"Failed to merge worktree: {e.stderr}"
-            ) from e
+            raise WorktreeError(f"Failed to merge worktree: {e.stderr}") from e
 
     def _get_conflicting_files(self) -> list[str]:
         """Get list of files with merge conflicts.
@@ -467,7 +457,7 @@ class WorktreeManager:
 
         elif conflict_strategy == ConflictResolutionStrategy.OURS:
             # Accept worktree changes (ours = the cherry-picked changes)
-            logger.info(f"Resolving conflict with OURS strategy (worktree wins)")
+            logger.info("Resolving conflict with OURS strategy (worktree wins)")
             for file_path in conflicting_files:
                 subprocess.run(
                     ["git", "checkout", "--ours", file_path],
@@ -492,7 +482,7 @@ class WorktreeManager:
 
         elif conflict_strategy == ConflictResolutionStrategy.THEIRS:
             # Accept main branch changes (theirs = current branch)
-            logger.info(f"Resolving conflict with THEIRS strategy (main wins)")
+            logger.info("Resolving conflict with THEIRS strategy (main wins)")
             for file_path in conflicting_files:
                 subprocess.run(
                     ["git", "checkout", "--theirs", file_path],
@@ -685,33 +675,33 @@ class WorktreeManager:
             Number of orphaned worktrees removed
         """
         logger.info("Checking for orphaned worktrees...")
-        
+
         # Get list of all git worktrees
         git_worktrees = self.list_worktrees()
         git_worktree_paths = {Path(wt["path"]).resolve() for wt in git_worktrees}
-        
+
         # Identify our main project path to avoid deleting it
         project_path = self.project_dir.resolve()
-        
+
         # Pattern for our worker worktrees
         worker_pattern = f"{self.project_dir.name}-worker-*"
         parent_dir = self.project_dir.parent
-        
+
         removed_count = 0
-        
+
         # Check all matching directories in parent
         for path in parent_dir.glob(worker_pattern):
             path = path.resolve()
-            
+
             # Skip if it's the project dir itself (unlikely with pattern, but safe)
             if path == project_path:
                 continue
-                
+
             # If it's a directory and looks like one of our workers
             if path.is_dir():
                 # Check if git knows about it
                 is_known = path in git_worktree_paths
-                
+
                 # If git knows about it, remove it cleanly
                 if is_known:
                     logger.info(f"Removing known orphaned worktree: {path}")
@@ -720,14 +710,14 @@ class WorktreeManager:
                             ["git", "worktree", "remove", "--force", str(path)],
                             cwd=str(self.project_dir),
                             capture_output=True,
-                            check=True
+                            check=True,
                         )
                         removed_count += 1
                     except subprocess.CalledProcessError as e:
                         logger.warning(f"Failed to remove worktree {path}: {e}")
-                
-                # If git doesn't know about it but it exists on disk, 
-                # it might be a left-over directory. 
+
+                # If git doesn't know about it but it exists on disk,
+                # it might be a left-over directory.
                 # Be careful not to delete random directories.
                 # Only delete if it matches our specific UUID pattern length or format
                 # For now, we only delete if it WAS a git worktree or we are sure.
@@ -744,7 +734,7 @@ class WorktreeManager:
             )
         except Exception:
             pass
-            
+
         return removed_count
 
     def __enter__(self):

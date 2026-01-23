@@ -14,17 +14,15 @@ Run with: pytest tests/test_langgraph.py -v
 """
 
 import json
-import pytest
-import tempfile
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch
-from dataclasses import asdict
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 
 # =============================================================================
 # Test State Schema and Reducers
 # =============================================================================
+
 
 class TestStateSchema:
     """Test LangGraph state schema and reducers."""
@@ -156,6 +154,7 @@ class TestStateReducers:
 # Test Routers
 # =============================================================================
 
+
 class TestValidationRouter:
     """Test validation phase routing logic."""
 
@@ -277,21 +276,20 @@ class TestGeneralRouters:
 # Test Validation Fan-In Logic
 # =============================================================================
 
+
 class TestValidationFanIn:
     """Test validation fan-in node logic."""
 
     @pytest.fixture
     def base_state(self, temp_project_dir):
         """Create base state for testing."""
-        from orchestrator.langgraph.state import PhaseState, PhaseStatus, AgentFeedback
+        from orchestrator.langgraph.state import PhaseState, PhaseStatus
 
         return {
             "project_dir": str(temp_project_dir),
             "project_name": "test-project",
             "current_phase": 2,
-            "phase_status": {
-                "2": PhaseState(status=PhaseStatus.IN_PROGRESS)
-            },
+            "phase_status": {"2": PhaseState(status=PhaseStatus.IN_PROGRESS)},
             "validation_feedback": {},
         }
 
@@ -392,6 +390,7 @@ class TestValidationFanIn:
 # Test Implementation Node Logic
 # =============================================================================
 
+
 class TestImplementationNode:
     """Test implementation node helper functions."""
 
@@ -407,11 +406,7 @@ class TestImplementationNode:
         """Test extracting clarifications from array."""
         from orchestrator.langgraph.nodes.implementation import _extract_clarifications
 
-        result = {
-            "clarifications_needed": [
-                {"task_id": "T1", "question": "What auth method?"}
-            ]
-        }
+        result = {"clarifications_needed": [{"task_id": "T1", "question": "What auth method?"}]}
         clarifications = _extract_clarifications(result)
         assert len(clarifications) == 1
         assert clarifications[0]["question"] == "What auth method?"
@@ -480,9 +475,7 @@ class TestImplementationNode:
         from orchestrator.langgraph.nodes.implementation import _detect_test_commands
 
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "scripts": {"test": "jest"}
-        }))
+        package_json.write_text(json.dumps({"scripts": {"test": "jest"}}))
 
         commands = _detect_test_commands(temp_project_dir)
         assert "npm test" in commands
@@ -504,6 +497,7 @@ class TestImplementationNode:
 # =============================================================================
 # Test Escalation Node
 # =============================================================================
+
 
 class TestEscalationNode:
     """Test human escalation node logic."""
@@ -532,6 +526,7 @@ class TestEscalationNode:
 # =============================================================================
 # Test Integration Adapters
 # =============================================================================
+
 
 class TestLangGraphStateAdapter:
     """Test state adapter between LangGraph and legacy StateManager."""
@@ -563,8 +558,12 @@ class TestLangGraphApprovalAdapter:
         from orchestrator.langgraph.state import AgentFeedback
 
         feedback = AgentFeedback(
-            agent="cursor", score=8.0, approved=True,
-            assessment="approve", concerns=[], blocking_issues=[]
+            agent="cursor",
+            score=8.0,
+            approved=True,
+            assessment="approve",
+            concerns=[],
+            blocking_issues=[],
         )
 
         # Test native to_dict
@@ -583,8 +582,12 @@ class TestLangGraphApprovalAdapter:
         adapter = LangGraphApprovalAdapter()
 
         feedback = AgentFeedback(
-            agent="cursor", score=8.0, approved=True,
-            assessment="approve", concerns=[], blocking_issues=[]
+            agent="cursor",
+            score=8.0,
+            approved=True,
+            assessment="approve",
+            concerns=[],
+            blocking_issues=[],
         )
 
         # Adapter conversion includes overall_assessment mapping
@@ -604,8 +607,12 @@ class TestLangGraphConflictAdapter:
         from orchestrator.langgraph.state import AgentFeedback
 
         feedback = AgentFeedback(
-            agent="cursor", score=8.0, approved=True,
-            assessment="approve", concerns=["minor concern"], blocking_issues=[]
+            agent="cursor",
+            score=8.0,
+            approved=True,
+            assessment="approve",
+            concerns=["minor concern"],
+            blocking_issues=[],
         )
 
         # Test the conversion manually (what _feedback_to_dict does)
@@ -625,12 +632,20 @@ class TestLangGraphConflictAdapter:
         from orchestrator.langgraph.state import AgentFeedback
 
         cursor_fb = AgentFeedback(
-            agent="cursor", score=4.0, approved=False,
-            assessment="reject", concerns=["Security issue"], blocking_issues=["Critical"]
+            agent="cursor",
+            score=4.0,
+            approved=False,
+            assessment="reject",
+            concerns=["Security issue"],
+            blocking_issues=["Critical"],
         )
         gemini_fb = AgentFeedback(
-            agent="gemini", score=9.0, approved=True,
-            assessment="approve", concerns=[], blocking_issues=[]
+            agent="gemini",
+            score=9.0,
+            approved=True,
+            assessment="approve",
+            concerns=[],
+            blocking_issues=[],
         )
 
         # Detect disagreement manually
@@ -647,10 +662,11 @@ class TestAsyncCircuitBreaker:
     def test_circuit_breaker_closed_state(self):
         """Test circuit breaker in closed (working) state."""
         import asyncio
+
         from orchestrator.langgraph.integrations.resilience import (
             AsyncCircuitBreaker,
             AsyncCircuitBreakerConfig,
-            AsyncCircuitState
+            AsyncCircuitState,
         )
 
         async def run_test():
@@ -668,10 +684,11 @@ class TestAsyncCircuitBreaker:
     def test_circuit_breaker_opens_on_failures(self):
         """Test circuit breaker opens after threshold failures."""
         import asyncio
+
         from orchestrator.langgraph.integrations.resilience import (
             AsyncCircuitBreaker,
             AsyncCircuitBreakerConfig,
-            AsyncCircuitState
+            AsyncCircuitState,
         )
 
         async def run_test():
@@ -699,11 +716,12 @@ class TestAsyncCircuitBreaker:
     def test_circuit_breaker_rejects_when_open(self):
         """Test circuit breaker rejects calls when open."""
         import asyncio
+
         from orchestrator.langgraph.integrations.resilience import (
             AsyncCircuitBreaker,
             AsyncCircuitBreakerConfig,
             AsyncCircuitBreakerError,
-            AsyncCircuitState
+            AsyncCircuitState,
         )
 
         async def run_test():
@@ -734,6 +752,7 @@ class TestAsyncCircuitBreaker:
 # Test Cursor JSON Parsing
 # =============================================================================
 
+
 class TestCursorJsonParsing:
     """Test cursor-agent JSON wrapper parsing."""
 
@@ -742,7 +761,7 @@ class TestCursorJsonParsing:
         # Simulate cursor-agent output
         cursor_output = {
             "type": "result",
-            "result": '```json\n{"reviewer": "cursor", "score": 8, "approved": true}\n```'
+            "result": '```json\n{"reviewer": "cursor", "score": 8, "approved": true}\n```',
         }
 
         import re
@@ -759,7 +778,7 @@ class TestCursorJsonParsing:
         """Test parsing cursor output with raw JSON."""
         cursor_output = {
             "type": "result",
-            "result": '{"reviewer": "cursor", "score": 7, "approved": true}'
+            "result": '{"reviewer": "cursor", "score": 7, "approved": true}',
         }
 
         import re
@@ -773,13 +792,16 @@ class TestCursorJsonParsing:
             json_match = re.search(r"\{[\s\S]*\}", content)
 
         assert json_match is not None
-        parsed = json.loads(json_match.group(0) if not hasattr(json_match, 'group') else json_match.group(0))
+        parsed = json.loads(
+            json_match.group(0) if not hasattr(json_match, "group") else json_match.group(0)
+        )
         assert parsed["score"] == 7
 
 
 # =============================================================================
 # Test Parallel Execution Scenarios
 # =============================================================================
+
 
 class TestParallelExecution:
     """Test parallel execution edge cases."""
@@ -790,21 +812,25 @@ class TestParallelExecution:
 
         # Cursor succeeds
         cursor_feedback = AgentFeedback(
-            agent="cursor", score=8.0, approved=True,
-            assessment="approve", concerns=[], blocking_issues=[]
+            agent="cursor",
+            score=8.0,
+            approved=True,
+            assessment="approve",
+            concerns=[],
+            blocking_issues=[],
         )
 
         # Gemini returns error
         gemini_feedback = AgentFeedback(
-            agent="gemini", score=0.0, approved=False,
-            assessment="error", concerns=["Agent failed to respond"],
-            blocking_issues=["Agent unavailable"]
+            agent="gemini",
+            score=0.0,
+            approved=False,
+            assessment="error",
+            concerns=["Agent failed to respond"],
+            blocking_issues=["Agent unavailable"],
         )
 
-        merged = _merge_feedback(
-            {"cursor": cursor_feedback},
-            {"gemini": gemini_feedback}
-        )
+        merged = _merge_feedback({"cursor": cursor_feedback}, {"gemini": gemini_feedback})
 
         assert "cursor" in merged
         assert "gemini" in merged
@@ -816,15 +842,22 @@ class TestParallelExecution:
 
         # Simulate timeout scenario
         cursor_feedback = AgentFeedback(
-            agent="cursor", score=8.0, approved=True,
-            assessment="approve", concerns=[], blocking_issues=[]
+            agent="cursor",
+            score=8.0,
+            approved=True,
+            assessment="approve",
+            concerns=[],
+            blocking_issues=[],
         )
 
         # Gemini times out - represented as error
         gemini_feedback = AgentFeedback(
-            agent="gemini", score=0.0, approved=False,
-            assessment="timeout", concerns=["Request timed out"],
-            blocking_issues=["Timeout: No response within 5 minutes"]
+            agent="gemini",
+            score=0.0,
+            approved=False,
+            assessment="timeout",
+            concerns=["Request timed out"],
+            blocking_issues=["Timeout: No response within 5 minutes"],
         )
 
         # Test approval logic directly - should not approve due to gemini failure
@@ -844,6 +877,7 @@ class TestParallelExecution:
 # =============================================================================
 # Test Error Recovery Paths
 # =============================================================================
+
 
 class TestErrorRecovery:
     """Test error handling and recovery paths."""
@@ -871,6 +905,7 @@ class TestErrorRecovery:
 # =============================================================================
 # Test Workflow File Operations
 # =============================================================================
+
 
 class TestWorkflowFileOperations:
     """Test workflow file creation and management."""
@@ -933,6 +968,7 @@ class TestWorkflowFileOperations:
 # Integration Tests (Mocked)
 # =============================================================================
 
+
 class TestWorkflowIntegration:
     """Integration tests with mocked agents."""
 
@@ -940,28 +976,25 @@ class TestWorkflowIntegration:
     def mock_agents(self):
         """Create all mock agents."""
         claude = MagicMock()
-        claude.run_planning = AsyncMock(return_value={
-            "success": True,
-            "parsed_output": {"plan_name": "Test", "phases": []}
-        })
+        claude.run_planning = AsyncMock(
+            return_value={"success": True, "parsed_output": {"plan_name": "Test", "phases": []}}
+        )
 
         cursor = MagicMock()
-        cursor.run_validation = AsyncMock(return_value={
-            "success": True,
-            "parsed_output": {"score": 8, "approved": True}
-        })
+        cursor.run_validation = AsyncMock(
+            return_value={"success": True, "parsed_output": {"score": 8, "approved": True}}
+        )
 
         gemini = MagicMock()
-        gemini.run_validation = AsyncMock(return_value={
-            "success": True,
-            "parsed_output": {"score": 9, "approved": True}
-        })
+        gemini.run_validation = AsyncMock(
+            return_value={"success": True, "parsed_output": {"score": 9, "approved": True}}
+        )
 
         return {"claude": claude, "cursor": cursor, "gemini": gemini}
 
     def test_initial_state_creation(self, temp_project_dir):
         """Test initial workflow state is created correctly."""
-        from orchestrator.langgraph.state import WorkflowState, PhaseState, PhaseStatus
+        from orchestrator.langgraph.state import PhaseState, PhaseStatus, WorkflowState
 
         state: WorkflowState = {
             "project_dir": str(temp_project_dir),

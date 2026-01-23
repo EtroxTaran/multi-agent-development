@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
@@ -106,18 +106,26 @@ class ConnectionManager:
             event_type: Event type (action, state_change, escalation, etc.)
             data: Event data
         """
-        message = json.dumps({
-            "type": event_type,
-            "data": data,
-            "timestamp": datetime.now().isoformat(),
-        })
+        message = json.dumps(
+            {
+                "type": event_type,
+                "data": data,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         async with self._lock:
             connections = self._connections.get(project_name, []).copy()
 
+        if not connections:
+            return
+
+        # Send to all connections in parallel
+        results = await asyncio.gather(*[self._send_safe(ws, message) for ws in connections])
+
         dead_connections = []
-        for websocket in connections:
-            if not await self._send_safe(websocket, message):
+        for websocket, success in zip(connections, results):
+            if not success:
                 dead_connections.append(websocket)
 
         # Clean up dead connections
@@ -135,18 +143,26 @@ class ConnectionManager:
             event_type: Event type
             data: Event data
         """
-        message = json.dumps({
-            "type": event_type,
-            "data": data,
-            "timestamp": datetime.now().isoformat(),
-        })
+        message = json.dumps(
+            {
+                "type": event_type,
+                "data": data,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         async with self._lock:
             connections = self._global_connections.copy()
 
+        if not connections:
+            return
+
+        # Send to all connections in parallel
+        results = await asyncio.gather(*[self._send_safe(ws, message) for ws in connections])
+
         dead_connections = []
-        for websocket in connections:
-            if not await self._send_safe(websocket, message):
+        for websocket, success in zip(connections, results):
+            if not success:
                 dead_connections.append(websocket)
 
         # Clean up dead connections
@@ -169,11 +185,13 @@ class ConnectionManager:
         Returns:
             True if sent successfully
         """
-        message = json.dumps({
-            "type": event_type,
-            "data": data,
-            "timestamp": datetime.now().isoformat(),
-        })
+        message = json.dumps(
+            {
+                "type": event_type,
+                "data": data,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
         return await self._send_safe(websocket, message)
 
     async def _send_safe(self, websocket: WebSocket, message: str) -> bool:
@@ -209,11 +227,13 @@ class ConnectionManager:
                     # No connections, stop heartbeat
                     break
 
-                message = json.dumps({
-                    "type": "heartbeat",
-                    "data": {},
-                    "timestamp": datetime.now().isoformat(),
-                })
+                message = json.dumps(
+                    {
+                        "type": "heartbeat",
+                        "data": {},
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
                 for websocket in all_connections:
                     await self._send_safe(websocket, message)

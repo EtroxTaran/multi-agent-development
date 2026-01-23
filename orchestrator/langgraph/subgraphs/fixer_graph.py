@@ -5,27 +5,26 @@ Triage -> Diagnose -> Validate -> Apply -> Verify
 """
 
 import logging
-from typing import Optional, Any
 
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 
-from ..state import WorkflowState
 from ..nodes import (
-    fixer_triage_node,
-    fixer_diagnose_node,
-    fixer_validate_node,
     fixer_apply_node,
-    fixer_verify_node,
+    fixer_diagnose_node,
     fixer_research_node,
+    fixer_triage_node,
+    fixer_validate_node,
+    fixer_verify_node,
 )
 from ..routers import (
-    fixer_triage_router,
-    fixer_diagnose_router,
-    fixer_validate_router,
     fixer_apply_router,
-    fixer_verify_router,
+    fixer_diagnose_router,
     fixer_research_router,
+    fixer_triage_router,
+    fixer_validate_router,
+    fixer_verify_router,
 )
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ def create_fixer_subgraph() -> StateGraph:
     graph.add_node("fixer_research", fixer_research_node)
 
     # Define edges
-    
+
     # Start -> Triage
     graph.add_edge(START, "fixer_triage")
 
@@ -65,8 +64,8 @@ def create_fixer_subgraph() -> StateGraph:
         fixer_triage_router,
         {
             "fixer_diagnose": "fixer_diagnose",
-            "human_escalation": END, # Exit to parent graph
-            "skip_fixer": END,       # Exit to parent graph
+            "human_escalation": END,  # Exit to parent graph
+            "skip_fixer": END,  # Exit to parent graph
         },
     )
 
@@ -118,7 +117,7 @@ def create_fixer_subgraph() -> StateGraph:
         "fixer_verify",
         fixer_verify_router,
         {
-            "resume_workflow": END, # Exit to parent graph (mapped to evaluate_agent)
+            "resume_workflow": END,  # Exit to parent graph (mapped to evaluate_agent)
             "human_escalation": END,
         },
     )

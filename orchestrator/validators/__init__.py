@@ -1,12 +1,18 @@
 """Validators package for pre-mortem risk mitigation.
 
 Provides validation utilities for PRODUCT.md specs, environment checks,
-coverage verification, and security scanning.
+coverage verification, security scanning, and dependency checking.
 """
 
-from .product_validator import ProductValidator, ProductValidationResult
-from .environment_checker import EnvironmentChecker, EnvironmentCheckResult
 from .coverage_checker import CoverageChecker, CoverageCheckResult
+from .dependency_checker import (
+    DependencyChecker,
+    DependencyCheckResult,
+    DependencyFinding,
+    DependencySeverity,
+)
+from .environment_checker import EnvironmentChecker, EnvironmentCheckResult
+from .product_validator import ProductValidationResult, ProductValidator
 from .security_scanner import SecurityScanner, SecurityScanResult, Severity
 
 __all__ = [
@@ -19,4 +25,8 @@ __all__ = [
     "SecurityScanner",
     "SecurityScanResult",
     "Severity",
+    "DependencyChecker",
+    "DependencyCheckResult",
+    "DependencyFinding",
+    "DependencySeverity",
 ]

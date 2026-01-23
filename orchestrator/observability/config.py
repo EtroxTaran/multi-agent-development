@@ -3,8 +3,8 @@
 All features are opt-in and configured via environment variables.
 """
 
-import os
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -105,11 +105,7 @@ class ObservabilityConfig:
     @property
     def any_enabled(self) -> bool:
         """Check if any observability feature is enabled."""
-        return (
-            self.prometheus.enabled
-            or self.tracing.enabled
-            or self.webhooks.enabled
-        )
+        return self.prometheus.enabled or self.tracing.enabled or self.webhooks.enabled
 
 
 def get_config() -> ObservabilityConfig:

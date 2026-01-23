@@ -13,20 +13,19 @@ Run with: pytest tests/test_new_nodes.py -v
 """
 
 import json
-import pytest
 import tempfile
-import asyncio
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+
+import pytest
 
 # Configure pytest-asyncio
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 
 
 # =============================================================================
 # Product Validation Node Tests
 # =============================================================================
+
 
 class TestProductValidationNode:
     """Test product_validation_node."""
@@ -48,7 +47,8 @@ class TestProductValidationNode:
 
         # Create valid PRODUCT.md
         product_md = temp_project / "PRODUCT.md"
-        product_md.write_text("""
+        product_md.write_text(
+            """
 # Product Specification
 
 ## Feature Name
@@ -88,13 +88,12 @@ Response: {"success": true}
 ## Testing Strategy
 - Unit tests for auth service
 - Integration tests for API endpoints
-""")
+"""
+        )
 
         # Create .project-config.json to enable feature
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "workflow": {"features": {"product_validation": True}}
-        }))
+        config.write_text(json.dumps({"workflow": {"features": {"product_validation": True}}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -114,9 +113,7 @@ Response: {"success": true}
         product_md.write_text("# Product\n[TODO]")
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "workflow": {"features": {"product_validation": True}}
-        }))
+        config.write_text(json.dumps({"workflow": {"features": {"product_validation": True}}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -132,9 +129,7 @@ Response: {"success": true}
         from orchestrator.langgraph.state import create_initial_state
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "workflow": {"features": {"product_validation": False}}
-        }))
+        config.write_text(json.dumps({"workflow": {"features": {"product_validation": False}}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -146,6 +141,7 @@ Response: {"success": true}
 # =============================================================================
 # Pre-Implementation Node Tests
 # =============================================================================
+
 
 class TestPreImplementationNode:
     """Test pre_implementation_node."""
@@ -167,18 +163,15 @@ class TestPreImplementationNode:
 
         # Create package.json
         package_json = temp_project / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test",
-            "scripts": {"build": "tsc", "test": "vitest"}
-        }))
+        package_json.write_text(
+            json.dumps({"name": "test", "scripts": {"build": "tsc", "test": "vitest"}})
+        )
 
         # Create node_modules to indicate deps installed
         (temp_project / "node_modules").mkdir()
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "workflow": {"features": {"environment_check": True}}
-        }))
+        config.write_text(json.dumps({"workflow": {"features": {"environment_check": True}}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -194,9 +187,7 @@ class TestPreImplementationNode:
         from orchestrator.langgraph.state import create_initial_state
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "workflow": {"features": {"environment_check": False}}
-        }))
+        config.write_text(json.dumps({"workflow": {"features": {"environment_check": False}}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -208,6 +199,7 @@ class TestPreImplementationNode:
 # =============================================================================
 # Build Verification Node Tests
 # =============================================================================
+
 
 class TestBuildVerificationNode:
     """Test build_verification_node."""
@@ -228,9 +220,7 @@ class TestBuildVerificationNode:
         from orchestrator.langgraph.state import create_initial_state
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "workflow": {"features": {"build_verification": False}}
-        }))
+        config.write_text(json.dumps({"workflow": {"features": {"build_verification": False}}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -245,9 +235,7 @@ class TestBuildVerificationNode:
         from orchestrator.langgraph.state import create_initial_state
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "quality": {"build_required": False}
-        }))
+        config.write_text(json.dumps({"quality": {"build_required": False}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -259,6 +247,7 @@ class TestBuildVerificationNode:
 # =============================================================================
 # Coverage Check Node Tests
 # =============================================================================
+
 
 class TestCoverageCheckNode:
     """Test coverage_check_node."""
@@ -282,14 +271,12 @@ class TestCoverageCheckNode:
         coverage_dir = temp_project / "coverage"
         coverage_dir.mkdir()
         coverage_file = coverage_dir / "coverage-summary.json"
-        coverage_file.write_text(json.dumps({
-            "total": {"lines": {"pct": 85.0}}
-        }))
+        coverage_file.write_text(json.dumps({"total": {"lines": {"pct": 85.0}}}))
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "quality": {"coverage_threshold": 80, "coverage_blocking": True}
-        }))
+        config.write_text(
+            json.dumps({"quality": {"coverage_threshold": 80, "coverage_blocking": True}})
+        )
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -306,14 +293,12 @@ class TestCoverageCheckNode:
         coverage_dir = temp_project / "coverage"
         coverage_dir.mkdir()
         coverage_file = coverage_dir / "coverage-summary.json"
-        coverage_file.write_text(json.dumps({
-            "total": {"lines": {"pct": 50.0}}
-        }))
+        coverage_file.write_text(json.dumps({"total": {"lines": {"pct": 50.0}}}))
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "quality": {"coverage_threshold": 80, "coverage_blocking": True}
-        }))
+        config.write_text(
+            json.dumps({"quality": {"coverage_threshold": 80, "coverage_blocking": True}})
+        )
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -339,6 +324,7 @@ class TestCoverageCheckNode:
 # =============================================================================
 # Security Scan Node Tests
 # =============================================================================
+
 
 class TestSecurityScanNode:
     """Test security_scan_node."""
@@ -392,9 +378,7 @@ class TestSecurityScanNode:
         from orchestrator.langgraph.state import create_initial_state
 
         config = temp_project / ".project-config.json"
-        config.write_text(json.dumps({
-            "security": {"enabled": False}
-        }))
+        config.write_text(json.dumps({"security": {"enabled": False}}))
 
         state = create_initial_state(str(temp_project), temp_project.name)
 
@@ -406,6 +390,7 @@ class TestSecurityScanNode:
 # =============================================================================
 # Router Tests
 # =============================================================================
+
 
 class TestNewRouters:
     """Test new routers for risk mitigation nodes."""
@@ -470,10 +455,8 @@ class TestNewRouters:
 
         state = {
             "next_decision": "continue",
-            "errors": [
-                {"type": "build_verification_failed", "message": "Build failed"}
-            ],
-            "iteration_count": 0
+            "errors": [{"type": "build_verification_failed", "message": "Build failed"}],
+            "iteration_count": 0,
         }
         result = verification_router(state)
         assert result == "implementation"  # Retry
@@ -484,10 +467,8 @@ class TestNewRouters:
 
         state = {
             "next_decision": "continue",
-            "errors": [
-                {"type": "build_verification_failed", "message": "Build failed"}
-            ],
-            "iteration_count": 5  # > 3 retries
+            "errors": [{"type": "build_verification_failed", "message": "Build failed"}],
+            "iteration_count": 5,  # > 3 retries
         }
         result = verification_router(state)
         assert result == "human_escalation"
@@ -496,6 +477,7 @@ class TestNewRouters:
 # =============================================================================
 # Workflow Integration Tests
 # =============================================================================
+
 
 class TestWorkflowIntegration:
     """Test workflow graph with new nodes."""

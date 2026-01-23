@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Tools Policy Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_id",
+    "agent_name",
+    "description",
+    "allowed",
+    "forbidden",
+    "file_restrictions",
+    "budget_limits",
+    "timeout_seconds",
+    "max_retries",
+    "completion_signals"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^A\\d{2}$"
+    },
+    "agent_name": {
+      "type": "string",
+      "minLength": 2
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10
+    },
+    "allowed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "forbidden": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "file_restrictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_paths", "forbidden_paths", "read_only"],
+      "properties": {
+        "allowed_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "forbidden_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "read_only": { "type": "boolean" }
+      }
+    },
+    "budget_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per_invocation_usd", "per_task_usd", "fallback_model"],
+      "properties": {
+        "per_invocation_usd": { "type": "number", "minimum": 0.1 },
+        "per_task_usd": { "type": "number", "minimum": 0.2 },
+        "fallback_model": { "type": "string", "minLength": 2 }
+      }
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 60
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "security_restrictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "forbidden_patterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "require_confirmation": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "secrets_check": { "type": "boolean" }
+      }
+    },
+    "tool_descriptions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "completion_signals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "claude": { "type": "string" },
+        "cursor": { "type": "string" },
+        "gemini": { "type": "string" }
+      }
+    },
+    "mcp_tools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description"],
+        "properties": {
+          "description": { "type": "string" },
+          "required": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

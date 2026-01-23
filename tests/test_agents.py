@@ -1,11 +1,9 @@
 """Tests for agent wrappers."""
 
 import subprocess
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from orchestrator.agents.base import BaseAgent, AgentResult
+from orchestrator.agents.base import AgentResult
 from orchestrator.agents.claude_agent import ClaudeAgent
 from orchestrator.agents.cursor_agent import CursorAgent
 from orchestrator.agents.gemini_agent import GeminiAgent
@@ -446,6 +444,7 @@ class TestOutputFileWriting:
         assert output_file.exists()
 
         import json
+
         content = json.loads(output_file.read_text())
         assert content["result"] == "test"
 

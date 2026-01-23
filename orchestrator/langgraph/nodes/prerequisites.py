@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState, PhaseStatus
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,14 @@ async def prerequisites_node(state: WorkflowState) -> dict[str, Any]:
     # Check PRODUCT.md
     product_file = project_dir / "PRODUCT.md"
     if not product_file.exists():
-        errors.append({
-            "type": "missing_file",
-            "file": "PRODUCT.md",
-            "message": "PRODUCT.md not found. Create it with your feature specification.",
-            "timestamp": datetime.now().isoformat(),
-        })
+        errors.append(
+            {
+                "type": "missing_file",
+                "file": "PRODUCT.md",
+                "message": "PRODUCT.md not found. Create it with your feature specification.",
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
     # Check for workflow directory
     workflow_dir = project_dir / ".workflow"
@@ -82,12 +84,14 @@ async def prerequisites_node(state: WorkflowState) -> dict[str, Any]:
         can_proceed = False
 
     if missing_agents:
-        errors.append({
-            "type": "missing_agents",
-            "agents": missing_agents,
-            "message": f"Missing agents: {', '.join(missing_agents)}",
-            "timestamp": datetime.now().isoformat(),
-        })
+        errors.append(
+            {
+                "type": "missing_agents",
+                "agents": missing_agents,
+                "message": f"Missing agents: {', '.join(missing_agents)}",
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
     # If we have errors, fail the prerequisite check
     if errors:

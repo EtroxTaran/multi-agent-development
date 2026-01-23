@@ -10,14 +10,13 @@ Run with: pytest tests/test_validators.py -v
 """
 
 import json
-import pytest
 import tempfile
 from pathlib import Path
-
 
 # =============================================================================
 # ProductValidator Tests
 # =============================================================================
+
 
 class TestProductValidator:
     """Test ProductValidator for PRODUCT.md validation."""
@@ -214,6 +213,7 @@ This is a test problem statement that should be long enough to pass.
 # EnvironmentChecker Tests
 # =============================================================================
 
+
 class TestEnvironmentChecker:
     """Test EnvironmentChecker for pre-flight environment checks."""
 
@@ -227,12 +227,9 @@ class TestEnvironmentChecker:
 
             # Create package.json
             package_json = project_dir / "package.json"
-            package_json.write_text(json.dumps({
-                "name": "test-project",
-                "dependencies": {
-                    "express": "^4.18.0"
-                }
-            }))
+            package_json.write_text(
+                json.dumps({"name": "test-project", "dependencies": {"express": "^4.18.0"}})
+            )
 
             checker = EnvironmentChecker(project_dir)
             result = checker.check()
@@ -248,12 +245,9 @@ class TestEnvironmentChecker:
             project_dir = Path(tmpdir)
 
             package_json = project_dir / "package.json"
-            package_json.write_text(json.dumps({
-                "name": "test-react",
-                "dependencies": {
-                    "react": "^18.0.0"
-                }
-            }))
+            package_json.write_text(
+                json.dumps({"name": "test-react", "dependencies": {"react": "^18.0.0"}})
+            )
 
             checker = EnvironmentChecker(project_dir)
             result = checker.check()
@@ -298,6 +292,7 @@ class TestEnvironmentChecker:
 # CoverageChecker Tests
 # =============================================================================
 
+
 class TestCoverageChecker:
     """Test CoverageChecker for coverage enforcement."""
 
@@ -313,15 +308,19 @@ class TestCoverageChecker:
 
             # Create coverage-summary.json
             coverage_file = coverage_dir / "coverage-summary.json"
-            coverage_file.write_text(json.dumps({
-                "total": {
-                    "lines": {"total": 100, "covered": 80, "pct": 80.0},
-                    "branches": {"total": 50, "covered": 40, "pct": 80.0},
-                },
-                "src/main.ts": {
-                    "lines": {"total": 100, "covered": 80, "pct": 80.0},
-                }
-            }))
+            coverage_file.write_text(
+                json.dumps(
+                    {
+                        "total": {
+                            "lines": {"total": 100, "covered": 80, "pct": 80.0},
+                            "branches": {"total": 50, "covered": 40, "pct": 80.0},
+                        },
+                        "src/main.ts": {
+                            "lines": {"total": 100, "covered": 80, "pct": 80.0},
+                        },
+                    }
+                )
+            )
 
             checker = CoverageChecker(project_dir, threshold=70.0)
             result = checker.check()
@@ -341,11 +340,15 @@ class TestCoverageChecker:
             coverage_dir.mkdir()
 
             coverage_file = coverage_dir / "coverage-summary.json"
-            coverage_file.write_text(json.dumps({
-                "total": {
-                    "lines": {"total": 100, "covered": 50, "pct": 50.0},
-                }
-            }))
+            coverage_file.write_text(
+                json.dumps(
+                    {
+                        "total": {
+                            "lines": {"total": 100, "covered": 50, "pct": 50.0},
+                        }
+                    }
+                )
+            )
 
             # Non-blocking
             checker = CoverageChecker(project_dir, threshold=70.0, blocking=False)
@@ -378,12 +381,13 @@ class TestCoverageChecker:
 # SecurityScanner Tests
 # =============================================================================
 
+
 class TestSecurityScanner:
     """Test SecurityScanner for security vulnerability detection."""
 
     def test_detect_hardcoded_api_key(self):
         """Test detection of hardcoded API keys."""
-        from orchestrator.validators import SecurityScanner, Severity
+        from orchestrator.validators import SecurityScanner
 
         with tempfile.TemporaryDirectory() as tmpdir:
             project_dir = Path(tmpdir)
@@ -409,11 +413,13 @@ class TestSecurityScanner:
 
             # Create file with SQL injection vulnerability
             src_file = project_dir / "db.py"
-            src_file.write_text('''
+            src_file.write_text(
+                """
 def get_user(user_id):
     query = f"SELECT * FROM users WHERE id = {user_id}"
     return db.execute(query)
-''')
+"""
+            )
 
             scanner = SecurityScanner(project_dir)
             result = scanner.scan()
@@ -447,12 +453,12 @@ def get_user(user_id):
 
         scanner = SecurityScanner("/tmp")
 
-        content = '''
+        content = """
 const config = {
     apiKey: "sk-abcdefghijklmnopqrstuvwxyz123456",
     secret: "my-super-secret-password"
 };
-'''
+"""
         findings = scanner.scan_content(content, "config.js")
 
         assert len(findings) > 0
@@ -470,15 +476,13 @@ const config = {
 
             # With HIGH blocking - should pass (Math.random is MEDIUM)
             scanner_high = SecurityScanner(
-                project_dir,
-                blocking_severities=[Severity.CRITICAL, Severity.HIGH]
+                project_dir, blocking_severities=[Severity.CRITICAL, Severity.HIGH]
             )
             result_high = scanner_high.scan()
 
             # With MEDIUM blocking - should fail
             scanner_medium = SecurityScanner(
-                project_dir,
-                blocking_severities=[Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM]
+                project_dir, blocking_severities=[Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM]
             )
             result_medium = scanner_medium.scan()
 
@@ -488,6 +492,7 @@ const config = {
 # =============================================================================
 # Config/Thresholds Tests
 # =============================================================================
+
 
 class TestProjectConfig:
     """Test project configuration loading."""
@@ -520,15 +525,15 @@ class TestProjectConfig:
 
             # Create custom config
             config_file = project_dir / ".project-config.json"
-            config_file.write_text(json.dumps({
-                "project_type": "custom",
-                "validation": {
-                    "validation_threshold": 8.0
-                },
-                "quality": {
-                    "coverage_threshold": 90
-                }
-            }))
+            config_file.write_text(
+                json.dumps(
+                    {
+                        "project_type": "custom",
+                        "validation": {"validation_threshold": 8.0},
+                        "quality": {"coverage_threshold": 90},
+                    }
+                )
+            )
 
             config = load_project_config(project_dir)
 
@@ -543,14 +548,15 @@ class TestProjectConfig:
             project_dir = Path(tmpdir)
 
             config_file = project_dir / ".project-config.json"
-            config_file.write_text(json.dumps({
-                "workflow": {
-                    "features": {
-                        "product_validation": False,
-                        "security_scan": False
+            config_file.write_text(
+                json.dumps(
+                    {
+                        "workflow": {
+                            "features": {"product_validation": False, "security_scan": False}
+                        }
                     }
-                }
-            }))
+                )
+            )
 
             config = load_project_config(project_dir)
 

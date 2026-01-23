@@ -1,0 +1,1 @@
+../skills/api-contracts-and-validation/SKILL.md

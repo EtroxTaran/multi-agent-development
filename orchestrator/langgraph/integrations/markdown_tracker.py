@@ -14,7 +14,7 @@ import json
 import logging
 import os
 import stat
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -294,7 +294,9 @@ class MarkdownTracker:
         frontmatter = {
             "id": task_id,
             "title": task.get("title", ""),
-            "status": task.get("status", TaskStatus.PENDING).value if isinstance(task.get("status"), TaskStatus) else task.get("status", "pending"),
+            "status": task.get("status", TaskStatus.PENDING).value
+            if isinstance(task.get("status"), TaskStatus)
+            else task.get("status", "pending"),
             "priority": task.get("priority", "medium"),
             "linear_issue_id": linear_issue_id,
             "dependencies": task.get("dependencies", []),
@@ -354,12 +356,14 @@ class MarkdownTracker:
         else:
             lines.append("_No acceptance criteria defined_")
 
-        lines.extend([
-            "",
-            "## Files",
-            "",
-            "### To Create",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Files",
+                "",
+                "### To Create",
+            ]
+        )
 
         if files_to_create:
             for f in files_to_create:
@@ -367,10 +371,12 @@ class MarkdownTracker:
         else:
             lines.append("- None")
 
-        lines.extend([
-            "",
-            "### To Modify",
-        ])
+        lines.extend(
+            [
+                "",
+                "### To Modify",
+            ]
+        )
 
         if files_to_modify:
             for f in files_to_modify:
@@ -378,10 +384,12 @@ class MarkdownTracker:
         else:
             lines.append("- None")
 
-        lines.extend([
-            "",
-            "### Test Files",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Test Files",
+            ]
+        )
 
         if test_files:
             for f in test_files:
@@ -389,14 +397,16 @@ class MarkdownTracker:
         else:
             lines.append("- None")
 
-        lines.extend([
-            "",
-            "## Implementation Notes",
-            "<!-- Updated after completion -->",
-            "",
-            "## History",
-            f"- {datetime.now().isoformat()} - Task created",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Implementation Notes",
+                "<!-- Updated after completion -->",
+                "",
+                "## History",
+                f"- {datetime.now().isoformat()} - Task created",
+            ]
+        )
 
         return "\n".join(lines) + "\n"
 
@@ -422,7 +432,7 @@ class MarkdownTracker:
                 else:
                     lines.append(f"{key}:")
                     for item in value:
-                        lines.append(f"  - \"{item}\"")
+                        lines.append(f'  - "{item}"')
             elif isinstance(value, str):
                 # Quote strings with special characters
                 if any(c in value for c in ":#{}[]&*!|>'\"%@`"):
@@ -455,7 +465,7 @@ class MarkdownTracker:
             return {}, content
 
         frontmatter_text = content[3:end_idx].strip()
-        body = content[end_idx + 3:].lstrip("\n")
+        body = content[end_idx + 3 :].lstrip("\n")
 
         # Simple YAML parsing (handles our limited format)
         frontmatter: dict[str, Any] = {}

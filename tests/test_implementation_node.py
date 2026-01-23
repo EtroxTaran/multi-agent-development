@@ -16,34 +16,24 @@ Tests cover:
 """
 
 import asyncio
-import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 from orchestrator.langgraph.nodes.implementation import (
-    implementation_node,
     _build_feedback_section,
-    _extract_clarifications,
-    _load_clarification_answers,
-    _is_transient_error,
-    _handle_implementation_error,
-    _run_worker_claude,
-    _parse_worker_output,
-    _verify_tests_with_fallback,
     _detect_test_commands,
+    _extract_clarifications,
     _find_test_files,
-    _run_test_command,
-    IMPLEMENTATION_TIMEOUT,
-    TEST_TIMEOUT,
+    _handle_implementation_error,
+    _is_transient_error,
+    _load_clarification_answers,
+    _parse_worker_output,
+    _run_worker_claude,
+    _verify_tests_with_fallback,
+    implementation_node,
 )
-from orchestrator.langgraph.state import (
-    WorkflowState,
-    PhaseState,
-    PhaseStatus,
-    create_initial_state,
-)
+from orchestrator.langgraph.state import PhaseState, PhaseStatus, create_initial_state
 
 
 class TestImplementationNode:
@@ -207,6 +197,7 @@ class TestImplementationNode:
     @pytest.mark.asyncio
     async def test_implementation_node_timeout_handling(self, initial_state):
         """Test 30-min timeout returns non-retryable error."""
+
         async def slow_worker(*args, **kwargs):
             await asyncio.sleep(0.1)  # Simulate work
             return {"success": True, "output": {}}
@@ -290,7 +281,7 @@ class TestRunWorkerClaude:
         mock_process = MagicMock()
         mock_process.returncode = 0
         mock_process.communicate = AsyncMock(
-            return_value=(b'{"implementation_complete": true}', b'')
+            return_value=(b'{"implementation_complete": true}', b"")
         )
 
         with patch(
@@ -332,9 +323,7 @@ class TestRunWorkerClaude:
         """Test handling of non-zero exit code."""
         mock_process = MagicMock()
         mock_process.returncode = 1
-        mock_process.communicate = AsyncMock(
-            return_value=(b'', b'Error: something went wrong')
-        )
+        mock_process.communicate = AsyncMock(return_value=(b"", b"Error: something went wrong"))
 
         with patch(
             "asyncio.create_subprocess_exec",
@@ -493,11 +482,7 @@ class TestExtractClarifications:
 
     def test_extract_clarifications_from_array(self):
         """Test extraction from clarifications_needed array."""
-        result = {
-            "clarifications_needed": [
-                {"task_id": "T1", "question": "REST or GraphQL?"}
-            ]
-        }
+        result = {"clarifications_needed": [{"task_id": "T1", "question": "REST or GraphQL?"}]}
 
         clarifications = _extract_clarifications(result)
         assert len(clarifications) == 1
@@ -616,7 +601,8 @@ class TestHandleImplementationError:
         phase_3 = phase_status["3"]
 
         result = _handle_implementation_error(
-            phase_status, phase_3,
+            phase_status,
+            phase_3,
             "Rate limit exceeded",
             is_transient=True,
         )
@@ -630,7 +616,8 @@ class TestHandleImplementationError:
         phase_3 = phase_status["3"]
 
         result = _handle_implementation_error(
-            phase_status, phase_3,
+            phase_status,
+            phase_3,
             "Persistent failure",
             is_transient=True,
         )

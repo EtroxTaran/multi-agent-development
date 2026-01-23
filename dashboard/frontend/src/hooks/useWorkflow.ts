@@ -2,15 +2,17 @@
  * TanStack Query hooks for workflow operations
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { workflowApi } from '@/lib/api';
-import type { WorkflowHealthResponse, WorkflowStatusResponse } from '@/types';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { workflowApi } from "@/lib/api";
+import type { WorkflowHealthResponse, WorkflowStatusResponse } from "@/types";
 
 // Query keys
 export const workflowKeys = {
-  all: ['workflow'] as const,
-  status: (projectName: string) => [...workflowKeys.all, 'status', projectName] as const,
-  health: (projectName: string) => [...workflowKeys.all, 'health', projectName] as const,
+  all: ["workflow"] as const,
+  status: (projectName: string) =>
+    [...workflowKeys.all, "status", projectName] as const,
+  health: (projectName: string) =>
+    [...workflowKeys.all, "health", projectName] as const,
 };
 
 /**
@@ -21,7 +23,7 @@ export function useWorkflowStatus(projectName: string) {
     queryKey: workflowKeys.status(projectName),
     queryFn: () => workflowApi.getStatus(projectName),
     enabled: !!projectName,
-    refetchInterval: 5000, // Poll every 5 seconds
+    refetchInterval: 30000, // Poll every 30 seconds (rely on WebSocket for real-time)
   });
 }
 
@@ -33,7 +35,7 @@ export function useWorkflowHealth(projectName: string) {
     queryKey: workflowKeys.health(projectName),
     queryFn: () => workflowApi.getHealth(projectName),
     enabled: !!projectName,
-    refetchInterval: 10000, // Poll every 10 seconds
+    refetchInterval: 60000, // Poll every 60 seconds
   });
 }
 
@@ -51,8 +53,12 @@ export function useStartWorkflow(projectName: string) {
       autonomous?: boolean;
     }) => workflowApi.start(projectName, options),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workflowKeys.status(projectName) });
-      queryClient.invalidateQueries({ queryKey: workflowKeys.health(projectName) });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.health(projectName),
+      });
     },
   });
 }
@@ -64,10 +70,15 @@ export function useResumeWorkflow(projectName: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (autonomous: boolean = false) => workflowApi.resume(projectName, autonomous),
+    mutationFn: (autonomous: boolean = false) =>
+      workflowApi.resume(projectName, autonomous),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workflowKeys.status(projectName) });
-      queryClient.invalidateQueries({ queryKey: workflowKeys.health(projectName) });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.health(projectName),
+      });
     },
   });
 }
@@ -81,7 +92,9 @@ export function usePauseWorkflow(projectName: string) {
   return useMutation({
     mutationFn: () => workflowApi.pause(projectName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workflowKeys.status(projectName) });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
     },
   });
 }
@@ -95,8 +108,12 @@ export function useRollbackWorkflow(projectName: string) {
   return useMutation({
     mutationFn: (phase: number) => workflowApi.rollback(projectName, phase),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workflowKeys.status(projectName) });
-      queryClient.invalidateQueries({ queryKey: workflowKeys.health(projectName) });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.health(projectName),
+      });
     },
   });
 }
@@ -110,8 +127,12 @@ export function useResetWorkflow(projectName: string) {
   return useMutation({
     mutationFn: () => workflowApi.reset(projectName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workflowKeys.status(projectName) });
-      queryClient.invalidateQueries({ queryKey: workflowKeys.health(projectName) });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.health(projectName),
+      });
     },
   });
 }

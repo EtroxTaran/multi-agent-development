@@ -1,3 +1,12 @@
+---
+name: phase-status
+description: Display current workflow phase status and progress for a project.
+version: 1.1.0
+tags: [status, workflow, observability]
+owner: orchestration
+status: active
+---
+
 # Phase Status Skill
 
 Display current workflow status and progress for a project.
@@ -17,10 +26,14 @@ This skill reads the workflow state and provides a formatted status report showi
 /phase-status --project <project-name>
 ```
 
-## State File Location
+## Prerequisites
+
+- SurrealDB connection configured for the project namespace.
+
+## State Source
 
 ```
-projects/<project-name>/.workflow/state.json
+SurrealDB: workflow_state, phase_outputs, logs
 ```
 
 ## Status Report Format
@@ -74,15 +87,14 @@ Completed: {N}/{total} ({percentage}%)
 
 ```python
 # Pseudocode for reading state
-state_path = f"projects/{project}//.workflow/state.json"
-state = read_json(state_path)
+state = workflow_state_repo.get(project)
 
 current_phase = state.get("current_phase", 0)
 phase_status = state.get("phase_status", {})
 tasks = state.get("tasks", [])
-validation = state.get("validation_feedback", {})
-verification = state.get("verification_feedback", {})
-errors = state.get("errors", [])
+validation = phase_outputs_repo.get_by_type(phase=2, output_type="validation_consolidated")
+verification = phase_outputs_repo.get_by_type(phase=4, output_type="verification_consolidated")
+errors = logs_repo.get_by_type("blocker")
 ```
 
 ## Phase Names
@@ -175,3 +187,16 @@ Completed: 2/5 (40%)
 
 2026-01-22T12:30:00Z
 ```
+
+## Outputs
+
+- Human-readable status report for the project.
+
+## Error Handling
+
+- If SurrealDB is unreachable, show a degraded report and warn about missing phase data.
+
+## Related Skills
+
+- `/status` - Summary status view
+- `/orchestrate` - Full workflow execution

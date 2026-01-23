@@ -1,11 +1,11 @@
 """Pytest fixtures for orchestrator tests."""
 
 import sys
-import json
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Mock websockets/surrealdb at import time for test collection
 # These modules may not be installed in all test environments
@@ -18,23 +18,20 @@ for mod in [
     if mod not in sys.modules:
         sys.modules[mod] = MagicMock()
 
-from orchestrator.models import WorkflowState, PhaseState, PhaseStatus
 from orchestrator.storage.workflow_adapter import get_workflow_storage
-from orchestrator.utils.logging import OrchestrationLogger, LogLevel
+from orchestrator.utils.logging import LogLevel, OrchestrationLogger
 
 # Import mock factories
 from tests.helpers.mock_factories import (
-    create_mock_phase_output_repo,
-    create_mock_logs_repo,
-    create_mock_workflow_repo,
-    create_mock_session_repo,
-    create_mock_budget_repo,
     create_mock_audit_repo,
+    create_mock_budget_repo,
     create_mock_checkpoint_repo,
+    create_mock_logs_repo,
+    create_mock_phase_output_repo,
+    create_mock_session_repo,
     create_mock_task_repo,
-    create_mock_workflow_state,
+    create_mock_workflow_repo,
 )
-
 
 # -------------------------------------------------------------------
 # DB Mock Fixtures for Unit Tests
@@ -238,7 +235,8 @@ def temp_project_dir():
 
         # Create PRODUCT.md with all required sections
         product_md = project_dir / "PRODUCT.md"
-        product_md.write_text("""# Test Feature
+        product_md.write_text(
+            """# Test Feature
 
 ## Feature
 A test feature for testing the orchestrator. This feature allows users to
@@ -251,7 +249,8 @@ test the multi-agent orchestration system with various configurations.
 
 ## Summary
 A comprehensive test feature for testing the orchestrator.
-""")
+"""
+        )
 
         yield project_dir
 

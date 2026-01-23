@@ -7,20 +7,13 @@ and the existing file-based StateManager.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
-from ...utils.state import (
-    StateManager,
-    WorkflowState as LegacyWorkflowState,
-    PhaseState as LegacyPhaseState,
-    PhaseStatus as LegacyPhaseStatus,
-)
-from ..state import (
-    WorkflowState,
-    PhaseState,
-    PhaseStatus,
-    create_initial_state,
-)
+from ...utils.state import PhaseState as LegacyPhaseState
+from ...utils.state import PhaseStatus as LegacyPhaseStatus
+from ...utils.state import StateManager
+from ...utils.state import WorkflowState as LegacyWorkflowState
+from ..state import PhaseState, PhaseStatus, WorkflowState, create_initial_state
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +109,7 @@ class LangGraphStateAdapter:
         plan_file = self.project_dir / ".workflow" / "phases" / "planning" / "plan.json"
         if plan_file.exists():
             import json
+
             try:
                 lg_state["plan"] = json.loads(plan_file.read_text())
             except json.JSONDecodeError:
@@ -137,6 +131,7 @@ class LangGraphStateAdapter:
             lg_state: LangGraph WorkflowState
         """
         import warnings
+
         warnings.warn(
             "save_langgraph_state() is deprecated. State should be persisted "
             "through LangGraph checkpoints and projected via StateProjector.",
@@ -187,6 +182,7 @@ class LangGraphStateAdapter:
             lg_state: LangGraph state containing phase updates
         """
         import warnings
+
         warnings.warn(
             "sync_phase() is deprecated. State should be persisted "
             "through LangGraph checkpoints and projected via StateProjector.",
@@ -220,9 +216,7 @@ class LangGraphStateAdapter:
         phase = self.state_manager.start_phase(phase_num)
         return {
             "current_phase": phase_num,
-            "phase_status": {
-                str(phase_num): self._convert_legacy_phase(phase, phase_num)
-            },
+            "phase_status": {str(phase_num): self._convert_legacy_phase(phase, phase_num)},
         }
 
     def complete_phase(
@@ -241,9 +235,7 @@ class LangGraphStateAdapter:
         """
         phase = self.state_manager.complete_phase(phase_num, outputs)
         return {
-            "phase_status": {
-                str(phase_num): self._convert_legacy_phase(phase, phase_num)
-            },
+            "phase_status": {str(phase_num): self._convert_legacy_phase(phase, phase_num)},
         }
 
     def fail_phase(
@@ -262,9 +254,7 @@ class LangGraphStateAdapter:
         """
         phase = self.state_manager.fail_phase(phase_num, error)
         return {
-            "phase_status": {
-                str(phase_num): self._convert_legacy_phase(phase, phase_num)
-            },
+            "phase_status": {str(phase_num): self._convert_legacy_phase(phase, phase_num)},
         }
 
     def record_commit(

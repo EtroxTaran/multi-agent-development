@@ -8,12 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from ...integrations import create_linear_adapter, create_markdown_tracker, load_issue_mapping
 from ...state import Task, TaskStatus
-from ...integrations import (
-    create_linear_adapter,
-    load_issue_mapping,
-    create_markdown_tracker,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +28,7 @@ def save_clarification_request(
         request: Clarification request data
         project_name: Project name for DB storage
     """
-    from ....db.repositories.logs import get_logs_repository, LogType
+    from ....db.repositories.logs import LogType, get_logs_repository
     from ....storage.async_utils import run_async
 
     request_data = {
@@ -92,12 +88,14 @@ def handle_task_error(task: Task, error_message: str) -> dict[str, Any]:
         return {
             "tasks": [task],
             "failed_task_ids": [task_id],
-            "errors": [{
-                "type": "task_failed",
-                "task_id": task_id,
-                "message": f"Task failed after {attempts} attempts: {error_message}",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "task_failed",
+                    "task_id": task_id,
+                    "message": f"Task failed after {attempts} attempts: {error_message}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }
@@ -106,13 +104,15 @@ def handle_task_error(task: Task, error_message: str) -> dict[str, Any]:
         task["status"] = TaskStatus.PENDING
         return {
             "tasks": [task],
-            "errors": [{
-                "type": "task_error",
-                "task_id": task_id,
-                "message": error_message,
-                "attempt": attempts,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "task_error",
+                    "task_id": task_id,
+                    "message": error_message,
+                    "attempt": attempts,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",
             "updated_at": datetime.now().isoformat(),
         }

@@ -1,0 +1,71 @@
+{
+  "agent_id": "A14",
+  "agent_name": "Dependency Checker",
+  "description": "Tool policy for dependency audits and updates.",
+  "allowed": [
+    "Read",
+    "Write",
+    "Edit",
+    "Glob",
+    "Grep",
+    "Bash(npm*)",
+    "Bash(npx*)",
+    "Bash(docker*)",
+    "Bash(node*)",
+    "Bash(cat package.json*)",
+    "mcp__Ref__ref_search_documentation",
+    "mcp__Ref__ref_read_url"
+  ],
+  "forbidden": [
+    "Bash(rm -rf*)",
+    "Bash(git push*)"
+  ],
+  "file_restrictions": {
+    "allowed_paths": [
+      "package.json",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "requirements.txt",
+      "poetry.lock",
+      "Pipfile",
+      "Pipfile.lock"
+    ],
+    "forbidden_paths": [
+      "src/**/*",
+      "tests/**/*",
+      "*.md"
+    ],
+    "read_only": false
+  },
+  "budget_limits": {
+    "per_invocation_usd": 1.0,
+    "per_task_usd": 2.0,
+    "fallback_model": "sonnet"
+  },
+  "timeout_seconds": 1800,
+  "max_retries": 3,
+  "security_restrictions": {
+    "forbidden_patterns": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(*--force*delete*)"
+    ],
+    "require_confirmation": [
+      "Bash(docker*)",
+      "Bash(kubectl*)",
+      "Bash(terraform*)"
+    ],
+    "secrets_check": true
+  },
+  "completion_signals": {
+    "claude": "<promise>DONE</promise>",
+    "cursor": "{\"status\": \"done\"}",
+    "gemini": "DONE|COMPLETE"
+  },
+  "tool_descriptions": {
+    "Write": "Update dependency manifests and lock files.",
+    "Bash(npm*)": "Run dependency audit or install commands."
+  },
+  "rationale": "Dependency checker updates manifest and lock files only."
+}

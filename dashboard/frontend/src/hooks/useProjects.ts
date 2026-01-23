@@ -2,18 +2,18 @@
  * TanStack Query hooks for project operations
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { projectsApi } from '@/lib/api';
-import type { FolderInfo, ProjectStatus, ProjectSummary } from '@/types';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { projectsApi } from "@/lib/api";
+import type { FolderInfo, ProjectStatus, ProjectSummary } from "@/types";
 
 // Query keys
 export const projectKeys = {
-  all: ['projects'] as const,
-  lists: () => [...projectKeys.all, 'list'] as const,
+  all: ["projects"] as const,
+  lists: () => [...projectKeys.all, "list"] as const,
   list: () => projectKeys.lists(),
-  details: () => [...projectKeys.all, 'detail'] as const,
+  details: () => [...projectKeys.all, "detail"] as const,
   detail: (name: string) => [...projectKeys.details(), name] as const,
-  folders: () => [...projectKeys.all, 'folders'] as const,
+  folders: () => [...projectKeys.all, "folders"] as const,
 };
 
 /**
@@ -35,6 +35,7 @@ export function useProject(name: string) {
     queryKey: projectKeys.detail(name),
     queryFn: () => projectsApi.get(name),
     enabled: !!name,
+    staleTime: 10000, // 10 seconds
   });
 }
 
@@ -71,8 +72,13 @@ export function useDeleteProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ name, removeSource = false }: { name: string; removeSource?: boolean }) =>
-      projectsApi.delete(name, removeSource),
+    mutationFn: ({
+      name,
+      removeSource = false,
+    }: {
+      name: string;
+      removeSource?: boolean;
+    }) => projectsApi.delete(name, removeSource),
     onSuccess: (_, { name }) => {
       // Invalidate project lists and remove detail
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });

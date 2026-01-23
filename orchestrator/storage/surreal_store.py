@@ -7,9 +7,9 @@ import logging
 from pathlib import Path
 from typing import Any, Optional
 
-from .repository import StorageRepository
-from .async_utils import run_async
 from ..db.repositories.workflow import get_workflow_repository
+from .async_utils import run_async
+from .repository import StorageRepository
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class SurrealWorkflowRepository(StorageRepository):
 
     def get_state(self) -> Optional[Any]:
         """Retrieve the current workflow state.
-        
+
         Returns:
             Workflow state object or None if not found.
         """
@@ -49,7 +49,7 @@ class SurrealWorkflowRepository(StorageRepository):
 
     def save_state(self, state: Any) -> None:
         """Save the workflow state.
-        
+
         Args:
             state: Workflow state object to save.
         """
@@ -62,7 +62,7 @@ class SurrealWorkflowRepository(StorageRepository):
 
     def get_summary(self) -> dict:
         """Get a summary of the workflow status.
-        
+
         Returns:
             Dictionary with project status summary.
         """
@@ -76,7 +76,7 @@ class SurrealWorkflowRepository(StorageRepository):
 
     def reset_to_phase(self, phase: int) -> None:
         """Reset workflow state to the beginning of a specific phase.
-        
+
         Args:
             phase: Phase number (1-5) to reset to.
         """
@@ -85,7 +85,7 @@ class SurrealWorkflowRepository(StorageRepository):
 
     def record_git_commit(self, phase: int, commit_hash: str, message: str) -> None:
         """Record a git commit associated with a phase.
-        
+
         Args:
             phase: Phase number.
             commit_hash: Git commit hash.
@@ -96,15 +96,15 @@ class SurrealWorkflowRepository(StorageRepository):
 
     def get_git_commits(self) -> list[dict]:
         """Retrieve history of recorded git commits.
-        
+
         Returns:
             List of commit dictionaries.
         """
         db = self._get_db_backend()
         return run_async(db.get_git_commits())
-    
+
     # --- Additional methods specific to current WorkflowStorageAdapter usage ---
-    
+
     def initialize_state(
         self,
         project_dir: str,

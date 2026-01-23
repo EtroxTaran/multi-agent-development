@@ -5,17 +5,10 @@ converting between LangGraph state and approval engine formats.
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any, Optional
 
-from ...utils.approval import (
-    ApprovalEngine,
-    ApprovalConfig,
-    ApprovalPolicy,
-    ApprovalResult,
-    ApprovalStatus,
-    AgentFeedback as ApprovalAgentFeedback,
-)
-from ..state import WorkflowState, AgentFeedback, WorkflowDecision
+from ...utils.approval import ApprovalConfig, ApprovalEngine, ApprovalResult, ApprovalStatus
+from ..state import AgentFeedback, WorkflowDecision, WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -124,10 +117,14 @@ class LangGraphApprovalAdapter:
         # Convert AgentFeedback dataclass
         return {
             "agent": feedback.agent if hasattr(feedback, "agent") else "unknown",
-            "overall_assessment": feedback.assessment if hasattr(feedback, "assessment") else "unknown",
+            "overall_assessment": feedback.assessment
+            if hasattr(feedback, "assessment")
+            else "unknown",
             "score": feedback.score if hasattr(feedback, "score") else 0,
             "approved": feedback.approved if hasattr(feedback, "approved") else False,
-            "blocking_issues": feedback.blocking_issues if hasattr(feedback, "blocking_issues") else [],
+            "blocking_issues": feedback.blocking_issues
+            if hasattr(feedback, "blocking_issues")
+            else [],
             "concerns": feedback.concerns if hasattr(feedback, "concerns") else [],
             "summary": feedback.summary if hasattr(feedback, "summary") else "",
             "error": None,

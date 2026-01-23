@@ -4,15 +4,14 @@ Verifies that test coverage meets configured thresholds
 after verification.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState
-from ...validators import CoverageChecker
 from ...config import load_project_config
+from ...validators import CoverageChecker
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -82,18 +81,20 @@ async def coverage_check_node(state: WorkflowState) -> dict[str, Any]:
                 error_message += f"  - {f}\n"
 
         if result.low_coverage_files:
-            error_message += f"\nLow coverage files:\n"
+            error_message += "\nLow coverage files:\n"
             for f, pct in result.low_coverage_files[:10]:
                 error_message += f"  - {f}: {pct:.1f}%\n"
 
         return {
-            "errors": [{
-                "type": "coverage_below_threshold",
-                "message": error_message,
-                "coverage": result.overall_percent,
-                "threshold": result.threshold,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "coverage_below_threshold",
+                    "message": error_message,
+                    "coverage": result.overall_percent,
+                    "threshold": result.threshold,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",  # Retry implementation to add tests
             "updated_at": datetime.now().isoformat(),
         }

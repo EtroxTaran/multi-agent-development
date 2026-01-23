@@ -1,17 +1,19 @@
 """Tests for Handoff component."""
 
 import json
-import pytest
 import tempfile
 from pathlib import Path
 
-from orchestrator.utils.handoff import (
-    HandoffBrief,
-    HandoffGenerator,
-    generate_handoff,
-)
+import pytest
+
 from orchestrator.utils.action_log import ActionLog, ActionType, reset_action_log
-from orchestrator.utils.error_aggregator import ErrorAggregator, ErrorSource, ErrorSeverity, reset_error_aggregator
+from orchestrator.utils.error_aggregator import (
+    ErrorAggregator,
+    ErrorSeverity,
+    ErrorSource,
+    reset_error_aggregator,
+)
+from orchestrator.utils.handoff import HandoffBrief, HandoffGenerator, generate_handoff
 
 
 @pytest.fixture
@@ -137,7 +139,12 @@ class TestHandoffBrief:
             current_phase=3,
             phase_status={},
             last_actions=[
-                {"timestamp": "2024-01-15T09:30:00", "agent": "claude", "phase": 3, "message": "Started task"},
+                {
+                    "timestamp": "2024-01-15T09:30:00",
+                    "agent": "claude",
+                    "phase": 3,
+                    "message": "Started task",
+                },
                 {"timestamp": "2024-01-15T09:35:00", "message": "Completed step"},
             ],
             next_action="Continue",

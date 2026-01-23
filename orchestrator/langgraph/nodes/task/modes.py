@@ -14,33 +14,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ...state import (
-    WorkflowState,
-    Task,
-    TaskStatus,
-    create_agent_execution,
-    create_error_context,
-)
-from ...integrations.ralph_loop import (
-    RalphLoopConfig,
-    run_ralph_loop,
-    detect_test_framework,
-)
-from ...integrations.unified_loop import (
-    UnifiedLoopRunner,
-    UnifiedLoopConfig,
-    LoopContext,
-)
-from ....specialists.runner import SpecialistRunner
 from ....cleanup import CleanupManager
+from ....specialists.runner import SpecialistRunner
 from ...integrations.board_sync import sync_board
-from .prompts import build_task_prompt
+from ...integrations.ralph_loop import RalphLoopConfig, detect_test_framework, run_ralph_loop
+from ...integrations.unified_loop import LoopContext, UnifiedLoopConfig, UnifiedLoopRunner
+from ...state import Task, TaskStatus, WorkflowState, create_agent_execution, create_error_context
 from .output import parse_task_output
-from .storage import (
-    save_clarification_request,
-    save_task_result,
-    handle_task_error,
-)
+from .prompts import build_task_prompt
+from .storage import handle_task_error, save_clarification_request, save_task_result
 
 logger = logging.getLogger(__name__)
 
@@ -243,14 +225,19 @@ async def implement_with_ralph_loop(
 
         if result.success:
             # Task completed successfully
-            save_task_result(project_dir, task_id, {
-                "status": "completed",
-                "implementation_mode": "ralph_wiggum",
-                "iterations": result.iterations,
-                "total_time_seconds": result.total_time_seconds,
-                "completion_reason": result.completion_reason,
-                **(result.final_output or {}),
-            }, state["project_name"])
+            save_task_result(
+                project_dir,
+                task_id,
+                {
+                    "status": "completed",
+                    "implementation_mode": "ralph_wiggum",
+                    "iterations": result.iterations,
+                    "total_time_seconds": result.total_time_seconds,
+                    "completion_reason": result.completion_reason,
+                    **(result.final_output or {}),
+                },
+                state["project_name"],
+            )
 
             updated_task["implementation_notes"] = (
                 f"Completed via Ralph loop in {result.iterations} iteration(s). "
@@ -258,8 +245,7 @@ async def implement_with_ralph_loop(
             )
 
             logger.info(
-                f"Task {task_id} completed via Ralph loop "
-                f"in {result.iterations} iterations"
+                f"Task {task_id} completed via Ralph loop " f"in {result.iterations} iterations"
             )
 
             # Cleanup transient/session artifacts for this task
@@ -280,9 +266,7 @@ async def implement_with_ralph_loop(
             }
         else:
             # Ralph loop failed
-            logger.warning(
-                f"Ralph loop failed for task {task_id}: {result.error}"
-            )
+            logger.warning(f"Ralph loop failed for task {task_id}: {result.error}")
             return handle_task_error(
                 updated_task,
                 f"Ralph loop failed after {result.iterations} iterations: {result.error}",
@@ -350,17 +334,22 @@ async def implement_with_unified_loop(
 
         if result.success:
             # Task completed successfully
-            save_task_result(project_dir, task_id, {
-                "status": "completed",
-                "implementation_mode": "unified_loop",
-                "agent_type": result.agent_type,
-                "model": result.model,
-                "iterations": result.iterations,
-                "total_time_seconds": result.total_time_seconds,
-                "total_cost_usd": result.total_cost_usd,
-                "completion_reason": result.completion_reason,
-                **(result.final_output or {}),
-            }, state["project_name"])
+            save_task_result(
+                project_dir,
+                task_id,
+                {
+                    "status": "completed",
+                    "implementation_mode": "unified_loop",
+                    "agent_type": result.agent_type,
+                    "model": result.model,
+                    "iterations": result.iterations,
+                    "total_time_seconds": result.total_time_seconds,
+                    "total_cost_usd": result.total_cost_usd,
+                    "completion_reason": result.completion_reason,
+                    **(result.final_output or {}),
+                },
+                state["project_name"],
+            )
 
             updated_task["implementation_notes"] = (
                 f"Completed via unified loop ({result.agent_type}) "
@@ -392,9 +381,7 @@ async def implement_with_unified_loop(
             }
         else:
             # Unified loop failed
-            logger.warning(
-                f"Unified loop failed for task {task_id}: {result.error}"
-            )
+            logger.warning(f"Unified loop failed for task {task_id}: {result.error}")
             return handle_task_error(
                 updated_task,
                 f"Unified loop failed after {result.iterations} iterations "
@@ -485,13 +472,15 @@ async def implement_standard(
 
             return {
                 "tasks": [updated_task],
-                "errors": [{
-                    "type": "task_clarification_needed",
-                    "task_id": task_id,
-                    "question": output.get("question"),
-                    "options": output.get("options", []),
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "task_clarification_needed",
+                        "task_id": task_id,
+                        "question": output.get("question"),
+                        "options": output.get("options", []),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "next_decision": "escalate",
                 "updated_at": datetime.now().isoformat(),
                 "last_agent_execution": execution,

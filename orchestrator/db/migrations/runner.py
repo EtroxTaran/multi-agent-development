@@ -14,14 +14,8 @@ from datetime import datetime
 from typing import Optional
 
 from ..connection import get_connection
-from .base import (
-    BaseMigration,
-    MigrationContext,
-    MigrationError,
-    MigrationRecord,
-    MigrationStatus,
-)
-from .registry import get_registry, MigrationRegistry
+from .base import BaseMigration, MigrationContext, MigrationRecord, MigrationStatus
+from .registry import MigrationRegistry, get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -263,9 +257,7 @@ class MigrationRunner:
 
                 # Check dependencies
                 for dep in migration.dependencies:
-                    if dep not in applied_versions and dep not in {
-                        r.version for r in applied
-                    }:
+                    if dep not in applied_versions and dep not in {r.version for r in applied}:
                         return MigrationResult(
                             success=False,
                             applied=applied,
@@ -323,9 +315,7 @@ class MigrationRunner:
                         error_msg,
                     )
 
-                    logger.error(
-                        f"Failed to apply migration {migration.full_name}: {error_msg}"
-                    )
+                    logger.error(f"Failed to apply migration {migration.full_name}: {error_msg}")
 
                     return MigrationResult(
                         success=False,
@@ -385,14 +375,11 @@ class MigrationRunner:
             for record in result:
                 migration = self.registry.get(record["version"])
                 if not migration:
-                    logger.warning(
-                        f"Migration {record['version']} not found in registry, skipping"
-                    )
+                    logger.warning(f"Migration {record['version']} not found in registry, skipping")
                     continue
 
                 logger.info(
-                    f"{'[DRY-RUN] ' if dry_run else ''}Rolling back "
-                    f"{migration.full_name}..."
+                    f"{'[DRY-RUN] ' if dry_run else ''}Rolling back " f"{migration.full_name}..."
                 )
 
                 start_time = time.time()
@@ -423,9 +410,7 @@ class MigrationRunner:
                     )
 
                 except NotImplementedError:
-                    logger.error(
-                        f"Migration {migration.full_name} does not support rollback"
-                    )
+                    logger.error(f"Migration {migration.full_name} does not support rollback")
                     return MigrationResult(
                         success=False,
                         applied=rolled_back,
@@ -442,9 +427,7 @@ class MigrationRunner:
                     execution_time_ms = int((time.time() - start_time) * 1000)
                     error_msg = str(e)
 
-                    logger.error(
-                        f"Failed to rollback migration {migration.full_name}: {error_msg}"
-                    )
+                    logger.error(f"Failed to rollback migration {migration.full_name}: {error_msg}")
 
                     return MigrationResult(
                         success=False,

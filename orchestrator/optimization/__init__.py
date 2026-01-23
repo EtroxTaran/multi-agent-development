@@ -7,11 +7,11 @@ This module provides:
 - Safe deployment with progressive rollout
 """
 
-from .optimizer import PromptOptimizer, OptimizationResult
-from .opro import OPROOptimizer
 from .bootstrap import BootstrapOptimizer
-from .scheduler import OptimizationScheduler
 from .deployer import DeploymentController, DeploymentResult
+from .opro import OPROOptimizer
+from .optimizer import OptimizationResult, PromptOptimizer
+from .scheduler import OptimizationScheduler
 
 __all__ = [
     "PromptOptimizer",

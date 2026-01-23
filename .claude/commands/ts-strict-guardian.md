@@ -1,0 +1,1 @@
+../skills/ts-strict-guardian/SKILL.md

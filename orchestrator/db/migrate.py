@@ -6,20 +6,19 @@ Migrates existing workflow data from file-based storage to SurrealDB.
 import asyncio
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .config import is_surrealdb_enabled
-from .schema import ensure_schema
 from .repositories import (
     get_audit_repository,
-    get_workflow_repository,
-    get_task_repository,
+    get_budget_repository,
     get_checkpoint_repository,
     get_session_repository,
-    get_budget_repository,
+    get_task_repository,
+    get_workflow_repository,
 )
+from .schema import ensure_schema
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ class MigrationResult:
         """Get migration summary."""
         lines = ["Migration Result:"]
         lines.append(f"  Success: {self.success}")
-        lines.append(f"  Migrated:")
+        lines.append("  Migrated:")
         for entity, count in self.migrated.items():
             lines.append(f"    - {entity}: {count}")
         if self.warnings:
@@ -113,10 +112,13 @@ async def migrate_project(
                     execution_mode=state_data.get("execution_mode", "afk"),
                 )
                 # Update with full state
-                await repo.update_state(**{
-                    k: v for k, v in state_data.items()
-                    if k not in ("project_name", "project_dir", "created_at")
-                })
+                await repo.update_state(
+                    **{
+                        k: v
+                        for k, v in state_data.items()
+                        if k not in ("project_name", "project_dir", "created_at")
+                    }
+                )
             result.migrated["workflow_state"] = 1
             logger.info(f"Migrated workflow state for {project_name}")
         except Exception as e:
@@ -163,7 +165,7 @@ async def migrate_project(
             count = 0
             repo = get_audit_repository(project_name) if not dry_run else None
 
-            with open(audit_file, "r") as f:
+            with open(audit_file) as f:
                 for line in f:
                     line = line.strip()
                     if not line:
@@ -192,7 +194,7 @@ async def migrate_project(
                             )
                         count += 1
                     except json.JSONDecodeError:
-                        result.add_warning(f"Skipped invalid JSON line in audit log")
+                        result.add_warning("Skipped invalid JSON line in audit log")
 
             result.migrated["audit_entries"] = count
             logger.info(f"Migrated {count} audit entries for {project_name}")
@@ -407,6 +409,7 @@ def run_migration(
         projects_dir: Projects directory for bulk migration
         dry_run: If True, only validate
     """
+
     async def _run():
         if project_name and project_dir:
             result = await migrate_project(project_name, project_dir, dry_run)

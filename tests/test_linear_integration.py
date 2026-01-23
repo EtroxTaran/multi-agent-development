@@ -11,14 +11,14 @@ Run with: pytest tests/test_linear_integration.py -v
 """
 
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+import pytest
 
 # =============================================================================
 # Test LinearConfig
 # =============================================================================
+
 
 class TestLinearConfig:
     """Test Linear configuration loading."""
@@ -56,11 +56,9 @@ class TestLinearConfig:
                     "team_id": "TEAM123",
                     "create_project": False,
                 }
-            }
+            },
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         config = load_linear_config(temp_project_dir)
 
@@ -83,15 +81,13 @@ class TestLinearConfig:
 # Test LinearAdapter
 # =============================================================================
 
+
 class TestLinearAdapter:
     """Test Linear adapter functionality."""
 
     def test_adapter_disabled(self):
         """Test adapter behavior when disabled."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=False)
         adapter = LinearAdapter(config)
@@ -100,10 +96,7 @@ class TestLinearAdapter:
 
     def test_adapter_enabled_no_team_id(self):
         """Test adapter requires team_id when enabled."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=True, team_id=None)
         adapter = LinearAdapter(config)
@@ -113,10 +106,7 @@ class TestLinearAdapter:
 
     def test_adapter_enabled_with_team_id(self):
         """Test adapter enabled with team_id."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=True, team_id="TEAM123")
         adapter = LinearAdapter(config)
@@ -125,10 +115,7 @@ class TestLinearAdapter:
 
     def test_create_issues_disabled(self):
         """Test create_issues returns empty when disabled."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=False)
         adapter = LinearAdapter(config)
@@ -140,10 +127,7 @@ class TestLinearAdapter:
 
     def test_update_status_disabled(self):
         """Test update_status returns True when disabled."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
         from orchestrator.langgraph.state import TaskStatus
 
         config = LinearConfig(enabled=False)
@@ -155,10 +139,7 @@ class TestLinearAdapter:
 
     def test_add_blocker_comment_disabled(self):
         """Test add_blocker returns True when disabled."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=False)
         adapter = LinearAdapter(config)
@@ -183,6 +164,7 @@ class TestLinearAdapter:
 # =============================================================================
 # Test Issue Mapping Persistence
 # =============================================================================
+
 
 class TestIssueMappingPersistence:
     """Test saving and loading issue mappings."""
@@ -220,9 +202,13 @@ class TestIssueMappingPersistence:
 
         workflow_dir = temp_project_dir / ".workflow"
         workflow_dir.mkdir()
-        (workflow_dir / "linear_issues.json").write_text(json.dumps({
-            "T1": "LINEAR-123",
-        }))
+        (workflow_dir / "linear_issues.json").write_text(
+            json.dumps(
+                {
+                    "T1": "LINEAR-123",
+                }
+            )
+        )
 
         mapping = load_issue_mapping(temp_project_dir)
 
@@ -253,6 +239,7 @@ class TestIssueMappingPersistence:
 # Test Factory Function
 # =============================================================================
 
+
 class TestLinearAdapterFactory:
     """Test adapter factory function."""
 
@@ -277,9 +264,7 @@ class TestLinearAdapterFactory:
                 }
             }
         }
-        (temp_project_dir / ".project-config.json").write_text(
-            json.dumps(config_content)
-        )
+        (temp_project_dir / ".project-config.json").write_text(json.dumps(config_content))
 
         adapter = create_linear_adapter(temp_project_dir)
 
@@ -290,15 +275,13 @@ class TestLinearAdapterFactory:
 # Test MCP Availability Check
 # =============================================================================
 
+
 class TestMCPAvailability:
     """Test MCP availability detection."""
 
     def test_mcp_not_available_when_command_fails(self):
         """Test MCP is detected as unavailable when command fails."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=True, team_id="TEAM123")
         adapter = LinearAdapter(config)
@@ -312,10 +295,7 @@ class TestMCPAvailability:
 
     def test_mcp_available_when_returns_teams(self):
         """Test MCP is detected as available when it returns teams."""
-        from orchestrator.langgraph.integrations.linear import (
-            LinearAdapter,
-            LinearConfig,
-        )
+        from orchestrator.langgraph.integrations.linear import LinearAdapter, LinearConfig
 
         config = LinearConfig(enabled=True, team_id="TEAM123")
         adapter = LinearAdapter(config)
@@ -332,6 +312,7 @@ class TestMCPAvailability:
 # Test Integration Exports
 # =============================================================================
 
+
 class TestIntegrationExports:
     """Test integrations __init__ exports."""
 
@@ -341,9 +322,6 @@ class TestIntegrationExports:
             LinearAdapter,
             LinearConfig,
             create_linear_adapter,
-            load_linear_config,
-            save_issue_mapping,
-            load_issue_mapping,
         )
 
         # Just verify imports work

@@ -1,37 +1,14 @@
 """Integration tests for fixer module."""
 
-import json
+
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from orchestrator.fixer.agent import FixerAgent, create_fixer_agent
-from orchestrator.fixer.circuit_breaker import CircuitBreaker, CircuitState
-from orchestrator.fixer.triage import (
-    ErrorCategory,
-    ErrorTriage,
-    FixerError,
-    TriageDecision,
-)
-from orchestrator.fixer.diagnosis import (
-    DiagnosisConfidence,
-    DiagnosisEngine,
-    DiagnosisResult,
-    RootCause,
-)
-from orchestrator.fixer.strategies import (
-    FixAction,
-    FixPlan,
-    FixResult,
-    FixStatus,
-    is_protected_file,
-)
-from orchestrator.fixer.validator import (
-    FixValidator,
-    PreValidation,
-    PostValidation,
-    ValidationStatus,
-)
+from orchestrator.fixer.circuit_breaker import CircuitState
+from orchestrator.fixer.diagnosis import DiagnosisConfidence, DiagnosisResult, RootCause
+from orchestrator.fixer.strategies import FixAction, FixPlan
+from orchestrator.fixer.triage import ErrorCategory, FixerError, TriageDecision
+from orchestrator.fixer.validator import FixValidator
 
 
 class TestCircuitBreakerIntegration:
@@ -164,10 +141,12 @@ class TestValidatorIntegration:
         )
         validation = validator.validate_pre_fix(plan)
         # Should either warn about scope, have errors, or indicate scope issue
-        assert (validation.scope_within_limits is False or
-                len(validation.warnings) > 0 or
-                len(validation.errors) > 0 or
-                validation.safe_to_proceed is False)
+        assert (
+            validation.scope_within_limits is False
+            or len(validation.warnings) > 0
+            or len(validation.errors) > 0
+            or validation.safe_to_proceed is False
+        )
 
 
 class TestErrorDispatchIntegration:
@@ -274,7 +253,7 @@ class TestConfigIntegration:
                 "circuit_breaker": {
                     "failure_threshold": 10,
                     "reset_timeout_seconds": 600,
-                }
+                },
             }
         }
         agent = create_fixer_agent(tmp_path, config)

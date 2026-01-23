@@ -9,12 +9,12 @@ Stores structured output from each workflow phase:
 """
 
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
-from .base import BaseRepository
 from ..connection import get_connection
+from .base import BaseRepository
 
 logger = logging.getLogger(__name__)
 

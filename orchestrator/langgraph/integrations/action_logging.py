@@ -3,16 +3,10 @@
 Provides helper functions to log workflow actions from nodes.
 """
 
-from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 
-from ...utils.action_log import (
-    ActionLog,
-    ActionType,
-    ActionStatus,
-    ErrorInfo,
-)
+from ...utils.action_log import ActionLog, ActionStatus, ActionType, ErrorInfo
 
 
 class NodeActionLogger:

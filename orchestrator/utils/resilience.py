@@ -7,14 +7,15 @@ Implements:
 - Timeout: Bound execution time
 """
 
-import time
+import logging
 import threading
-from dataclasses import dataclass, field
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Callable, Optional, Any, TypeVar
 from functools import wraps
-import logging
+from typing import Optional, TypeVar
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -22,23 +23,26 @@ logger = logging.getLogger(__name__)
 
 class CircuitState(Enum):
     """Circuit breaker states."""
-    CLOSED = "closed"      # Normal operation, requests flow through
-    OPEN = "open"          # Failing, requests blocked
+
+    CLOSED = "closed"  # Normal operation, requests flow through
+    OPEN = "open"  # Failing, requests blocked
     HALF_OPEN = "half_open"  # Testing if service recovered
 
 
 @dataclass
 class CircuitBreakerConfig:
     """Configuration for circuit breaker."""
-    failure_threshold: int = 5        # Failures before opening
-    success_threshold: int = 3        # Successes to close from half-open
-    timeout_seconds: int = 60         # Time before trying half-open
-    excluded_exceptions: tuple = ()   # Exceptions that don't count as failures
+
+    failure_threshold: int = 5  # Failures before opening
+    success_threshold: int = 3  # Successes to close from half-open
+    timeout_seconds: int = 60  # Time before trying half-open
+    excluded_exceptions: tuple = ()  # Exceptions that don't count as failures
 
 
 @dataclass
 class CircuitStats:
     """Statistics for circuit breaker monitoring."""
+
     total_calls: int = 0
     successful_calls: int = 0
     failed_calls: int = 0
@@ -69,6 +73,7 @@ class CircuitStats:
 
 class CircuitBreakerError(Exception):
     """Raised when circuit breaker is open."""
+
     pass
 
 
@@ -188,8 +193,7 @@ class CircuitBreaker:
         if self.state == CircuitState.OPEN:
             self.stats.rejected_calls += 1
             raise CircuitBreakerError(
-                f"Circuit breaker '{self.name}' is OPEN. "
-                f"Service temporarily unavailable."
+                f"Circuit breaker '{self.name}' is OPEN. " f"Service temporarily unavailable."
             )
         return self
 
@@ -205,6 +209,7 @@ class CircuitBreaker:
 
     def __call__(self, func: Callable[..., T]) -> Callable[..., T]:
         """Decorator to wrap function with circuit breaker."""
+
         @wraps(func)
         def wrapper(*args, **kwargs) -> T:
             try:
@@ -279,13 +284,14 @@ def retry_with_backoff(
 
                     # Calculate delay with exponential backoff
                     delay = min(
-                        config.base_delay * (config.exponential_base ** attempt),
+                        config.base_delay * (config.exponential_base**attempt),
                         config.max_delay,
                     )
 
                     # Add jitter to prevent thundering herd
                     if config.jitter:
                         import random
+
                         delay = delay * (0.5 + random.random())
 
                     logger.warning(
@@ -298,12 +304,14 @@ def retry_with_backoff(
             raise last_exception
 
         return wrapper
+
     return decorator
 
 
 @dataclass
 class ExecutionLimit:
     """Execution limits for cost control."""
+
     max_calls_per_minute: int = 60
     max_calls_per_hour: int = 1000
     max_tokens_per_request: int = 100000
@@ -357,7 +365,10 @@ class ExecutionLimiter:
 
             # Check calls per minute
             if len(self._minute_calls) >= self.limits.max_calls_per_minute:
-                return False, f"Rate limit: {self.limits.max_calls_per_minute} calls/minute exceeded"
+                return (
+                    False,
+                    f"Rate limit: {self.limits.max_calls_per_minute} calls/minute exceeded",
+                )
 
             # Check calls per hour
             if len(self._hour_calls) >= self.limits.max_calls_per_hour:
@@ -401,6 +412,7 @@ def timeout(seconds: int) -> Callable:
         def long_running_task():
             ...
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         def wrapper(*args, **kwargs) -> T:
@@ -420,6 +432,7 @@ def timeout(seconds: int) -> Callable:
                 signal.signal(signal.SIGALRM, old_handler)
 
         return wrapper
+
     return decorator
 
 

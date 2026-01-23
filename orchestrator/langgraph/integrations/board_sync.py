@@ -13,9 +13,7 @@ The board structure is:
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from ..state import Task, TaskStatus, WorkflowState
 
@@ -32,7 +30,7 @@ class BoardSyncer:
 
     def sync(self, state: WorkflowState) -> None:
         """Sync the current state to the board files.
-        
+
         This is a one-way sync from State -> Board.
         The Board is a view of the State.
         """
@@ -60,7 +58,7 @@ class BoardSyncer:
                 backlog.append(task)
             elif status_str == "in_progress":
                 in_progress.append(task)
-            elif status_str == "review" or status_str == "verification": # Handle variations
+            elif status_str == "review" or status_str == "verification":  # Handle variations
                 review.append(task)
             elif status_str == "completed":
                 done.append(task)
@@ -76,10 +74,10 @@ class BoardSyncer:
         self._write_list(self.board_dir / "review.md", "Review / Verification", review)
         self._write_list(self.board_dir / "done.md", "Done", done)
         self._write_list(self.board_dir / "blocked.md", "Blocked / Failed", blocked)
-        
+
         logger.info(f"Synced board: {len(tasks)} tasks updated across .board/ files")
 
-    def _write_list(self, file_path: Path, title: str, tasks: List[Task]) -> None:
+    def _write_list(self, file_path: Path, title: str, tasks: list[Task]) -> None:
         """Write a list of tasks to a markdown file."""
         lines = [f"# {title}", "", f"Count: {len(tasks)}", ""]
 
@@ -89,7 +87,7 @@ class BoardSyncer:
             # Sort by priority/id
             # Priority map: critical=0, high=1, medium=2, low=3
             priority_map = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-            
+
             def sort_key(t):
                 p = t.get("priority", "medium").lower()
                 return (priority_map.get(p, 2), t.get("id", ""))
@@ -108,27 +106,27 @@ class BoardSyncer:
         title = task.get("title", "Untitled")
         priority = task.get("priority", "medium").upper()
         complexity = task.get("estimated_complexity", "medium")
-        agent = "A04 (Impl)" # Default
-        
+        agent = "A04 (Impl)"  # Default
+
         # Determine agent based on type/status if possible, but keep it simple for now
-        
+
         lines = [
             f"## [{tid}] {title}",
             "",
-            f"| Field | Value |",
-            f"|-------|-------|",
+            "| Field | Value |",
+            "|-------|-------|",
             f"| **ID** | {tid} |",
             f"| **Priority** | {priority} |",
             f"| **Complexity** | {complexity} |",
             f"| **Agent** | {agent} |",
-            ""
+            "",
         ]
-        
+
         deps = task.get("dependencies", [])
         if deps:
             lines.append(f"**Dependencies:** {', '.join(deps)}")
             lines.append("")
-            
+
         user_story = task.get("user_story")
         if user_story:
             lines.append("### User Story")
@@ -141,8 +139,9 @@ class BoardSyncer:
             for c in criteria:
                 lines.append(f"- [ ] {c}")
             lines.append("")
-            
+
         return "\n".join(lines)
+
 
 def sync_board(state: WorkflowState) -> None:
     """Helper function to sync board from state."""

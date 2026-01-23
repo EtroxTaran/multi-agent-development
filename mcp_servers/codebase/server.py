@@ -11,16 +11,11 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import (
-    Tool,
-    TextContent,
-    Resource,
-    ResourceTemplate,
-)
+from mcp.types import Resource, ResourceTemplate, TextContent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -313,11 +308,13 @@ async def search_code(
                 data = json.loads(line)
                 if data.get("type") == "match":
                     match_data = data["data"]
-                    matches.append({
-                        "file": match_data["path"]["text"],
-                        "line": match_data["line_number"],
-                        "text": match_data["lines"]["text"].strip(),
-                    })
+                    matches.append(
+                        {
+                            "file": match_data["path"]["text"],
+                            "line": match_data["line_number"],
+                            "text": match_data["lines"]["text"].strip(),
+                        }
+                    )
             except json.JSONDecodeError:
                 continue
 
@@ -384,7 +381,11 @@ async def get_symbols(
         files = [target]
     else:
         files = list(target.rglob("*.py")) + list(target.rglob("*.ts")) + list(target.rglob("*.js"))
-        files = [f for f in files if not any(p in str(f) for p in ["node_modules", "__pycache__", ".venv"])]
+        files = [
+            f
+            for f in files
+            if not any(p in str(f) for p in ["node_modules", "__pycache__", ".venv"])
+        ]
 
     symbols: dict[str, list] = {
         "functions": [],
@@ -418,11 +419,13 @@ async def get_symbols(
                 for i, line in enumerate(content.split("\n"), 1):
                     match = re.match(pattern, line)
                     if match:
-                        symbols[type_to_key[sym_type]].append({
-                            "name": match.group(1),
-                            "file": rel_path,
-                            "line": i,
-                        })
+                        symbols[type_to_key[sym_type]].append(
+                            {
+                                "name": match.group(1),
+                                "file": rel_path,
+                                "line": i,
+                            }
+                        )
 
         except Exception as e:
             logger.warning(f"Error reading {file}: {e}")
@@ -484,19 +487,23 @@ async def find_references(
                     line_text = match_data["lines"]["text"].strip()
 
                     # Determine if this is a definition
-                    is_definition = any([
-                        re.search(rf"(?:def|function|class)\s+{symbol}\b", line_text),
-                        re.search(rf"(?:const|let|var)\s+{symbol}\b", line_text),
-                        re.search(rf"{symbol}\s*=", line_text),
-                    ])
+                    is_definition = any(
+                        [
+                            re.search(rf"(?:def|function|class)\s+{symbol}\b", line_text),
+                            re.search(rf"(?:const|let|var)\s+{symbol}\b", line_text),
+                            re.search(rf"{symbol}\s*=", line_text),
+                        ]
+                    )
 
                     if include_definition or not is_definition:
-                        references.append({
-                            "file": file_path,
-                            "line": line_num,
-                            "text": line_text,
-                            "is_definition": is_definition,
-                        })
+                        references.append(
+                            {
+                                "file": file_path,
+                                "line": line_num,
+                                "text": line_text,
+                                "is_definition": is_definition,
+                            }
+                        )
             except json.JSONDecodeError:
                 continue
 
@@ -558,11 +565,13 @@ async def get_file_structure(
                 if item.is_dir():
                     result["children"].append(build_tree(item, depth + 1))
                 else:
-                    result["children"].append({
-                        "name": item.name,
-                        "type": "file",
-                        "size": item.stat().st_size,
-                    })
+                    result["children"].append(
+                        {
+                            "name": item.name,
+                            "type": "file",
+                            "size": item.stat().st_size,
+                        }
+                    )
 
         except PermissionError:
             result["error"] = "Permission denied"

@@ -6,12 +6,13 @@ enabling global evaluation and optimization.
 
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
-from ..state import AgentExecution, create_agent_execution, ErrorContext
+from ..state import AgentExecution, ErrorContext, create_agent_execution
 
 logger = logging.getLogger(__name__)
 

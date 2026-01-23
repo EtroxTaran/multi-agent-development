@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
-from ..state import WorkflowState, ErrorContext
+from ..state import ErrorContext, WorkflowState
 
 logger = logging.getLogger(__name__)
 

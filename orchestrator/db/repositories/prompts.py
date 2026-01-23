@@ -5,7 +5,7 @@ Provides CRUD operations for versioned prompts with performance tracking.
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from ..connection import get_connection
 from .base import BaseRepository

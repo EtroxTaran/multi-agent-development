@@ -37,11 +37,7 @@ from .config import (
     is_tracing_enabled,
     is_webhooks_enabled,
 )
-
-from .manager import (
-    ObservabilityManager,
-    get_observability_manager,
-)
+from .manager import ObservabilityManager, get_observability_manager
 
 __all__ = [
     # Config

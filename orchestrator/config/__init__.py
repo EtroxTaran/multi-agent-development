@@ -5,12 +5,12 @@ specific defaults.
 """
 
 from .thresholds import (
+    DEFAULT_CONFIGS,
     ProjectConfig,
-    ValidationConfig,
     QualityConfig,
     SecurityConfig,
+    ValidationConfig,
     WorkflowConfig,
-    DEFAULT_CONFIGS,
     get_project_config,
     load_project_config,
 )

@@ -13,19 +13,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ...agents.prompts import format_prompt, load_prompt
+from ...config import load_project_config
+from ...config.models import get_role_assignment, infer_task_type
+from ...review.resolver import ConflictResolver
+from ...specialists.runner import SpecialistRunner
 from ..state import (
-    WorkflowState,
-    PhaseStatus,
-    PhaseState,
     AgentFeedback,
+    PhaseState,
+    PhaseStatus,
+    WorkflowState,
     create_agent_execution,
     create_error_context,
 )
-from ...specialists.runner import SpecialistRunner
-from ...review.resolver import ConflictResolver
-from ...config import load_project_config
-from ...agents.prompts import load_prompt, format_prompt
-from ...config.models import get_role_assignment, infer_task_type
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def _build_verification_correction_prompt(
                 desc = finding.get("description", "")
                 sev = finding.get("severity", "INFO")
                 sections.append(f"- `{f}:{ln}` [{sev}]: {desc}\n")
-        
+
         # Check for test failures in raw output if available
         test_failures = cursor_feedback.raw_output.get("test_failures", [])
         if test_failures:
@@ -78,7 +78,7 @@ def _build_verification_correction_prompt(
         # Also check for 'concerns' if 'comments' is empty (standard format)
         if not comments:
             comments = gemini_feedback.raw_output.get("concerns", [])
-            
+
         if comments:
             sections.append("\n### 🏛️ Architecture Issues\n")
             for c in comments[:5]:
@@ -125,6 +125,7 @@ async def cursor_review_node(state: WorkflowState) -> dict[str, Any]:
         # Save to database
         from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_cursor_review(feedback.to_dict()))
         return {
@@ -142,11 +143,15 @@ async def cursor_review_node(state: WorkflowState) -> dict[str, Any]:
         # Try to get from git
         files_changed = await _get_changed_files(project_dir)
 
-    files_list = "\n".join(f"- {f}" for f in files_changed) if files_changed else "No files specified"
+    files_list = (
+        "\n".join(f"- {f}" for f in files_changed) if files_changed else "No files specified"
+    )
 
     # Get test results if available
     test_results = impl_result.get("test_results", {})
-    test_results_str = json.dumps(test_results, indent=2) if test_results else "No test results available"
+    test_results_str = (
+        json.dumps(test_results, indent=2) if test_results else "No test results available"
+    )
 
     # Build prompt from template with fallback
     try:
@@ -166,12 +171,9 @@ TEST RESULTS:
 
     try:
         runner = SpecialistRunner(project_dir)
-        
+
         # Run A07-security-reviewer
-        result = await asyncio.to_thread(
-            runner.create_agent("A07-security-reviewer").run,
-            prompt
-        )
+        result = await asyncio.to_thread(runner.create_agent("A07-security-reviewer").run, prompt)
 
         if not result.success:
             raise Exception(result.error or "Cursor review failed")
@@ -185,6 +187,7 @@ TEST RESULTS:
             content = raw_output.get("result", "")
             # Extract JSON from markdown code block
             import re
+
             json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", content)
             if json_match:
                 try:
@@ -202,6 +205,7 @@ TEST RESULTS:
             feedback_data = raw_output
         elif result.output:
             import re
+
             json_match = re.search(r"\{[\s\S]*\}", result.output)
             if json_match:
                 try:
@@ -209,9 +213,9 @@ TEST RESULTS:
                 except json.JSONDecodeError:
                     pass
 
-        score = float(feedback_data.get("score", 0)) # A07 uses "score"
+        score = float(feedback_data.get("score", 0))  # A07 uses "score"
         blocking = []
-        
+
         # Parse findings from A07 format
         findings = feedback_data.get("findings", [])
         for finding in findings:
@@ -220,7 +224,7 @@ TEST RESULTS:
                 blocking.append(f"[{severity}] {finding.get('file')}: {finding.get('description')}")
 
         feedback = AgentFeedback(
-            agent="cursor", # Kept as "cursor" for compatibility with state schema
+            agent="cursor",  # Kept as "cursor" for compatibility with state schema
             approved=feedback_data.get("approved", False) and len(blocking) == 0,
             score=score,
             assessment="approved" if feedback_data.get("approved") else "needs_changes",
@@ -233,6 +237,7 @@ TEST RESULTS:
         # Save feedback to database
         from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_cursor_review(feedback.to_dict()))
 
@@ -274,7 +279,7 @@ TEST RESULTS:
             agent="cursor",
             node="cursor_review",
             template_name="code_review",
-            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            prompt=prompt[:5000] if "prompt" in dir() else "",
             output=str(e),
             success=False,
             exit_code=1,
@@ -292,12 +297,14 @@ TEST RESULTS:
                     summary=str(e),
                 )
             },
-            "errors": [{
-                "type": "verification_error",
-                "agent": "cursor",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verification_error",
+                    "agent": "cursor",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "error_context": error_context,
             "last_agent_execution": failed_execution,
             "execution_history": [failed_execution],
@@ -333,6 +340,7 @@ async def gemini_review_node(state: WorkflowState) -> dict[str, Any]:
         # Save to database
         from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_gemini_review(feedback.to_dict()))
         return {
@@ -349,7 +357,9 @@ async def gemini_review_node(state: WorkflowState) -> dict[str, Any]:
     if not files_changed:
         files_changed = await _get_changed_files(project_dir)
 
-    files_list = "\n".join(f"- {f}" for f in files_changed) if files_changed else "No files specified"
+    files_list = (
+        "\n".join(f"- {f}" for f in files_changed) if files_changed else "No files specified"
+    )
     plan_json = json.dumps(plan, indent=2)
 
     # Build prompt from template with fallback
@@ -369,10 +379,7 @@ FILES IMPLEMENTED:
         runner = SpecialistRunner(project_dir)
 
         # Run A08-code-reviewer
-        result = await asyncio.to_thread(
-            runner.create_agent("A08-code-reviewer").run,
-            prompt
-        )
+        result = await asyncio.to_thread(runner.create_agent("A08-code-reviewer").run, prompt)
 
         if not result.success:
             raise Exception(result.error or "Gemini review failed")
@@ -408,6 +415,7 @@ FILES IMPLEMENTED:
         # Save feedback to database
         from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_gemini_review(feedback.to_dict()))
 
@@ -449,7 +457,7 @@ FILES IMPLEMENTED:
             agent="gemini",
             node="gemini_review",
             template_name="architecture_review",
-            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            prompt=prompt[:5000] if "prompt" in dir() else "",
             output=str(e),
             success=False,
             exit_code=1,
@@ -467,12 +475,14 @@ FILES IMPLEMENTED:
                     summary=str(e),
                 )
             },
-            "errors": [{
-                "type": "verification_error",
-                "agent": "gemini",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verification_error",
+                    "agent": "gemini",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "error_context": error_context,
             "last_agent_execution": failed_execution,
             "execution_history": [failed_execution],
@@ -536,12 +546,14 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
 
         return {
             "phase_status": phase_status,
-            "errors": [{
-                "type": "verification_incomplete",
-                "missing_agents": missing,
-                "message": f"Missing review from: {', '.join(missing)}",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verification_incomplete",
+                    "missing_agents": missing,
+                    "message": f"Missing review from: {', '.join(missing)}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",
         }
 
@@ -580,6 +592,7 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
     # Save consolidated feedback to database
     from ...db.repositories.phase_outputs import get_phase_output_repository
     from ...storage.async_utils import run_async
+
     repo = get_phase_output_repository(state["project_name"])
     run_async(repo.save_output(phase=4, output_type="consolidated", content=consolidated))
 
@@ -603,11 +616,13 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
         return {
             "phase_status": phase_status,
             "next_decision": "escalate",
-            "errors": [{
-                "type": "verification_conflict",
-                "message": result.decision_reason,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "verification_conflict",
+                    "message": result.decision_reason,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }
     else:
         # Rejected - retry via Bug Fixer (or legacy implementation)
@@ -635,13 +650,15 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
             return {
                 "phase_status": phase_status,
                 "next_decision": "escalate",
-                "errors": [{
-                    "type": "verification_failed",
-                    "combined_score": result.final_score,
-                    "blocking_issues": result.blocking_issues,
-                    "message": f"Code verification failed: {result.decision_reason}",
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "verification_failed",
+                        "combined_score": result.final_score,
+                        "blocking_issues": result.blocking_issues,
+                        "message": f"Code verification failed: {result.decision_reason}",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
             }
 
 

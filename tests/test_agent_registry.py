@@ -1,18 +1,19 @@
 """Unit tests for the agent registry."""
 
 import pytest
+
 from orchestrator.registry import (
     AGENT_REGISTRY,
+    AgentConfig,
     get_agent,
     get_agent_reviewers,
-    get_all_agents,
     get_agents_by_cli,
-    AgentConfig,
+    get_all_agents,
 )
 from orchestrator.registry.agents import (
-    validate_agent_can_write,
-    get_reviewer_agents,
     get_review_pairings,
+    get_reviewer_agents,
+    validate_agent_can_write,
 )
 
 
@@ -22,8 +23,18 @@ class TestAgentRegistry:
     def test_registry_has_all_agents(self):
         """Test that all 12 agents are registered."""
         expected_agents = [
-            "A01", "A02", "A03", "A04", "A05", "A06",
-            "A07", "A08", "A09", "A10", "A11", "A12",
+            "A01",
+            "A02",
+            "A03",
+            "A04",
+            "A05",
+            "A06",
+            "A07",
+            "A08",
+            "A09",
+            "A10",
+            "A11",
+            "A12",
         ]
         for agent_id in expected_agents:
             assert agent_id in AGENT_REGISTRY, f"Agent {agent_id} not in registry"
@@ -141,14 +152,13 @@ class TestReviewPairings:
         """Test that all working agents have at least 2 reviewers."""
         pairings = get_review_pairings()
 
-        working_agents = [
-            "A01", "A03", "A04", "A05", "A06", "A09", "A10", "A11", "A12"
-        ]
+        working_agents = ["A01", "A03", "A04", "A05", "A06", "A09", "A10", "A11", "A12"]
 
         for agent_id in working_agents:
             if agent_id in pairings:
-                assert len(pairings[agent_id]["reviewers"]) >= 2, \
-                    f"Agent {agent_id} has fewer than 2 reviewers"
+                assert (
+                    len(pairings[agent_id]["reviewers"]) >= 2
+                ), f"Agent {agent_id} has fewer than 2 reviewers"
 
     def test_reviewers_use_different_clis(self):
         """Test that reviewers use different CLIs when possible."""
@@ -167,5 +177,6 @@ class TestReviewPairings:
 
         for agent_id, pairing in pairings.items():
             for reviewer_id, weight in pairing["weights"].items():
-                assert 0 <= weight <= 1, \
-                    f"Invalid weight {weight} for {reviewer_id} reviewing {agent_id}"
+                assert (
+                    0 <= weight <= 1
+                ), f"Invalid weight {weight} for {reviewer_id} reviewing {agent_id}"

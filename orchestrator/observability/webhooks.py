@@ -25,7 +25,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
-from urllib.parse import urlparse
 
 from .config import get_config
 
@@ -34,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Optional import - graceful degradation if aiohttp not installed
 try:
     import aiohttp
+
     AIOHTTP_AVAILABLE = True
 except ImportError:
     AIOHTTP_AVAILABLE = False
@@ -41,6 +41,7 @@ except ImportError:
 
 try:
     import requests
+
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
@@ -203,9 +204,7 @@ class WebhookDispatcher:
                         else:
                             error = f"HTTP {response.status}"
                             if attempt < self.config.retry_attempts:
-                                await asyncio.sleep(
-                                    self.config.retry_delay_seconds * attempt
-                                )
+                                await asyncio.sleep(self.config.retry_delay_seconds * attempt)
                                 continue
 
                             return WebhookDeliveryResult(
@@ -375,10 +374,7 @@ class WebhookDispatcher:
         )
 
         # Deliver to all endpoints concurrently
-        tasks = [
-            self._deliver_async(endpoint, payload)
-            for endpoint in self.config.endpoints
-        ]
+        tasks = [self._deliver_async(endpoint, payload) for endpoint in self.config.endpoints]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -404,9 +400,7 @@ class WebhookDispatcher:
                     f"(status={result.status_code}, ms={result.duration_ms})"
                 )
             else:
-                logger.warning(
-                    f"Webhook delivery failed to {result.endpoint}: {result.error}"
-                )
+                logger.warning(f"Webhook delivery failed to {result.endpoint}: {result.error}")
 
         return final_results
 

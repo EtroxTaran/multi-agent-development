@@ -1,1 +1,1 @@
-export * from './orchestrator-client.mock';
+export * from "./orchestrator-client.mock";

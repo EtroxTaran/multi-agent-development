@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class CheckStatus(str, Enum):
     """Status of an environment check."""
+
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"
@@ -27,6 +28,7 @@ class CheckStatus(str, Enum):
 
 class ProjectType(str, Enum):
     """Supported project types."""
+
     NODE = "node"
     REACT = "react"
     NODE_API = "node-api"
@@ -39,6 +41,7 @@ class ProjectType(str, Enum):
 
 class Complexity(str, Enum):
     """Estimated project complexity."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -47,6 +50,7 @@ class Complexity(str, Enum):
 @dataclass
 class CheckResult:
     """Result of a single environment check."""
+
     name: str
     status: CheckStatus
     message: str
@@ -66,6 +70,7 @@ class CheckResult:
 @dataclass
 class EnvironmentCheckResult:
     """Result of all environment checks."""
+
     ready: bool
     project_type: ProjectType
     complexity: Complexity
@@ -130,12 +135,14 @@ class EnvironmentChecker:
         elif project_type == ProjectType.RUST:
             checks.extend(self._check_rust_environment())
         else:
-            checks.append(CheckResult(
-                name="project_type",
-                status=CheckStatus.WARNING,
-                message="Could not detect project type",
-                details="Will use generic checks",
-            ))
+            checks.append(
+                CheckResult(
+                    name="project_type",
+                    status=CheckStatus.WARNING,
+                    message="Could not detect project type",
+                    details="Will use generic checks",
+                )
+            )
 
         # Detect test framework
         test_framework, test_command = self._detect_test_framework(project_type)
@@ -219,38 +226,46 @@ class EnvironmentChecker:
         # Check package manager
         pkg_manager = self._detect_package_manager()
         if pkg_manager:
-            results.append(CheckResult(
-                name="package_manager",
-                status=CheckStatus.PASSED,
-                message=f"Found package manager: {pkg_manager}",
-            ))
+            results.append(
+                CheckResult(
+                    name="package_manager",
+                    status=CheckStatus.PASSED,
+                    message=f"Found package manager: {pkg_manager}",
+                )
+            )
 
             # Check npm install --dry-run or pnpm install --dry-run
             dry_run_check = self._check_dry_run_install(pkg_manager)
             results.append(dry_run_check)
         else:
-            results.append(CheckResult(
-                name="package_manager",
-                status=CheckStatus.WARNING,
-                message="No lock file found (npm, pnpm, or yarn)",
-                details="Run your package manager to install dependencies first",
-            ))
+            results.append(
+                CheckResult(
+                    name="package_manager",
+                    status=CheckStatus.WARNING,
+                    message="No lock file found (npm, pnpm, or yarn)",
+                    details="Run your package manager to install dependencies first",
+                )
+            )
 
         # Check if node_modules exists
         node_modules = self.project_dir / "node_modules"
         if node_modules.exists():
-            results.append(CheckResult(
-                name="node_modules",
-                status=CheckStatus.PASSED,
-                message="node_modules directory exists",
-            ))
+            results.append(
+                CheckResult(
+                    name="node_modules",
+                    status=CheckStatus.PASSED,
+                    message="node_modules directory exists",
+                )
+            )
         else:
-            results.append(CheckResult(
-                name="node_modules",
-                status=CheckStatus.WARNING,
-                message="node_modules not found",
-                details="Run 'npm install' or equivalent to install dependencies",
-            ))
+            results.append(
+                CheckResult(
+                    name="node_modules",
+                    status=CheckStatus.WARNING,
+                    message="node_modules not found",
+                    details="Run 'npm install' or equivalent to install dependencies",
+                )
+            )
 
         return results
 
@@ -269,24 +284,30 @@ class EnvironmentChecker:
 
         # Check for Gradle
         if (self.project_dir / "gradlew").exists():
-            results.append(CheckResult(
-                name="gradle_wrapper",
-                status=CheckStatus.PASSED,
-                message="Gradle wrapper found",
-            ))
+            results.append(
+                CheckResult(
+                    name="gradle_wrapper",
+                    status=CheckStatus.PASSED,
+                    message="Gradle wrapper found",
+                )
+            )
         elif shutil.which("gradle"):
-            results.append(CheckResult(
-                name="gradle",
-                status=CheckStatus.PASSED,
-                message="Gradle installed",
-            ))
+            results.append(
+                CheckResult(
+                    name="gradle",
+                    status=CheckStatus.PASSED,
+                    message="Gradle installed",
+                )
+            )
         else:
-            results.append(CheckResult(
-                name="gradle",
-                status=CheckStatus.FAILED,
-                message="Gradle not found",
-                details="Install Gradle or add a gradlew wrapper",
-            ))
+            results.append(
+                CheckResult(
+                    name="gradle",
+                    status=CheckStatus.FAILED,
+                    message="Gradle not found",
+                    details="Install Gradle or add a gradlew wrapper",
+                )
+            )
 
         return results
 
@@ -306,24 +327,30 @@ class EnvironmentChecker:
         # Check for virtual environment
         venv_dir = self.project_dir / ".venv"
         if venv_dir.exists():
-            results.append(CheckResult(
-                name="virtualenv",
-                status=CheckStatus.PASSED,
-                message="Virtual environment found at .venv",
-            ))
+            results.append(
+                CheckResult(
+                    name="virtualenv",
+                    status=CheckStatus.PASSED,
+                    message="Virtual environment found at .venv",
+                )
+            )
         elif (self.project_dir / "venv").exists():
-            results.append(CheckResult(
-                name="virtualenv",
-                status=CheckStatus.PASSED,
-                message="Virtual environment found at venv",
-            ))
+            results.append(
+                CheckResult(
+                    name="virtualenv",
+                    status=CheckStatus.PASSED,
+                    message="Virtual environment found at venv",
+                )
+            )
         else:
-            results.append(CheckResult(
-                name="virtualenv",
-                status=CheckStatus.WARNING,
-                message="No virtual environment found",
-                details="Consider creating a venv: python3 -m venv .venv",
-            ))
+            results.append(
+                CheckResult(
+                    name="virtualenv",
+                    status=CheckStatus.WARNING,
+                    message="No virtual environment found",
+                    details="Consider creating a venv: python3 -m venv .venv",
+                )
+            )
 
         return results
 
@@ -355,17 +382,21 @@ class EnvironmentChecker:
 
         # Check for cargo
         if shutil.which("cargo"):
-            results.append(CheckResult(
-                name="cargo",
-                status=CheckStatus.PASSED,
-                message="Cargo build tool found",
-            ))
+            results.append(
+                CheckResult(
+                    name="cargo",
+                    status=CheckStatus.PASSED,
+                    message="Cargo build tool found",
+                )
+            )
         else:
-            results.append(CheckResult(
-                name="cargo",
-                status=CheckStatus.FAILED,
-                message="Cargo not found",
-            ))
+            results.append(
+                CheckResult(
+                    name="cargo",
+                    status=CheckStatus.FAILED,
+                    message="Cargo not found",
+                )
+            )
 
         return results
 
@@ -539,7 +570,9 @@ class EnvironmentChecker:
                 message=f"Could not run dry-run install: {e}",
             )
 
-    def _detect_test_framework(self, project_type: ProjectType) -> tuple[Optional[str], Optional[str]]:
+    def _detect_test_framework(
+        self, project_type: ProjectType
+    ) -> tuple[Optional[str], Optional[str]]:
         """Detect the test framework used by the project.
 
         Returns:
@@ -643,11 +676,13 @@ class EnvironmentChecker:
             bullet_count = len(re.findall(r"^\s*[-*]\s+\w", content, re.MULTILINE))
 
             # Count technical sections
-            technical_sections = len(re.findall(
-                r"#+\s*(API|Database|Schema|Architecture|Security|Performance)",
-                content,
-                re.IGNORECASE,
-            ))
+            technical_sections = len(
+                re.findall(
+                    r"#+\s*(API|Database|Schema|Architecture|Security|Performance)",
+                    content,
+                    re.IGNORECASE,
+                )
+            )
 
             # Word count as rough estimate
             word_count = len(content.split())

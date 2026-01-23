@@ -8,9 +8,9 @@ import asyncio
 import logging
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Optional, List, Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class RateLimitStats:
     current_tpm: float = 0.0
     last_request_time: Optional[datetime] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert stats to dictionary."""
         return {
             "total_requests": self.total_requests,
@@ -52,7 +52,9 @@ class RateLimitStats:
             "throttled_requests": self.throttled_requests,
             "current_rpm": self.current_rpm,
             "current_tpm": self.current_tpm,
-            "last_request_time": self.last_request_time.isoformat() if self.last_request_time else None,
+            "last_request_time": self.last_request_time.isoformat()
+            if self.last_request_time
+            else None,
         }
 
 
@@ -166,9 +168,9 @@ class AsyncRateLimiter:
         )
 
         # Request tracking
-        self._minute_requests: List[datetime] = []
-        self._hour_requests: List[datetime] = []
-        self._minute_tokens: List[int] = []
+        self._minute_requests: list[datetime] = []
+        self._hour_requests: list[datetime] = []
+        self._minute_tokens: list[int] = []
 
         # Cost tracking
         self._hour_start = datetime.now()
@@ -221,7 +223,7 @@ class AsyncRateLimiter:
             return False, "Hourly request limit exceeded"
 
         # Check TPM
-        current_minute_tokens = sum(self._minute_tokens) if hasattr(self, '_minute_tokens') else 0
+        current_minute_tokens = sum(self._minute_tokens) if hasattr(self, "_minute_tokens") else 0
         if current_minute_tokens + estimated_tokens > self.config.tokens_per_minute:
             return False, "TPM limit exceeded"
 
@@ -254,7 +256,7 @@ class AsyncRateLimiter:
         """
         # Cap the exponent to prevent excessive backoff
         throttle_count = min(self._consecutive_throttles, 10)
-        base_backoff = self.config.backoff_base * (1.5 ** throttle_count)
+        base_backoff = self.config.backoff_base * (1.5**throttle_count)
         capped_backoff = min(base_backoff, self.config.backoff_max)
 
         # Add jitter to prevent synchronized retries
@@ -341,7 +343,7 @@ class AsyncRateLimiter:
             self._minute_requests.append(now)
             self._hour_requests.append(now)
 
-            if not hasattr(self, '_minute_tokens'):
+            if not hasattr(self, "_minute_tokens"):
                 self._minute_tokens = []
             self._minute_tokens.append(tokens)
 
@@ -355,7 +357,11 @@ class AsyncRateLimiter:
 
             # Cleanup old minute tokens
             minute_ago = now - timedelta(minutes=1)
-            while self._minute_tokens and self._minute_requests and self._minute_requests[0] <= minute_ago:
+            while (
+                self._minute_tokens
+                and self._minute_requests
+                and self._minute_requests[0] <= minute_ago
+            ):
                 self._minute_requests.pop(0)
                 self._minute_tokens.pop(0)
 
@@ -379,7 +385,8 @@ class AsyncRateLimiter:
 
 # Global rate limiter registry with thread safety
 import threading
-_rate_limiters: Dict[str, AsyncRateLimiter] = {}
+
+_rate_limiters: dict[str, AsyncRateLimiter] = {}
 _registry_lock = threading.Lock()
 
 
@@ -403,7 +410,7 @@ def get_rate_limiter(
         return _rate_limiters[name]
 
 
-def get_all_rate_limiters() -> Dict[str, AsyncRateLimiter]:
+def get_all_rate_limiters() -> dict[str, AsyncRateLimiter]:
     """Get all registered rate limiters (thread-safe)."""
     with _registry_lock:
         return dict(_rate_limiters)

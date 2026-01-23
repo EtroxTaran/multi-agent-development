@@ -1,3 +1,12 @@
+---
+name: add-lesson
+description: Add a new lesson learned to shared rules and sync to context files.
+version: 1.1.0
+tags: [lessons, governance, rules]
+owner: orchestration
+status: active
+---
+
 # Add Lesson Skill
 
 Add a new lesson learned to the shared rules.
@@ -11,6 +20,10 @@ When you discover a bug, mistake, or useful pattern, use this skill to document 
 ```
 /add-lesson
 ```
+
+## Prerequisites
+
+- Access to `shared-rules/` and permission to run `scripts/sync-rules.py`.
 
 ## Lesson Template
 
@@ -75,3 +88,16 @@ Lessons should be categorized by:
 After 30 days or when list gets long:
 - Move old lessons to "Archived Lessons" section
 - Keep for historical reference
+
+## Outputs
+
+- Updated `shared-rules/` content and synced context files (e.g. `CLAUDE.md`).
+
+## Error Handling
+
+- If sync fails, do not proceed; resolve and rerun `scripts/sync-rules.py`.
+- If lesson template is incomplete, request the missing fields before adding.
+
+## Related Skills
+
+- `/sync-rules` - Sync shared rules into context files

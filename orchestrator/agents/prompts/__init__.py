@@ -14,10 +14,9 @@ Usage:
     prompt = format_prompt(template, product_spec=spec)
 """
 
+import json
 from pathlib import Path
 from typing import Any, Optional
-import json
-
 
 PROMPTS_DIR = Path(__file__).parent
 

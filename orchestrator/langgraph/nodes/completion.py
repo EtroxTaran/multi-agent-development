@@ -9,8 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState, PhaseStatus, PhaseState
 from ...cleanup import CleanupManager
+from ..state import PhaseState, PhaseStatus, WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -53,76 +53,88 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
 
     # Build summary
     summary_lines = [
-        f"# Workflow Completion Summary",
-        f"",
+        "# Workflow Completion Summary",
+        "",
         f"**Project:** {state['project_name']}",
         f"**Completed:** {datetime.now().isoformat()}",
-        f"",
-        f"## Plan Summary",
-        f"",
+        "",
+        "## Plan Summary",
+        "",
         f"**Name:** {plan.get('plan_name', 'Unknown')}",
-        f"",
+        "",
         f"{plan.get('summary', 'No summary available.')}",
-        f"",
+        "",
     ]
 
     # Implementation results
     if impl_result:
-        summary_lines.extend([
-            f"## Implementation Results",
-            f"",
-            f"- **Files Created:** {impl_result.get('total_files_created', 0)}",
-            f"- **Files Modified:** {impl_result.get('total_files_modified', 0)}",
-            f"- **Tests:** {json.dumps(impl_result.get('test_results', {}))}",
-            f"",
-        ])
+        summary_lines.extend(
+            [
+                "## Implementation Results",
+                "",
+                f"- **Files Created:** {impl_result.get('total_files_created', 0)}",
+                f"- **Files Modified:** {impl_result.get('total_files_modified', 0)}",
+                f"- **Tests:** {json.dumps(impl_result.get('test_results', {}))}",
+                "",
+            ]
+        )
 
     # Validation summary
     if validation_feedback:
-        summary_lines.extend([
-            f"## Validation Summary",
-            f"",
-        ])
+        summary_lines.extend(
+            [
+                "## Validation Summary",
+                "",
+            ]
+        )
         for agent, feedback in validation_feedback.items():
             if hasattr(feedback, "to_dict"):
                 fb_dict = feedback.to_dict()
             else:
                 fb_dict = feedback if isinstance(feedback, dict) else {"summary": str(feedback)}
 
-            summary_lines.extend([
-                f"### {agent.title()}",
-                f"- **Score:** {fb_dict.get('score', 'N/A')}",
-                f"- **Assessment:** {fb_dict.get('assessment', 'N/A')}",
-                f"- **Summary:** {fb_dict.get('summary', 'N/A')}",
-                f"",
-            ])
+            summary_lines.extend(
+                [
+                    f"### {agent.title()}",
+                    f"- **Score:** {fb_dict.get('score', 'N/A')}",
+                    f"- **Assessment:** {fb_dict.get('assessment', 'N/A')}",
+                    f"- **Summary:** {fb_dict.get('summary', 'N/A')}",
+                    "",
+                ]
+            )
 
     # Verification summary
     if verification_feedback:
-        summary_lines.extend([
-            f"## Verification Summary",
-            f"",
-        ])
+        summary_lines.extend(
+            [
+                "## Verification Summary",
+                "",
+            ]
+        )
         for agent, feedback in verification_feedback.items():
             if hasattr(feedback, "to_dict"):
                 fb_dict = feedback.to_dict()
             else:
                 fb_dict = feedback if isinstance(feedback, dict) else {"summary": str(feedback)}
 
-            summary_lines.extend([
-                f"### {agent.title()}",
-                f"- **Approved:** {fb_dict.get('approved', 'N/A')}",
-                f"- **Score:** {fb_dict.get('score', 'N/A')}",
-                f"- **Summary:** {fb_dict.get('summary', 'N/A')}",
-                f"",
-            ])
+            summary_lines.extend(
+                [
+                    f"### {agent.title()}",
+                    f"- **Approved:** {fb_dict.get('approved', 'N/A')}",
+                    f"- **Score:** {fb_dict.get('score', 'N/A')}",
+                    f"- **Summary:** {fb_dict.get('summary', 'N/A')}",
+                    "",
+                ]
+            )
 
     # Git commits
     if git_commits:
-        summary_lines.extend([
-            f"## Git Commits",
-            f"",
-        ])
+        summary_lines.extend(
+            [
+                "## Git Commits",
+                "",
+            ]
+        )
         for commit in git_commits:
             summary_lines.append(
                 f"- `{commit.get('hash', 'unknown')[:8]}` - {commit.get('message', 'No message')}"
@@ -131,10 +143,12 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
 
     # Errors
     if errors:
-        summary_lines.extend([
-            f"## Errors Encountered",
-            f"",
-        ])
+        summary_lines.extend(
+            [
+                "## Errors Encountered",
+                "",
+            ]
+        )
         for error in errors:
             summary_lines.append(
                 f"- **{error.get('type', 'Unknown')}:** {error.get('message', 'No message')}"
@@ -142,12 +156,14 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
         summary_lines.append("")
 
     # Phase status summary
-    summary_lines.extend([
-        f"## Phase Status",
-        f"",
-        f"| Phase | Status | Attempts |",
-        f"|-------|--------|----------|",
-    ])
+    summary_lines.extend(
+        [
+            "## Phase Status",
+            "",
+            "| Phase | Status | Attempts |",
+            "|-------|--------|----------|",
+        ]
+    )
 
     phase_names = {
         "1": "Planning",
@@ -166,16 +182,16 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
             PhaseStatus.PENDING: "⏳",
             PhaseStatus.SKIPPED: "⏭️",
         }.get(ps.status, "❓")
-        summary_lines.append(
-            f"| {phase_name} | {status_emoji} {ps.status.value} | {ps.attempts} |"
-        )
+        summary_lines.append(f"| {phase_name} | {status_emoji} {ps.status.value} | {ps.attempts} |")
 
-    summary_lines.extend([
-        f"",
-        f"---",
-        f"",
-        f"*Generated by Multi-Agent Orchestration System*",
-    ])
+    summary_lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "*Generated by Multi-Agent Orchestration System*",
+        ]
+    )
 
     # Build JSON summary
     summary_json = {
@@ -184,8 +200,7 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
         "plan": plan.get("plan_name"),
         "implementation": impl_result,
         "phase_status": {
-            k: v.to_dict() if hasattr(v, "to_dict") else str(v)
-            for k, v in phase_status.items()
+            k: v.to_dict() if hasattr(v, "to_dict") else str(v) for k, v in phase_status.items()
         },
         "total_errors": len(errors),
         "total_commits": len(git_commits),
@@ -195,6 +210,7 @@ async def completion_node(state: WorkflowState) -> dict[str, Any]:
     # Save completion summary to database
     from ...db.repositories.phase_outputs import get_phase_output_repository
     from ...storage.async_utils import run_async
+
     repo = get_phase_output_repository(state["project_name"])
     run_async(repo.save_summary(summary_json))
 

@@ -17,7 +17,8 @@ import concurrent.futures
 import functools
 import logging
 import threading
-from typing import Any, Callable, Coroutine, Optional, TypeVar
+from collections.abc import Callable, Coroutine
+from typing import Any, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,7 @@ def _get_thread_pool() -> concurrent.futures.ThreadPoolExecutor:
             # Double-check after acquiring lock
             if _thread_pool is None:
                 _thread_pool = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=4,
-                    thread_name_prefix="async_bridge_"
+                    max_workers=4, thread_name_prefix="async_bridge_"
                 )
                 logger.debug("Created async bridge ThreadPoolExecutor with 4 workers")
     return _thread_pool

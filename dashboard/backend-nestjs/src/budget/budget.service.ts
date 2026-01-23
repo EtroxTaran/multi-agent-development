@@ -1,19 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { OrchestratorClientService } from '../orchestrator-client/orchestrator-client.service';
-import { BudgetStatusDto, BudgetReportResponseDto } from './dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { OrchestratorClientService } from "../orchestrator-client/orchestrator-client.service";
+import { BudgetStatusDto, BudgetReportResponseDto } from "./dto";
 
 @Injectable()
 export class BudgetService {
-  constructor(
-    private readonly orchestratorClient: OrchestratorClientService,
-  ) {}
+  constructor(private readonly orchestratorClient: OrchestratorClientService) {}
 
   async getBudget(projectName: string): Promise<BudgetStatusDto> {
     try {
-      const budget = (await this.orchestratorClient.getBudget(projectName)) as any;
+      const budget = (await this.orchestratorClient.getBudget(
+        projectName,
+      )) as any;
       return this.mapToBudgetStatus(budget);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -22,9 +25,14 @@ export class BudgetService {
 
   async getReport(projectName: string): Promise<BudgetReportResponseDto> {
     try {
-      return (await this.orchestratorClient.getBudgetReport(projectName)) as BudgetReportResponseDto;
+      return (await this.orchestratorClient.getBudgetReport(
+        projectName,
+      )) as BudgetReportResponseDto;
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;

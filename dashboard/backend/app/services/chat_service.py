@@ -6,9 +6,9 @@ Provides full Claude Code integration for the dashboard.
 import asyncio
 import json
 import logging
-import subprocess
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, Optional
 
 from ..config import get_settings
 
@@ -175,8 +175,8 @@ class ChatService:
             "path": str(self.project_dir),
             "name": self.project_dir.name,
             "has_claude_md": (self.project_dir / "CLAUDE.md").exists(),
-            "has_product_md": (self.project_dir / "PRODUCT.md").exists() or
-                             (self.project_dir / "Docs" / "PRODUCT.md").exists(),
+            "has_product_md": (self.project_dir / "PRODUCT.md").exists()
+            or (self.project_dir / "Docs" / "PRODUCT.md").exists(),
         }
 
 
@@ -230,7 +230,7 @@ class ChatHistory:
             return []
 
         messages = []
-        with open(self.history_file, "r") as f:
+        with open(self.history_file) as f:
             for line in f:
                 if line.strip():
                     try:

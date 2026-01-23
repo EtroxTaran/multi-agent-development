@@ -14,7 +14,7 @@ Usage:
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,9 @@ class SchemaValidator:
             # Find schemas directory relative to this file
             self.schemas_dir = Path(__file__).parent.parent.parent / "schemas"
 
-        self._schema_cache: Dict[str, Dict[str, Any]] = {}
+        self._schema_cache: dict[str, dict[str, Any]] = {}
 
-    def load_schema(self, schema_name: str) -> Optional[Dict[str, Any]]:
+    def load_schema(self, schema_name: str) -> Optional[dict[str, Any]]:
         """Load a JSON schema by name.
 
         Args:
@@ -67,8 +67,8 @@ class SchemaValidator:
     def validate(
         self,
         schema_name: str,
-        data: Dict[str, Any],
-    ) -> List[str]:
+        data: dict[str, Any],
+    ) -> list[str]:
         """Validate data against a schema.
 
         Args:
@@ -99,9 +99,9 @@ class SchemaValidator:
 
     def _basic_validate(
         self,
-        schema: Dict[str, Any],
-        data: Dict[str, Any],
-    ) -> List[str]:
+        schema: dict[str, Any],
+        data: dict[str, Any],
+    ) -> list[str]:
         """Basic validation without jsonschema library.
 
         Args:
@@ -158,7 +158,7 @@ class SchemaValidator:
 
         return isinstance(value, type_map[expected_type])
 
-    def get_schema_info(self, schema_name: str) -> Dict[str, Any]:
+    def get_schema_info(self, schema_name: str) -> dict[str, Any]:
         """Get information about a schema.
 
         Args:
@@ -181,9 +181,9 @@ class SchemaValidator:
 
 def validate_output(
     schema_path: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     schemas_dir: Optional[Path] = None,
-) -> List[str]:
+) -> list[str]:
     """Convenience function to validate output against schema.
 
     Args:
@@ -206,13 +206,15 @@ def validate_output(
             validator = SchemaValidator()
             schema_name = schema_path
 
-    return validator.validate(schema_name if "/" not in schema_path else Path(schema_path).name, data)
+    return validator.validate(
+        schema_name if "/" not in schema_path else Path(schema_path).name, data
+    )
 
 
 def validate_agent_output(
     agent_id: str,
-    output: Dict[str, Any],
-) -> List[str]:
+    output: dict[str, Any],
+) -> list[str]:
     """Validate output for a specific agent.
 
     Args:

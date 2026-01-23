@@ -73,3 +73,9 @@ jobs:
 
       - name: Run mypy
         run: mypy orchestrator/ --ignore-missing-imports
+
+      - name: Validate skill definitions
+        run: python scripts/validate_skills.py
+
+      - name: Validate agent tool policies
+        run: python scripts/validate_agent_tools.py

@@ -8,24 +8,25 @@ Implements multi-layer caching:
 
 import hashlib
 import json
-import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional, Any
 from enum import Enum
+from pathlib import Path
+from typing import Optional
 
 
 class CacheStrategy(Enum):
     """Caching strategies for different use cases."""
-    EXACT = "exact"           # Exact prompt match only
-    PREFIX = "prefix"         # Match on prompt prefix (first N tokens)
-    SEMANTIC = "semantic"     # Semantic similarity matching
+
+    EXACT = "exact"  # Exact prompt match only
+    PREFIX = "prefix"  # Match on prompt prefix (first N tokens)
+    SEMANTIC = "semantic"  # Semantic similarity matching
 
 
 @dataclass
 class CacheEntry:
     """A cached prompt-response pair."""
+
     prompt_hash: str
     response: str
     model: str
@@ -52,6 +53,7 @@ class CacheEntry:
 @dataclass
 class CacheStats:
     """Statistics for cache performance monitoring."""
+
     total_requests: int = 0
     cache_hits: int = 0
     cache_misses: int = 0
@@ -130,8 +132,7 @@ class PromptCache:
                 with open(cache_file) as f:
                     data = json.load(f)
                 self._cache = {
-                    k: CacheEntry.from_dict(v)
-                    for k, v in data.get("entries", {}).items()
+                    k: CacheEntry.from_dict(v) for k, v in data.get("entries", {}).items()
                 }
                 # Load stats
                 stats_data = data.get("stats", {})
@@ -297,10 +298,7 @@ class PromptCache:
         Returns:
             Number of entries removed
         """
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if entry.is_expired()
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
 
         for key in expired_keys:
             del self._cache[key]
@@ -365,8 +363,8 @@ class ConversationCompressor:
             return messages
 
         # Keep recent turns in full
-        recent = messages[-self.max_recent_turns:]
-        older = messages[:-self.max_recent_turns]
+        recent = messages[-self.max_recent_turns :]
+        older = messages[: -self.max_recent_turns]
 
         if not older:
             return recent
@@ -404,6 +402,7 @@ class ConversationCompressor:
         Returns:
             Dict with original_tokens, compressed_tokens, savings_pct
         """
+
         def count_tokens(messages):
             return sum(len(m.get("content", "")) // 4 for m in messages)
 

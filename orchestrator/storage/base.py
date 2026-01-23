@@ -5,12 +5,9 @@ These protocols enable transparent switching between file-based and
 SurrealDB-based storage.
 """
 
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Iterator, Optional, Protocol, runtime_checkable
-
+from typing import Any, Optional, Protocol, runtime_checkable
 
 # ============================================================================
 # Audit Storage Protocol

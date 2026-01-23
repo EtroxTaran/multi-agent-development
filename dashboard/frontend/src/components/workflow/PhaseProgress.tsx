@@ -2,15 +2,15 @@
  * Phase progress visualization component
  */
 
-import { useState } from 'react';
-import { CheckCircle, Circle, Clock, XCircle, RotateCcw } from 'lucide-react';
+import { useState } from "react";
+import { CheckCircle, Circle, Clock, XCircle, RotateCcw } from "lucide-react";
 import {
   useStartWorkflow,
   useResumeWorkflow,
   usePauseWorkflow,
   useResetWorkflow,
   useRollbackWorkflow,
-} from '@/hooks';
+} from "@/hooks";
 import {
   Button,
   Card,
@@ -23,8 +23,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui';
-import { cn, getPhaseName } from '@/lib/utils';
+} from "@/components/ui";
+import { cn, getPhaseName } from "@/lib/utils";
 
 interface PhaseProgressProps {
   projectName: string;
@@ -36,18 +36,22 @@ const phases = [1, 2, 3, 4, 5];
 
 function getPhaseIcon(status: string) {
   switch (status?.toLowerCase()) {
-    case 'completed':
+    case "completed":
       return <CheckCircle className="h-6 w-6 text-green-500" />;
-    case 'in_progress':
+    case "in_progress":
       return <Clock className="h-6 w-6 text-blue-500 animate-pulse" />;
-    case 'failed':
+    case "failed":
       return <XCircle className="h-6 w-6 text-red-500" />;
     default:
       return <Circle className="h-6 w-6 text-gray-300" />;
   }
 }
 
-export function PhaseProgress({ projectName, currentPhase, phaseStatus }: PhaseProgressProps) {
+export function PhaseProgress({
+  projectName,
+  currentPhase,
+  phaseStatus,
+}: PhaseProgressProps) {
   const [rollbackPhase, setRollbackPhase] = useState<number | null>(null);
 
   const startWorkflow = useStartWorkflow(projectName);
@@ -56,7 +60,7 @@ export function PhaseProgress({ projectName, currentPhase, phaseStatus }: PhaseP
   const resetWorkflow = useResetWorkflow(projectName);
   const rollbackWorkflow = useRollbackWorkflow(projectName);
 
-  const isRunning = Object.values(phaseStatus).some((s) => s === 'in_progress');
+  const isRunning = Object.values(phaseStatus).some((s) => s === "in_progress");
   const hasStarted = currentPhase > 0;
 
   const handlePhaseClick = (phase: number) => {
@@ -120,7 +124,7 @@ export function PhaseProgress({ projectName, currentPhase, phaseStatus }: PhaseP
         <CardContent>
           <div className="flex items-center justify-between">
             {phases.map((phase, index) => {
-              const status = phaseStatus[phase.toString()] || 'pending';
+              const status = phaseStatus[phase.toString()] || "pending";
               const isActive = phase === currentPhase;
               const canRb = hasStarted && phase < currentPhase;
 
@@ -129,14 +133,14 @@ export function PhaseProgress({ projectName, currentPhase, phaseStatus }: PhaseP
                   key={phase}
                   className={cn(
                     "flex items-center",
-                    canRb && "cursor-pointer group"
+                    canRb && "cursor-pointer group",
                   )}
                   onClick={() => handlePhaseClick(phase)}
                 >
                   <div
                     className={cn(
-                      'flex flex-col items-center relative',
-                      isActive && 'font-semibold'
+                      "flex flex-col items-center relative",
+                      isActive && "font-semibold",
                     )}
                   >
                     {canRb && (
@@ -147,31 +151,34 @@ export function PhaseProgress({ projectName, currentPhase, phaseStatus }: PhaseP
                     )}
                     <div
                       className={cn(
-                        'flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all',
-                        status === 'completed'
-                          ? 'border-green-500 bg-green-50'
-                          : status === 'in_progress'
-                            ? 'border-blue-500 bg-blue-50'
-                            : status === 'failed'
-                              ? 'border-red-500 bg-red-50'
-                              : 'border-gray-200',
-                        canRb && "group-hover:border-blue-400 group-hover:bg-blue-50"
+                        "flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all",
+                        status === "completed"
+                          ? "border-green-500 bg-green-50"
+                          : status === "in_progress"
+                            ? "border-blue-500 bg-blue-50"
+                            : status === "failed"
+                              ? "border-red-500 bg-red-50"
+                              : "border-gray-200",
+                        canRb &&
+                          "group-hover:border-blue-400 group-hover:bg-blue-50",
                       )}
                     >
                       {getPhaseIcon(status)}
                     </div>
                     <span className="mt-2 text-sm">{getPhaseName(phase)}</span>
-                    <span className="text-xs text-muted-foreground capitalize">{status}</span>
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {status}
+                    </span>
                   </div>
 
                   {index < phases.length - 1 && (
                     <div
                       className={cn(
-                        'mx-4 h-0.5 w-16 flex-1',
-                        phaseStatus[(phase + 1).toString()] === 'completed' ||
-                          phaseStatus[phase.toString()] === 'completed'
-                          ? 'bg-green-500'
-                          : 'bg-gray-200'
+                        "mx-4 h-0.5 w-16 flex-1",
+                        phaseStatus[(phase + 1).toString()] === "completed" ||
+                          phaseStatus[phase.toString()] === "completed"
+                          ? "bg-green-500"
+                          : "bg-gray-200",
                       )}
                     />
                   )}
@@ -182,22 +189,25 @@ export function PhaseProgress({ projectName, currentPhase, phaseStatus }: PhaseP
         </CardContent>
       </Card>
 
-      <Dialog open={rollbackPhase !== null} onOpenChange={(open) => { if (!open) setRollbackPhase(null); }}>
+      <Dialog
+        open={rollbackPhase !== null}
+        onOpenChange={(open) => {
+          if (!open) setRollbackPhase(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirm Rollback</DialogTitle>
             <DialogDescription>
-              Are you sure you want to rollback to Phase {rollbackPhase}?
-              This will reset progress in subsequent phases.
+              Are you sure you want to rollback to Phase {rollbackPhase}? This
+              will reset progress in subsequent phases.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRollbackPhase(null)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmRollback}>
-              Confirm Rollback
-            </Button>
+            <Button onClick={handleConfirmRollback}>Confirm Rollback</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

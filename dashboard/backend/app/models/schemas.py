@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -76,7 +76,7 @@ class ProjectStatus(BaseModel):
 class ProjectInitRequest(BaseModel):
     """Request to initialize a new project."""
 
-    name: str = Field(..., min_length=1, max_length=64, pattern=r'^[a-zA-Z0-9_-]+$')
+    name: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 class ProjectInitResponse(BaseModel):

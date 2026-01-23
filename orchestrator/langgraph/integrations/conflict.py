@@ -5,16 +5,15 @@ detecting and resolving conflicts between Cursor and Gemini feedback.
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any, Optional
 
 from ...utils.conflict_resolution import (
-    ConflictResolver,
-    ResolutionStrategy,
-    ConflictResult,
-    Conflict,
     ConflictResolution,
+    ConflictResolver,
+    ConflictResult,
+    ResolutionStrategy,
 )
-from ..state import WorkflowState, AgentFeedback, WorkflowDecision
+from ..state import AgentFeedback, WorkflowDecision, WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -173,10 +172,14 @@ class LangGraphConflictAdapter:
 
         # Convert AgentFeedback dataclass
         return {
-            "overall_assessment": feedback.assessment if hasattr(feedback, "assessment") else "unknown",
+            "overall_assessment": feedback.assessment
+            if hasattr(feedback, "assessment")
+            else "unknown",
             "score": feedback.score if hasattr(feedback, "score") else 0,
             "concerns": feedback.concerns if hasattr(feedback, "concerns") else [],
-            "blocking_issues": feedback.blocking_issues if hasattr(feedback, "blocking_issues") else [],
+            "blocking_issues": feedback.blocking_issues
+            if hasattr(feedback, "blocking_issues")
+            else [],
         }
 
     def _result_to_state_update(

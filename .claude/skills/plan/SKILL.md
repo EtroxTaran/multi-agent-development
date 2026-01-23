@@ -1,3 +1,12 @@
+---
+name: plan
+description: Create an interactive implementation plan and task breakdown from PRODUCT.md.
+version: 1.1.0
+tags: [planning, workflow, tasks]
+owner: orchestration
+status: active
+---
+
 # Plan Skill
 
 Create an implementation plan from PRODUCT.md with interactive task breakdown.
@@ -122,7 +131,7 @@ Wait for user response:
 
 ### Step 6: Save Plan
 
-After approval, save to `.workflow/plan.json`:
+After approval, save to `phase_outputs` (type=plan):
 
 ```json
 {
@@ -133,7 +142,6 @@ After approval, save to `.workflow/plan.json`:
     {
       "id": "T1",
       "title": "...",
-      "status": "pending",
       ...
     }
   ],
@@ -147,7 +155,7 @@ After approval, save to `.workflow/plan.json`:
 }
 ```
 
-Update `.workflow/state.json`:
+Update `workflow_state` in SurrealDB:
 ```json
 {
   "current_phase": 2,
@@ -218,8 +226,8 @@ This ensures:
 
 | File | Purpose |
 |------|---------|
-| `.workflow/plan.json` | Task breakdown and metadata |
-| `.workflow/state.json` | Updated workflow state |
+| `phase_outputs` (plan) | Task breakdown and metadata |
+| `workflow_state` | Updated workflow state |
 
 ## State Update
 
@@ -233,7 +241,7 @@ After plan approval:
 When plan is approved:
 
 ```
-Plan saved to .workflow/plan.json
+Plan saved to SurrealDB `phase_outputs` (type=plan)
 
 Summary:
   - {N} tasks created
@@ -245,7 +253,7 @@ Next steps:
   /status  - View progress anytime
 
 Or for full validation:
-  /validate - Run Cursor + Gemini review on the plan
+  /validate-plan - Run Cursor + Gemini review on the plan
 ```
 
 ## Example Session
@@ -319,7 +327,7 @@ Does this plan look correct? Would you like to:
 
 User: Looks good, approve it.
 
-Claude: Plan approved and saved to .workflow/plan.json
+Claude: Plan approved and saved to SurrealDB `phase_outputs` (type=plan)
 
 Summary:
   - 6 tasks created
@@ -331,9 +339,18 @@ Next steps:
   /status  - View progress anytime
 ```
 
+## Outputs
+
+- `phase_outputs` entries for `plan` and `task_breakdown`.
+
+## Error Handling
+
+- If `PRODUCT.md` is missing or invalid, stop and request a valid spec before planning.
+- If task complexity is too high, split tasks before seeking approval.
+
 ## Related Skills
 
 - `/discover` - Previous step (create PRODUCT.md)
 - `/task <id>` - Implement individual tasks
-- `/validate` - Run agent validation on plan (optional)
+- `/validate-plan` - Run agent validation on plan (optional)
 - `/status` - Check progress

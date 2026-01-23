@@ -9,32 +9,34 @@ Implements:
 """
 
 import json
-import time
-import uuid
-from contextlib import contextmanager
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
-from pathlib import Path
-from typing import Optional, Any, Generator
-from enum import Enum
 import logging
+import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class SpanKind(Enum):
     """Type of span in the trace."""
-    WORKFLOW = "workflow"       # Top-level workflow execution
-    PHASE = "phase"             # Workflow phase (1-5)
-    AGENT = "agent"             # Agent invocation
-    LLM_CALL = "llm_call"       # LLM API call
-    TOOL = "tool"               # Tool execution
-    VALIDATION = "validation"   # Validation step
-    INTERNAL = "internal"       # Internal operation
+
+    WORKFLOW = "workflow"  # Top-level workflow execution
+    PHASE = "phase"  # Workflow phase (1-5)
+    AGENT = "agent"  # Agent invocation
+    LLM_CALL = "llm_call"  # LLM API call
+    TOOL = "tool"  # Tool execution
+    VALIDATION = "validation"  # Validation step
+    INTERNAL = "internal"  # Internal operation
 
 
 class SpanStatus(Enum):
     """Status of a span."""
+
     UNSET = "unset"
     OK = "ok"
     ERROR = "error"
@@ -43,6 +45,7 @@ class SpanStatus(Enum):
 @dataclass
 class SpanEvent:
     """An event within a span."""
+
     name: str
     timestamp: str
     attributes: dict = field(default_factory=dict)
@@ -57,6 +60,7 @@ class Span:
 
     Represents a unit of work (e.g., an agent call, LLM request, or phase).
     """
+
     trace_id: str
     span_id: str
     name: str
@@ -85,11 +89,13 @@ class Span:
 
     def add_event(self, name: str, attributes: Optional[dict] = None) -> None:
         """Add an event to the span."""
-        self.events.append(SpanEvent(
-            name=name,
-            timestamp=datetime.now().isoformat(),
-            attributes=attributes or {},
-        ))
+        self.events.append(
+            SpanEvent(
+                name=name,
+                timestamp=datetime.now().isoformat(),
+                attributes=attributes or {},
+            )
+        )
 
     def set_attribute(self, key: str, value: Any) -> None:
         """Set a span attribute."""
@@ -100,10 +106,13 @@ class Span:
         self.status = SpanStatus.ERROR
         self.attributes["error.type"] = type(error).__name__
         self.attributes["error.message"] = str(error)
-        self.add_event("exception", {
-            "exception.type": type(error).__name__,
-            "exception.message": str(error),
-        })
+        self.add_event(
+            "exception",
+            {
+                "exception.type": type(error).__name__,
+                "exception.message": str(error),
+            },
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -133,6 +142,7 @@ class Span:
 @dataclass
 class Trace:
     """A complete trace representing a workflow execution."""
+
     trace_id: str
     name: str
     start_time: str
@@ -493,34 +503,40 @@ class Tracer:
     def _to_otlp_format(self, trace: Trace) -> dict:
         """Convert trace to OTLP format."""
         return {
-            "resourceSpans": [{
-                "resource": {
-                    "attributes": [
-                        {"key": "service.name", "value": {"stringValue": self.service_name}},
-                        {"key": "session.id", "value": {"stringValue": self.session_id}},
-                    ]
-                },
-                "scopeSpans": [{
-                    "scope": {"name": "multi-agent-orchestrator"},
-                    "spans": [
+            "resourceSpans": [
+                {
+                    "resource": {
+                        "attributes": [
+                            {"key": "service.name", "value": {"stringValue": self.service_name}},
+                            {"key": "session.id", "value": {"stringValue": self.session_id}},
+                        ]
+                    },
+                    "scopeSpans": [
                         {
-                            "traceId": span.trace_id,
-                            "spanId": span.span_id,
-                            "parentSpanId": span.parent_span_id or "",
-                            "name": span.name,
-                            "kind": self._map_span_kind(span.kind),
-                            "startTimeUnixNano": self._to_nanos(span.start_time),
-                            "endTimeUnixNano": self._to_nanos(span.end_time) if span.end_time else 0,
-                            "status": {"code": 1 if span.status == SpanStatus.OK else 2},
-                            "attributes": [
-                                {"key": k, "value": {"stringValue": str(v)}}
-                                for k, v in span.attributes.items()
+                            "scope": {"name": "multi-agent-orchestrator"},
+                            "spans": [
+                                {
+                                    "traceId": span.trace_id,
+                                    "spanId": span.span_id,
+                                    "parentSpanId": span.parent_span_id or "",
+                                    "name": span.name,
+                                    "kind": self._map_span_kind(span.kind),
+                                    "startTimeUnixNano": self._to_nanos(span.start_time),
+                                    "endTimeUnixNano": self._to_nanos(span.end_time)
+                                    if span.end_time
+                                    else 0,
+                                    "status": {"code": 1 if span.status == SpanStatus.OK else 2},
+                                    "attributes": [
+                                        {"key": k, "value": {"stringValue": str(v)}}
+                                        for k, v in span.attributes.items()
+                                    ],
+                                }
+                                for span in trace.spans
                             ],
                         }
-                        for span in trace.spans
-                    ]
-                }]
-            }]
+                    ],
+                }
+            ]
         }
 
     def _map_span_kind(self, kind: SpanKind) -> int:
@@ -528,7 +544,7 @@ class Tracer:
         mapping = {
             SpanKind.WORKFLOW: 1,  # INTERNAL
             SpanKind.PHASE: 1,
-            SpanKind.AGENT: 3,     # CLIENT
+            SpanKind.AGENT: 3,  # CLIENT
             SpanKind.LLM_CALL: 3,
             SpanKind.TOOL: 1,
             SpanKind.VALIDATION: 1,

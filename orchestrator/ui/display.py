@@ -2,11 +2,12 @@
 
 import threading
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Optional, Dict, Any, Generator
+from typing import Any, Optional
 
-from orchestrator.ui.state_adapter import TaskUIInfo, EventLogEntry, UIStateSnapshot
+from orchestrator.ui.state_adapter import EventLogEntry, TaskUIInfo, UIStateSnapshot
 
 
 class UIState:
@@ -30,7 +31,7 @@ class UIState:
         self._phase_name = "Initializing"
 
         # Task tracking
-        self._tasks: List[TaskUIInfo] = []
+        self._tasks: list[TaskUIInfo] = []
         self._tasks_completed = 0
         self._tasks_total = 0
         self._current_task_id: Optional[str] = None
@@ -42,7 +43,7 @@ class UIState:
         self._files_modified = 0
 
         # Events
-        self._recent_events: List[EventLogEntry] = []
+        self._recent_events: list[EventLogEntry] = []
         self._max_events = 50
 
         # Status
@@ -60,7 +61,7 @@ class UIState:
 
             # Trim if too many events
             if len(self._recent_events) > self._max_events:
-                self._recent_events = self._recent_events[-self._max_events:]
+                self._recent_events = self._recent_events[-self._max_events :]
 
     def update_ralph_iteration(
         self,
@@ -110,7 +111,7 @@ class UIState:
             self._phase_name = name
             self._phase_progress = progress
 
-    def set_tasks(self, tasks: List[TaskUIInfo]) -> None:
+    def set_tasks(self, tasks: list[TaskUIInfo]) -> None:
         """Set task list."""
         with self._lock:
             self._tasks = tasks
@@ -184,9 +185,11 @@ class PlaintextDisplay:
         tests_total: int = 0,
     ) -> None:
         """Print Ralph iteration info."""
-        print(f"  Task {task_id}: iteration {iteration}/{max_iter}, {tests_passed}/{tests_total} tests passed")
+        print(
+            f"  Task {task_id}: iteration {iteration}/{max_iter}, {tests_passed}/{tests_total} tests passed"
+        )
 
-    def update_state(self, state: Dict[str, Any]) -> None:
+    def update_state(self, state: dict[str, Any]) -> None:
         """Update from workflow state (no-op for plaintext)."""
         pass
 
@@ -257,7 +260,7 @@ class WorkflowDisplay:
             "info",
         )
 
-    def update_state(self, state: Dict[str, Any]) -> None:
+    def update_state(self, state: dict[str, Any]) -> None:
         """Update from workflow state."""
         if "current_phase" in state:
             phase = state["current_phase"]
@@ -276,11 +279,13 @@ class WorkflowDisplay:
         if "tasks" in state:
             tasks = []
             for t in state["tasks"]:
-                tasks.append(TaskUIInfo(
-                    id=t.get("id", ""),
-                    title=t.get("title", ""),
-                    status=t.get("status", "pending"),
-                ))
+                tasks.append(
+                    TaskUIInfo(
+                        id=t.get("id", ""),
+                        title=t.get("title", ""),
+                        status=t.get("status", "pending"),
+                    )
+                )
             self._state.set_tasks(tasks)
 
     def update_metrics(

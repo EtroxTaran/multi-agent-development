@@ -9,14 +9,16 @@ import {
   CardHeader,
   CardTitle,
   Separator,
-} from '@/components/ui';
+} from "@/components/ui";
 
 export function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Configure your Conductor dashboard</p>
+        <p className="text-muted-foreground">
+          Configure your Conductor dashboard
+        </p>
       </div>
 
       <Separator />
@@ -35,7 +37,9 @@ export function SettingsPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">WebSocket</span>
-                <span className="font-mono text-sm">/api/projects/:name/events</span>
+                <span className="font-mono text-sm">
+                  /api/projects/:name/events
+                </span>
               </div>
             </div>
           </CardContent>
@@ -54,7 +58,9 @@ export function SettingsPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">URL</span>
-                <span className="font-mono text-sm">ws://localhost:8000/rpc</span>
+                <span className="font-mono text-sm">
+                  ws://localhost:8000/rpc
+                </span>
               </div>
             </div>
           </CardContent>

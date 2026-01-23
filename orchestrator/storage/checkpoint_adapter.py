@@ -5,7 +5,6 @@ This is the DB-only version - no file fallback.
 """
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -53,6 +52,7 @@ class CheckpointStorageAdapter(CheckpointStorageProtocol):
         """Get or create database backend."""
         if self._db_backend is None:
             from orchestrator.db.repositories.checkpoints import get_checkpoint_repository
+
             self._db_backend = get_checkpoint_repository(self.project_name)
         return self._db_backend
 
@@ -60,6 +60,7 @@ class CheckpointStorageAdapter(CheckpointStorageProtocol):
         """Get workflow repository for state access."""
         if self._workflow_backend is None:
             from orchestrator.db.repositories.workflow import get_workflow_repository
+
             self._workflow_backend = get_workflow_repository(self.project_name)
         return self._workflow_backend
 

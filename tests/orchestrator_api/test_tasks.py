@@ -1,7 +1,6 @@
 """Tests for task endpoints."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestGetTasks:
@@ -92,9 +91,7 @@ class TestGetTasks:
 class TestGetTask:
     """Tests for GET /projects/{project_name}/tasks/{task_id} endpoint."""
 
-    def test_get_task_success(
-        self, test_client, mock_project_manager, temp_project_with_state
-    ):
+    def test_get_task_success(self, test_client, mock_project_manager, temp_project_with_state):
         """Get task should return task details."""
         mock_project_manager.get_project.return_value = temp_project_with_state
 
@@ -106,9 +103,7 @@ class TestGetTask:
         assert data["id"] == "T1"
         assert data["title"] == "Test Task 1"
 
-    def test_get_task_not_found(
-        self, test_client, mock_project_manager, temp_project_with_state
-    ):
+    def test_get_task_not_found(self, test_client, mock_project_manager, temp_project_with_state):
         """Get task should return 404 when task not found."""
         mock_project_manager.get_project.return_value = temp_project_with_state
 
@@ -155,9 +150,7 @@ class TestGetTaskHistory:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/tasks/T1/history"
-                )
+                response = test_client.get("/projects/test-project/tasks/T1/history")
 
         assert response.status_code == 200
         data = response.json()
@@ -172,9 +165,7 @@ class TestGetTaskHistory:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/tasks/T1/history?limit=50"
-                )
+                response = test_client.get("/projects/test-project/tasks/T1/history?limit=50")
 
         assert response.status_code == 200
         mock_audit_storage.get_task_history.assert_called_with("T1", limit=50)
@@ -187,9 +178,7 @@ class TestGetTaskHistory:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/tasks/T1/history"
-                )
+                response = test_client.get("/projects/test-project/tasks/T1/history")
 
         assert response.status_code == 200
         data = response.json()

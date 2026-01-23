@@ -4,15 +4,14 @@ Verifies that the implementation builds successfully
 before proceeding to code review.
 """
 
-import json
 import logging
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ..state import WorkflowState
 from ...config import load_project_config
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -123,12 +122,14 @@ async def build_verification_node(state: WorkflowState) -> dict[str, Any]:
         # Add error to state - verification_fan_in will check for this
         # and route appropriately (retry implementation or escalate)
         return {
-            "errors": [{
-                "type": "build_verification_failed",
-                "message": "\n\n".join(error_parts),
-                "details": results,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "build_verification_failed",
+                    "message": "\n\n".join(error_parts),
+                    "details": results,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             # Note: We set next_decision but the parallel fan-out means
             # both reviewers will still run. verification_fan_in checks
             # for build errors and handles accordingly.
@@ -160,6 +161,7 @@ def _detect_type_check_command(
     if package_json.exists():
         try:
             import json as json_mod
+
             pkg = json_mod.loads(package_json.read_text())
             scripts = pkg.get("scripts", {})
 
@@ -186,6 +188,7 @@ def _detect_build_command(
     if package_json.exists():
         try:
             import json as json_mod
+
             pkg = json_mod.loads(package_json.read_text())
             scripts = pkg.get("scripts", {})
 

@@ -25,7 +25,8 @@ class MigrationInitialSchema(BaseMigration):
 
     async def up(self, ctx: MigrationContext) -> None:
         """Apply the initial schema."""
-        await ctx.execute("""
+        await ctx.execute(
+            """
 -- ============================================
 -- Meta-Architect Orchestrator Schema v2.0.0
 -- ============================================
@@ -226,7 +227,8 @@ DEFINE FIELD IF NOT EXISTS created_at ON TABLE workflow_events TYPE datetime DEF
 
 DEFINE INDEX IF NOT EXISTS idx_events_type ON TABLE workflow_events COLUMNS event_type;
 DEFINE INDEX IF NOT EXISTS idx_events_time ON TABLE workflow_events COLUMNS created_at;
-        """)
+        """
+        )
 
     async def down(self, ctx: MigrationContext) -> None:
         """Rollback by removing all tables.

@@ -1,14 +1,15 @@
 """Unit tests for AuditTrail."""
 
 import json
-import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from orchestrator.audit import (
-    AuditTrail,
-    AuditEntry,
     AuditConfig,
+    AuditEntry,
+    AuditTrail,
     create_audit_trail,
     get_project_audit_trail,
 )

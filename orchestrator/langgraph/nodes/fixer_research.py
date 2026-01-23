@@ -5,16 +5,16 @@ This node performs deep research when the diagnosis indicates knowledge gaps
 and generates a fix plan.
 """
 
-import logging
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from orchestrator.agents.adapter import AgentType, create_adapter
+from orchestrator.fixer.diagnosis import DiagnosisResult
+from orchestrator.fixer.strategies import FixAction, FixPlan
 from orchestrator.langgraph.state import WorkflowState
-from orchestrator.agents.adapter import create_adapter, AgentType
-from orchestrator.fixer.strategies import FixPlan, FixAction
-from orchestrator.fixer.diagnosis import RootCause, DiagnosisResult
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def fixer_research_node(state: WorkflowState) -> dict[str, Any]:
     """
     project_dir = Path(state["project_dir"])
     current_fix = state.get("current_fix_attempt", {})
-    
+
     if not current_fix:
         return {"next_decision": "escalate"}
 
@@ -40,7 +40,7 @@ async def fixer_research_node(state: WorkflowState) -> dict[str, Any]:
 
     # Reconstruct diagnosis object
     diagnosis = DiagnosisResult.from_dict(diagnosis_data)
-    
+
     logger.info(f"Starting research for root cause: {diagnosis.root_cause.value}")
 
     # Initialize researcher
@@ -76,20 +76,20 @@ Respond with a JSON object containing the fix actions:
     ]
 }}
 """
-    
+
     try:
         result = await researcher.run_iteration(prompt, timeout=180)
-        
+
         # Parse output
         import re
-        
+
         match = re.search(r"```json\n(.*?)\n```", result.output, re.DOTALL)
         if not match:
             match = re.search(r"({.*})", result.output, re.DOTALL)
-            
+
         if match:
             plan_data = json.loads(match.group(1))
-            
+
             # Convert to FixPlan
             actions = []
             for action in plan_data.get("actions", []):
@@ -97,40 +97,39 @@ Respond with a JSON object containing the fix actions:
                 params = action.get("params", {})
                 if action.get("content"):
                     params["content"] = action.get("content")
-                
-                actions.append(FixAction(
-                    action_type=action.get("type", "modify_file"),
-                    target=action.get("target"),
-                    params=params,
-                    description=action.get("description", "Research based fix"),
-                ))
-                
+
+                actions.append(
+                    FixAction(
+                        action_type=action.get("type", "modify_file"),
+                        target=action.get("target"),
+                        params=params,
+                        description=action.get("description", "Research based fix"),
+                    )
+                )
+
             plan = FixPlan(
                 diagnosis=diagnosis,
                 strategy_name=plan_data.get("strategy_name", "research_fix"),
                 actions=actions,
                 confidence=plan_data.get("confidence", 0.8),
-                requires_validation=True # Always validate research fixes
+                requires_validation=True,  # Always validate research fixes
             )
-            
+
             return {
                 "current_fix_attempt": {
                     **current_fix,
                     "plan": plan.to_dict(),
-                    "research_notes": result.output # Store full research context
+                    "research_notes": result.output,  # Store full research context
                 },
-                "next_decision": "validate", # Go to validation
-                "updated_at": datetime.now().isoformat()
+                "next_decision": "validate",  # Go to validation
+                "updated_at": datetime.now().isoformat(),
             }
-            
+
     except Exception as e:
         logger.error(f"Research failed: {e}")
-        
+
     return {
-        "current_fix_attempt": {
-            **current_fix,
-            "error": "Research failed to produce a plan"
-        },
+        "current_fix_attempt": {**current_fix, "error": "Research failed to produce a plan"},
         "next_decision": "escalate",
-        "updated_at": datetime.now().isoformat()
+        "updated_at": datetime.now().isoformat(),
     }

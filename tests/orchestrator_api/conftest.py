@@ -3,13 +3,12 @@ Fixtures for orchestrator-api tests.
 """
 
 import json
-import os
 import shutil
 import sys
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +18,7 @@ CONDUCTOR_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(CONDUCTOR_ROOT / "orchestrator-api"))
 sys.path.insert(0, str(CONDUCTOR_ROOT))
 
-from main import app, get_project_manager, _project_manager
+from main import app
 
 
 @pytest.fixture

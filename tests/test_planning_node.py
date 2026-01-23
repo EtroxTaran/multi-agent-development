@@ -13,24 +13,19 @@ Tests cover:
 
 import asyncio
 import json
-import pytest
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from orchestrator.langgraph.nodes.planning import planning_node
-from orchestrator.langgraph.state import (
-    WorkflowState,
-    PhaseState,
-    PhaseStatus,
-    create_initial_state,
-)
+from orchestrator.langgraph.state import PhaseStatus, create_initial_state
 
 
 @dataclass
 class MockAgentResult:
     """Mock result from agent run."""
+
     success: bool
     output: str = ""
     error: str = ""
@@ -48,7 +43,8 @@ class TestPlanningNode:
 
         # Create PRODUCT.md with all required sections
         product_md = project_dir / "PRODUCT.md"
-        product_md.write_text("""# Test Feature
+        product_md.write_text(
+            """# Test Feature
 
 ## Summary
 A test feature for testing the planning node. This feature demonstrates
@@ -88,7 +84,8 @@ We need comprehensive test coverage to ensure reliable operation.
 - [ ] Documentation updated
 - [ ] Code reviewed
 - [ ] Merged to main
-""")
+"""
+        )
 
         # Create .workflow directory
         (project_dir / ".workflow" / "phases" / "planning").mkdir(parents=True)
@@ -147,7 +144,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         assert result["next_decision"] == "continue"
@@ -185,7 +184,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         # Should indicate retry is needed
@@ -195,7 +196,9 @@ We need comprehensive test coverage to ensure reliable operation.
         assert result["errors"][0]["type"] == "planning_error"
 
     @pytest.mark.asyncio
-    async def test_planning_node_json_parsing_fallback(self, initial_state, mock_plan, temp_project_dir):
+    async def test_planning_node_json_parsing_fallback(
+        self, initial_state, mock_plan, temp_project_dir
+    ):
         """Test that regex extraction is tried on JSON parse failure."""
         # Return raw JSON in text that needs extraction
         raw_output = f"Here is the plan:\n```json\n{json.dumps(mock_plan)}\n```"
@@ -207,7 +210,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         # Should still succeed using regex extraction
@@ -229,7 +234,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         # Should escalate after max attempts
@@ -248,7 +255,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         phase_1 = result["phase_status"]["1"]
@@ -269,7 +278,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         # Plan should be in the result state
@@ -288,8 +299,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner.create_agent.return_value = mock_agent
         mock_logger = MagicMock()
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner), \
-             patch("orchestrator.langgraph.nodes.planning.get_node_logger", return_value=mock_logger):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ), patch("orchestrator.langgraph.nodes.planning.get_node_logger", return_value=mock_logger):
             await planning_node(initial_state)
 
         # Verify logging calls
@@ -304,7 +316,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.side_effect = RuntimeError("Unexpected error")
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         assert result["next_decision"] == "retry"
@@ -322,7 +336,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         # Should fail gracefully and request retry
@@ -337,7 +353,9 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
 
-        with patch("orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner):
+        with patch(
+            "orchestrator.langgraph.nodes.planning.SpecialistRunner", return_value=mock_runner
+        ):
             result = await planning_node(initial_state)
 
         assert result["next_decision"] == "retry"
@@ -363,7 +381,8 @@ class TestSpecialistRunner:
 
         # Create context file
         context_file = agents_dir / "CLAUDE.md"
-        context_file.write_text("""# Planner Agent
+        context_file.write_text(
+            """# Planner Agent
 
 ## Role
 You are the planning agent responsible for creating implementation plans.
@@ -372,7 +391,8 @@ You are the planning agent responsible for creating implementation plans.
 1. Read PRODUCT.md
 2. Create a structured plan
 3. Output valid JSON
-""")
+"""
+        )
 
         # Create tools file
         tools_file = agents_dir / "TOOLS.json"
@@ -394,8 +414,8 @@ You are the planning agent responsible for creating implementation plans.
 
     def test_specialist_runner_creates_agent(self, temp_project_with_agents):
         """Test that SpecialistRunner can create an agent instance."""
-        from orchestrator.specialists.runner import SpecialistRunner
         from orchestrator.agents.base import BaseAgent
+        from orchestrator.specialists.runner import SpecialistRunner
 
         runner = SpecialistRunner(temp_project_with_agents)
         agent = runner.create_agent("A01")

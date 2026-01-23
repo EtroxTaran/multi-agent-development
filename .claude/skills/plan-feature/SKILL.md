@@ -1,3 +1,12 @@
+---
+name: plan-feature
+description: Create implementation plans for features using a Task tool worker.
+version: 1.1.0
+tags: [planning, workflow, tasks]
+owner: orchestration
+status: active
+---
+
 # Plan Feature Skill
 
 Create implementation plans for features using Task tool worker.
@@ -5,6 +14,10 @@ Create implementation plans for features using Task tool worker.
 ## Overview
 
 This skill handles Phase 1 (Planning) of the workflow. It spawns a worker Claude via the Task tool to analyze requirements and create a structured implementation plan.
+
+## Prerequisites
+
+- `Docs/PRODUCT.md` exists with a valid feature specification.
 
 ## Token Efficiency
 
@@ -141,7 +154,7 @@ Task(
 
   ## Output Location
 
-  Save the plan to: .workflow/phases/planning/plan.json
+  Save the plan to `phase_outputs` (type=plan)
 
   ## Validation Checklist
 
@@ -210,7 +223,7 @@ Task(
 
 ## After Planning
 
-1. **Save plan**: Write to `.workflow/phases/planning/plan.json`
+1. **Save plan**: Store in `phase_outputs` (type=plan)
 
 2. **Update state**:
    ```json
@@ -243,6 +256,10 @@ After Auto-Split (max 3):
     files_to_create: [d.py, e.py, f.py]
     dependencies: ["T1-a"]
 ```
+
+## Outputs
+
+- `phase_outputs` entry for `plan` and `task_breakdown`.
 
 ## Error Handling
 

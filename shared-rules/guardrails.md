@@ -79,12 +79,16 @@ If you see `DatabaseRequiredError`:
 - Create empty catch blocks
 - Use magic numbers without constants
 - Ignore linter/type errors
+- Use `any` type (unless strictly necessary for migration, comment required)
+- Suppress linter rules without valid reason and comment
 
 ### Always Do
 - Run tests before marking complete
 - Check for regressions in existing tests
 - Follow existing code patterns
 - Clean up temporary files
+- Fix all linter errors before committing
+- Ensure `npm run typecheck` leads to 0 errors
 
 ---
 

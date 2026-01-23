@@ -12,7 +12,9 @@
     "Bash(npm test*)",
     "Bash(npx playwright*)",
     "Bash(npx jest*)",
-    "mcp__Playwright__*"
+    "mcp__Playwright__*",
+    "mcp__Ref__ref_search_documentation",
+    "mcp__Ref__ref_read_url"
   ],
   "forbidden": [
     "Bash(rm*)",
@@ -31,7 +33,37 @@
       "lib/**/*",
       "app/**/*",
       ".workflow/**/*"
-    ]
+    ],
+    "read_only": false
   },
-  "notes": "A10 can write integration and E2E tests, and has access to Playwright MCP tools."
+  "budget_limits": {
+    "per_invocation_usd": 1.0,
+    "per_task_usd": 2.0,
+    "fallback_model": "sonnet"
+  },
+  "timeout_seconds": 1800,
+  "max_retries": 3,
+  "security_restrictions": {
+    "forbidden_patterns": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(*--force*delete*)"
+    ],
+    "require_confirmation": [
+      "Bash(docker*)",
+      "Bash(kubectl*)",
+      "Bash(terraform*)"
+    ],
+    "secrets_check": true
+  },
+  "completion_signals": {
+    "claude": "<promise>DONE</promise>",
+    "cursor": "{\"status\": \"done\"}",
+    "gemini": "DONE|COMPLETE"
+  },
+  "tool_descriptions": {
+    "Write": "Create integration and E2E tests.",
+    "Bash(npx playwright*)": "Run Playwright tests."
+  },
+  "rationale": "Integration tester writes tests and uses Playwright."
 }

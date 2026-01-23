@@ -7,36 +7,38 @@ Implements:
 """
 
 import json
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional, Any
-from enum import Enum
 import logging
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class TaskComplexity(Enum):
     """Task complexity levels for model routing."""
-    TRIVIAL = "trivial"      # Simple validation, formatting
-    SIMPLE = "simple"        # Basic code review, simple analysis
-    MODERATE = "moderate"    # Standard implementation, debugging
-    COMPLEX = "complex"      # Architecture design, security analysis
-    EXPERT = "expert"        # Critical decisions, novel problems
+
+    TRIVIAL = "trivial"  # Simple validation, formatting
+    SIMPLE = "simple"  # Basic code review, simple analysis
+    MODERATE = "moderate"  # Standard implementation, debugging
+    COMPLEX = "complex"  # Architecture design, security analysis
+    EXPERT = "expert"  # Critical decisions, novel problems
 
 
 @dataclass
 class ModelSpec:
     """Specification for an LLM model."""
+
     name: str
     provider: str
-    input_cost_per_1k: float    # Cost per 1K input tokens
-    output_cost_per_1k: float   # Cost per 1K output tokens
-    context_window: int         # Maximum context size
-    capabilities: list[str]     # What this model is good at
+    input_cost_per_1k: float  # Cost per 1K input tokens
+    output_cost_per_1k: float  # Cost per 1K output tokens
+    context_window: int  # Maximum context size
+    capabilities: list[str]  # What this model is good at
     complexity_threshold: TaskComplexity  # Minimum complexity it handles well
-    latency_ms: int             # Typical response latency
+    latency_ms: int  # Typical response latency
 
     @property
     def avg_cost_per_1k(self) -> float:
@@ -125,6 +127,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
 @dataclass
 class TokenUsage:
     """Token usage for a single API call."""
+
     model: str
     input_tokens: int
     output_tokens: int
@@ -159,6 +162,7 @@ class TokenUsage:
 @dataclass
 class UsageSummary:
     """Summary of token usage over a period."""
+
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_cost: float = 0.0
@@ -210,9 +214,7 @@ class TokenTracker:
             try:
                 with open(usage_file) as f:
                     data = json.load(f)
-                self._usage_log = [
-                    TokenUsage.from_dict(u) for u in data.get("usage", [])
-                ]
+                self._usage_log = [TokenUsage.from_dict(u) for u in data.get("usage", [])]
             except (json.JSONDecodeError, KeyError):
                 self._usage_log = []
 
@@ -275,10 +277,7 @@ class TokenTracker:
         if since is None:
             return sum(u.cost for u in self._usage_log)
 
-        return sum(
-            u.cost for u in self._usage_log
-            if datetime.fromisoformat(u.timestamp) >= since
-        )
+        return sum(u.cost for u in self._usage_log if datetime.fromisoformat(u.timestamp) >= since)
 
     def check_budget(self, estimated_cost: float = 0.0) -> tuple[bool, float]:
         """Check if within budget.
@@ -290,7 +289,7 @@ class TokenTracker:
             Tuple of (within_budget, remaining_budget)
         """
         if self.budget_limit is None:
-            return True, float('inf')
+            return True, float("inf")
 
         total = self.get_total_cost()
         remaining = self.budget_limit - total
@@ -314,15 +313,9 @@ class TokenTracker:
         filtered = self._usage_log
 
         if since:
-            filtered = [
-                u for u in filtered
-                if datetime.fromisoformat(u.timestamp) >= since
-            ]
+            filtered = [u for u in filtered if datetime.fromisoformat(u.timestamp) >= since]
         if until:
-            filtered = [
-                u for u in filtered
-                if datetime.fromisoformat(u.timestamp) <= until
-            ]
+            filtered = [u for u in filtered if datetime.fromisoformat(u.timestamp) <= until]
 
         summary = UsageSummary(
             period_start=since.isoformat() if since else None,
@@ -354,7 +347,9 @@ class TokenTracker:
             # By task type
             if usage.task_type not in summary.by_task_type:
                 summary.by_task_type[usage.task_type] = {"tokens": 0, "cost": 0.0, "calls": 0}
-            summary.by_task_type[usage.task_type]["tokens"] += usage.input_tokens + usage.output_tokens
+            summary.by_task_type[usage.task_type]["tokens"] += (
+                usage.input_tokens + usage.output_tokens
+            )
             summary.by_task_type[usage.task_type]["cost"] += usage.cost
             summary.by_task_type[usage.task_type]["calls"] += 1
 
@@ -389,12 +384,14 @@ class TokenTracker:
         if self.budget_limit:
             remaining = self.budget_limit - summary.total_cost
             pct_used = (summary.total_cost / self.budget_limit) * 100
-            lines.extend([
-                "",
-                f"Budget: ${self.budget_limit:.2f}",
-                f"Used: ${summary.total_cost:.4f} ({pct_used:.1f}%)",
-                f"Remaining: ${remaining:.4f}",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"Budget: ${self.budget_limit:.2f}",
+                    f"Used: ${summary.total_cost:.4f} ({pct_used:.1f}%)",
+                    f"Remaining: ${remaining:.4f}",
+                ]
+            )
 
         lines.append("=" * 50)
         return "\n".join(lines)
@@ -413,22 +410,18 @@ class ModelRouter:
         "format_check": TaskComplexity.TRIVIAL,
         "syntax_validation": TaskComplexity.TRIVIAL,
         "json_parsing": TaskComplexity.TRIVIAL,
-
         # Simple tasks
         "code_formatting": TaskComplexity.SIMPLE,
         "basic_review": TaskComplexity.SIMPLE,
         "documentation": TaskComplexity.SIMPLE,
-
         # Moderate tasks
         "bug_detection": TaskComplexity.MODERATE,
         "test_generation": TaskComplexity.MODERATE,
         "refactoring": TaskComplexity.MODERATE,
-
         # Complex tasks
         "security_audit": TaskComplexity.COMPLEX,
         "architecture_review": TaskComplexity.COMPLEX,
         "performance_analysis": TaskComplexity.COMPLEX,
-
         # Expert tasks - use best model
         "system_design": TaskComplexity.EXPERT,
         "critical_decision": TaskComplexity.EXPERT,
@@ -491,15 +484,9 @@ class ModelRouter:
 
         # Filter models by provider
         if agent == "cursor":
-            candidates = [
-                m for m in MODEL_REGISTRY.values()
-                if m.provider == "openai"
-            ]
+            candidates = [m for m in MODEL_REGISTRY.values() if m.provider == "openai"]
         else:  # gemini
-            candidates = [
-                m for m in MODEL_REGISTRY.values()
-                if m.provider == "google"
-            ]
+            candidates = [m for m in MODEL_REGISTRY.values() if m.provider == "google"]
 
         # Filter by context window
         candidates = [m for m in candidates if m.context_window >= context_size]
@@ -507,15 +494,11 @@ class ModelRouter:
         # Filter by capabilities
         if required_capabilities:
             candidates = [
-                m for m in candidates
-                if all(cap in m.capabilities for cap in required_capabilities)
+                m for m in candidates if all(cap in m.capabilities for cap in required_capabilities)
             ]
 
         # Filter by complexity threshold
-        candidates = [
-            m for m in candidates
-            if m.complexity_threshold.value <= complexity.value
-        ]
+        candidates = [m for m in candidates if m.complexity_threshold.value <= complexity.value]
 
         if not candidates:
             # Fallback to default
@@ -578,23 +561,15 @@ class ModelRouter:
             Dict with default_cost, optimized_cost, savings
         """
         # Cost with default models
-        default_cursor = self.estimate_cost(
-            self.default_cursor_model, input_tokens, output_tokens
-        )
-        default_gemini = self.estimate_cost(
-            self.default_gemini_model, input_tokens, output_tokens
-        )
+        default_cursor = self.estimate_cost(self.default_cursor_model, input_tokens, output_tokens)
+        default_gemini = self.estimate_cost(self.default_gemini_model, input_tokens, output_tokens)
 
         # Cost with optimized routing
         optimized_cursor_model = self.select_model("cursor", task_type)
         optimized_gemini_model = self.select_model("gemini", task_type)
 
-        optimized_cursor = self.estimate_cost(
-            optimized_cursor_model, input_tokens, output_tokens
-        )
-        optimized_gemini = self.estimate_cost(
-            optimized_gemini_model, input_tokens, output_tokens
-        )
+        optimized_cursor = self.estimate_cost(optimized_cursor_model, input_tokens, output_tokens)
+        optimized_gemini = self.estimate_cost(optimized_gemini_model, input_tokens, output_tokens)
 
         return {
             "cursor": {
@@ -604,7 +579,8 @@ class ModelRouter:
                 "optimized_cost": optimized_cursor,
                 "savings": default_cursor - optimized_cursor,
                 "savings_pct": ((default_cursor - optimized_cursor) / default_cursor * 100)
-                              if default_cursor > 0 else 0,
+                if default_cursor > 0
+                else 0,
             },
             "gemini": {
                 "default_model": self.default_gemini_model,
@@ -613,6 +589,7 @@ class ModelRouter:
                 "optimized_cost": optimized_gemini,
                 "savings": default_gemini - optimized_gemini,
                 "savings_pct": ((default_gemini - optimized_gemini) / default_gemini * 100)
-                              if default_gemini > 0 else 0,
+                if default_gemini > 0
+                else 0,
             },
         }

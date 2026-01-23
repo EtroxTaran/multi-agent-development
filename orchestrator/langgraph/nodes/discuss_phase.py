@@ -8,13 +8,11 @@ Implements the mandatory discussion phase before planning that:
 Based on GSD (Get Shit Done) pattern for developer preference capture.
 """
 
-import asyncio
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from ..state import WorkflowState
 
@@ -25,32 +23,48 @@ DISCUSSION_QUESTIONS = [
     {
         "category": "libraries",
         "question": "Are there any specific libraries you want to use or avoid?",
-        "examples": ["Use date-fns NOT moment.js", "Prefer axios over fetch", "Use zod for validation"],
-        "prompt_hint": "List specific library preferences (e.g., 'use X instead of Y')"
+        "examples": [
+            "Use date-fns NOT moment.js",
+            "Prefer axios over fetch",
+            "Use zod for validation",
+        ],
+        "prompt_hint": "List specific library preferences (e.g., 'use X instead of Y')",
     },
     {
         "category": "architecture",
         "question": "What architectural patterns should be followed?",
-        "examples": ["Repository pattern for data access", "Clean architecture", "Feature-based folder structure"],
-        "prompt_hint": "Describe preferred architectural patterns"
+        "examples": [
+            "Repository pattern for data access",
+            "Clean architecture",
+            "Feature-based folder structure",
+        ],
+        "prompt_hint": "Describe preferred architectural patterns",
     },
     {
         "category": "testing",
         "question": "What's your testing philosophy?",
-        "examples": ["Integration tests over unit tests with mocks", "E2E tests for critical user flows", "100% coverage for business logic"],
-        "prompt_hint": "Describe testing preferences and requirements"
+        "examples": [
+            "Integration tests over unit tests with mocks",
+            "E2E tests for critical user flows",
+            "100% coverage for business logic",
+        ],
+        "prompt_hint": "Describe testing preferences and requirements",
     },
     {
         "category": "code_style",
         "question": "Any code style preferences beyond linting rules?",
-        "examples": ["Early returns preferred", "Named exports over default", "No classes, use functions"],
-        "prompt_hint": "List coding style preferences"
+        "examples": [
+            "Early returns preferred",
+            "Named exports over default",
+            "No classes, use functions",
+        ],
+        "prompt_hint": "List coding style preferences",
     },
     {
         "category": "error_handling",
         "question": "How should errors be handled?",
         "examples": ["Use Result types", "Central error boundary", "Detailed logging with context"],
-        "prompt_hint": "Describe error handling approach"
+        "prompt_hint": "Describe error handling approach",
     },
 ]
 
@@ -126,7 +140,7 @@ async def discuss_phase_node(state: WorkflowState) -> dict[str, Any]:
         # Save discussion results to database
         _write_context_md(context_file, preferences, state["project_name"])
 
-        logger.info(f"Discussion phase complete - preferences saved to database")
+        logger.info("Discussion phase complete - preferences saved to database")
 
         return {
             "discussion_complete": True,
@@ -139,11 +153,13 @@ async def discuss_phase_node(state: WorkflowState) -> dict[str, Any]:
         logger.error(f"Discussion phase failed: {e}")
         return {
             "discussion_complete": False,
-            "errors": [{
-                "type": "discussion_phase_error",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "discussion_phase_error",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }
@@ -177,9 +193,9 @@ def _is_context_complete(context_file: Path) -> bool:
             section_start = content.find(section)
             next_section = content.find("##", section_start + len(section))
             if next_section == -1:
-                section_content = content[section_start + len(section):]
+                section_content = content[section_start + len(section) :]
             else:
-                section_content = content[section_start + len(section):next_section]
+                section_content = content[section_start + len(section) : next_section]
 
             # Check for placeholder markers
             section_content = section_content.strip()
@@ -530,7 +546,9 @@ def _extract_claude_md_preferences(project_dir: Path) -> dict[str, list[str]]:
     return preferences
 
 
-def _write_context_md(context_file: Path, preferences: dict[str, list[str]], project_name: str) -> None:
+def _write_context_md(
+    context_file: Path, preferences: dict[str, list[str]], project_name: str
+) -> None:
     """Write CONTEXT.md preferences to database.
 
     Args:
@@ -538,6 +556,7 @@ def _write_context_md(context_file: Path, preferences: dict[str, list[str]], pro
         preferences: Preferences by category
         project_name: Project name for DB storage
     """
+
     def format_list(items: list[str]) -> str:
         if not items:
             return "- No specific preferences captured"
@@ -558,5 +577,9 @@ def _write_context_md(context_file: Path, preferences: dict[str, list[str]], pro
     from ...storage.async_utils import run_async
 
     repo = get_logs_repository(project_name)
-    run_async(repo.create_log(log_type="discussion", content={"preferences": preferences, "formatted": content}))
-    logger.info(f"Discussion preferences saved to database")
+    run_async(
+        repo.create_log(
+            log_type="discussion", content={"preferences": preferences, "formatted": content}
+        )
+    )
+    logger.info("Discussion preferences saved to database")

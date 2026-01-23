@@ -31,10 +31,10 @@ async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
     """
     from ...fixer import (
         DiagnosisEngine,
-        FixerError,
         ErrorCategory,
-        get_strategy_for_error,
+        FixerError,
         KnownFixDatabase,
+        get_strategy_for_error,
     )
 
     project_dir = Path(state["project_dir"])
@@ -118,16 +118,14 @@ async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
     requires_research = diagnosis.root_cause in (
         RootCause.API_MISUSE,
         RootCause.MISSING_DOCUMENTATION,
-        RootCause.DEPRECATED_FEATURE
+        RootCause.DEPRECATED_FEATURE,
     )
 
     if requires_research:
         next_decision = "research"
     else:
         requires_validation = (
-            plan.requires_validation or
-            plan.requires_security_notification or
-            plan.confidence < 0.5
+            plan.requires_validation or plan.requires_security_notification or plan.confidence < 0.5
         )
         next_decision = "validate" if requires_validation else "apply"
 

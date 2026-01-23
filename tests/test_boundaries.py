@@ -1,18 +1,19 @@
 """Tests for file boundary enforcement."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from orchestrator.utils.boundaries import (
+    ORCHESTRATOR_FORBIDDEN_PATTERNS,
+    ORCHESTRATOR_WRITABLE_PATTERNS,
     OrchestratorBoundaryError,
-    validate_orchestrator_write,
     ensure_orchestrator_can_write,
     get_writable_paths_info,
-    is_workflow_path,
     is_project_config,
-    ORCHESTRATOR_WRITABLE_PATTERNS,
-    ORCHESTRATOR_FORBIDDEN_PATTERNS,
+    is_workflow_path,
+    validate_orchestrator_write,
 )
 
 
@@ -244,4 +245,6 @@ class TestPatternMatching:
         test_dirs = ["test", "tests"]
         for test_dir in test_dirs:
             target = project_dir / test_dir / "test_main.py"
-            assert validate_orchestrator_write(project_dir, target) is False, f"Should block {test_dir}/"
+            assert (
+                validate_orchestrator_write(project_dir, target) is False
+            ), f"Should block {test_dir}/"

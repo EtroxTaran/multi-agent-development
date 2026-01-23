@@ -24,13 +24,16 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from ..config.models import (
-    CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL,
-    GEMINI_MODELS, DEFAULT_GEMINI_MODEL,
-    CURSOR_MODELS, DEFAULT_CURSOR_MODEL,
-    get_role_assignment
+    CLAUDE_MODELS,
+    CURSOR_MODELS,
+    DEFAULT_CLAUDE_MODEL,
+    DEFAULT_CURSOR_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    GEMINI_MODELS,
+    get_role_assignment,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 class AgentType(str, Enum):
     """Supported agent types."""
+
     CLAUDE = "claude"
     CURSOR = "cursor"
     GEMINI = "gemini"
@@ -57,6 +61,7 @@ class AgentCapabilities:
         completion_patterns: Patterns that signal task completion
         default_model: Default model to use if none specified
     """
+
     supports_json_output: bool = False
     supports_session: bool = False
     supports_model_selection: bool = False
@@ -84,6 +89,7 @@ class IterationResult:
         cost_usd: Estimated cost if available
         model: Model used for this iteration
     """
+
     success: bool
     output: str = ""
     parsed_output: Optional[dict] = None
@@ -404,7 +410,9 @@ class AgentAdapter(ABC):
                 return session_id
 
         # Try to extract from output text
-        session_match = re.search(r'session[_-]?id["\']?\s*:\s*["\']?([a-zA-Z0-9_-]+)', output, re.IGNORECASE)
+        session_match = re.search(
+            r'session[_-]?id["\']?\s*:\s*["\']?([a-zA-Z0-9_-]+)', output, re.IGNORECASE
+        )
         if session_match:
             return session_match.group(1)
 
@@ -715,8 +723,7 @@ def create_adapter(
             agent_type = AgentType(agent_type.lower())
         except ValueError:
             raise ValueError(
-                f"Unknown agent type: {agent_type}. "
-                f"Available: {[t.value for t in AgentType]}"
+                f"Unknown agent type: {agent_type}. " f"Available: {[t.value for t in AgentType]}"
             )
 
     adapter_class = ADAPTER_REGISTRY.get(agent_type)

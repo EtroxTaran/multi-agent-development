@@ -1,16 +1,15 @@
 """Tests for UAT generator utility."""
 
 import json
-import pytest
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+
+import pytest
 
 from orchestrator.utils.uat_generator import (
-    UATDocument,
-    UATGenerator,
     FileChange,
     TestResults,
+    UATDocument,
+    UATGenerator,
     create_uat_generator,
     generate_uat_from_verification,
 )

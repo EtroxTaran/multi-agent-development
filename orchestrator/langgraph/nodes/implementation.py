@@ -13,14 +13,13 @@ Optimized for production with:
 import asyncio
 import json
 import logging
-import subprocess
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from ..state import WorkflowState, PhaseStatus, PhaseState
-from ...agents.prompts import load_prompt, format_prompt
+from ...agents.prompts import format_prompt, load_prompt
+from ..state import PhaseState, PhaseStatus, WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -119,11 +118,13 @@ async def implementation_node(state: WorkflowState) -> dict[str, Any]:
     if not plan:
         return {
             "phase_status": phase_status,
-            "errors": [{
-                "type": "implementation_error",
-                "message": "No plan to implement",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "implementation_error",
+                    "message": "No plan to implement",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "abort",
         }
 
@@ -145,7 +146,9 @@ Please fix these issues and ensure tests pass."""
     # Check for clarification answers from human (from DB)
     clarification_answers = _load_clarification_answers(state["project_name"])
     if clarification_answers:
-        feedback_section += f"\n\nCLARIFICATION ANSWERS FROM HUMAN:\n{json.dumps(clarification_answers, indent=2)}"
+        feedback_section += (
+            f"\n\nCLARIFICATION ANSWERS FROM HUMAN:\n{json.dumps(clarification_answers, indent=2)}"
+        )
         logger.info(f"Including {len(clarification_answers)} clarification answers")
 
     # Load prompt from template with fallback to inline
@@ -186,8 +189,18 @@ Please fix these issues and ensure tests pass."""
             from ...storage.async_utils import run_async
 
             repo = get_phase_output_repository(state["project_name"])
-            run_async(repo.save_output(phase=3, output_type="partial_result", content=implementation_result))
-            run_async(repo.save_output(phase=3, output_type="clarifications_needed", content={"clarifications": clarifications}))
+            run_async(
+                repo.save_output(
+                    phase=3, output_type="partial_result", content=implementation_result
+                )
+            )
+            run_async(
+                repo.save_output(
+                    phase=3,
+                    output_type="clarifications_needed",
+                    content={"clarifications": clarifications},
+                )
+            )
 
             phase_3.status = PhaseStatus.BLOCKED
             phase_status["3"] = phase_3
@@ -195,12 +208,14 @@ Please fix these issues and ensure tests pass."""
             return {
                 "phase_status": phase_status,
                 "implementation_result": implementation_result,
-                "errors": [{
-                    "type": "implementation_error",
-                    "message": f"Worker needs clarification: {clarifications[0].get('question', 'Unknown')}",
-                    "clarifications": clarifications,
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "implementation_error",
+                        "message": f"Worker needs clarification: {clarifications[0].get('question', 'Unknown')}",
+                        "clarifications": clarifications,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "next_decision": "escalate",
             }
 
@@ -220,7 +235,11 @@ Please fix these issues and ensure tests pass."""
         from ...storage.async_utils import run_async
 
         repo = get_phase_output_repository(state["project_name"])
-        run_async(repo.save_output(phase=3, output_type="implementation_result", content=implementation_result))
+        run_async(
+            repo.save_output(
+                phase=3, output_type="implementation_result", content=implementation_result
+            )
+        )
 
         # Update phase status
         phase_3.status = PhaseStatus.COMPLETED
@@ -241,7 +260,8 @@ Please fix these issues and ensure tests pass."""
     except asyncio.TimeoutError:
         logger.error(f"Implementation timed out after {IMPLEMENTATION_TIMEOUT}s")
         return _handle_implementation_error(
-            phase_status, phase_3,
+            phase_status,
+            phase_3,
             f"Implementation timed out after {IMPLEMENTATION_TIMEOUT // 60} minutes",
             is_transient=False,  # Timeout is not retryable
         )
@@ -251,7 +271,8 @@ Please fix these issues and ensure tests pass."""
         # Categorize error for retry decision
         is_transient = _is_transient_error(e)
         return _handle_implementation_error(
-            phase_status, phase_3,
+            phase_status,
+            phase_3,
             str(e),
             is_transient=is_transient,
         )
@@ -267,7 +288,9 @@ def _build_feedback_section(state: WorkflowState) -> str:
             if hasattr(feedback, "concerns"):
                 concerns.extend(feedback.concerns)
         if concerns:
-            feedback_section = f"\nVALIDATION FEEDBACK TO ADDRESS:\n{json.dumps(concerns, indent=2)}"
+            feedback_section = (
+                f"\nVALIDATION FEEDBACK TO ADDRESS:\n{json.dumps(concerns, indent=2)}"
+            )
     return feedback_section
 
 
@@ -293,19 +316,22 @@ def _extract_clarifications(result: dict) -> list[dict]:
     raw = result.get("raw_output", "")
     if isinstance(raw, str) and "needs_clarification" in raw:
         import re
+
         # Find JSON blocks with needs_clarification status
         json_blocks = re.findall(r"\{[^{}]*\"status\"[^{}]*\"needs_clarification\"[^{}]*\}", raw)
         for block in json_blocks:
             try:
                 parsed = json.loads(block)
                 if parsed.get("status") == "needs_clarification":
-                    clarifications.append({
-                        "task_id": parsed.get("task_id", "unknown"),
-                        "question": parsed.get("question", "Clarification needed"),
-                        "context": parsed.get("context", ""),
-                        "options": parsed.get("options", []),
-                        "recommendation": parsed.get("recommendation", ""),
-                    })
+                    clarifications.append(
+                        {
+                            "task_id": parsed.get("task_id", "unknown"),
+                            "question": parsed.get("question", "Clarification needed"),
+                            "context": parsed.get("context", ""),
+                            "options": parsed.get("options", []),
+                            "recommendation": parsed.get("recommendation", ""),
+                        }
+                    )
             except json.JSONDecodeError:
                 continue
 
@@ -345,8 +371,14 @@ def _is_transient_error(error: Exception) -> bool:
     """Determine if an error is transient and worth retrying."""
     error_str = str(error).lower()
     transient_indicators = [
-        "timeout", "connection", "rate limit", "503", "502",
-        "temporarily unavailable", "retry", "overloaded"
+        "timeout",
+        "connection",
+        "rate limit",
+        "503",
+        "502",
+        "temporarily unavailable",
+        "retry",
+        "overloaded",
     ]
     return any(indicator in error_str for indicator in transient_indicators)
 
@@ -366,14 +398,16 @@ def _handle_implementation_error(
         return {
             "phase_status": phase_status,
             "next_decision": "retry",
-            "errors": [{
-                "type": "implementation_error",
-                "message": error_message,
-                "phase": 3,
-                "attempt": phase_3.attempts,
-                "transient": is_transient,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "implementation_error",
+                    "message": error_message,
+                    "phase": 3,
+                    "attempt": phase_3.attempts,
+                    "transient": is_transient,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }
     else:
         phase_3.status = PhaseStatus.FAILED
@@ -381,13 +415,15 @@ def _handle_implementation_error(
         return {
             "phase_status": phase_status,
             "next_decision": "escalate",
-            "errors": [{
-                "type": "implementation_error",
-                "message": f"Implementation failed after {phase_3.attempts} attempts: {error_message}",
-                "phase": 3,
-                "transient": is_transient,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "implementation_error",
+                    "message": f"Implementation failed after {phase_3.attempts} attempts: {error_message}",
+                    "phase": 3,
+                    "transient": is_transient,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }
 
 
@@ -409,21 +445,23 @@ async def _run_worker_claude(
         Result dictionary with success flag and output
     """
     # Build command
-    allowed_tools = ",".join([
-        "Read",
-        "Write",
-        "Edit",
-        "Glob",
-        "Grep",
-        "Bash(npm*)",
-        "Bash(pytest*)",
-        "Bash(python*)",
-        "Bash(pnpm*)",
-        "Bash(yarn*)",
-        "Bash(bun*)",
-        "Bash(cargo*)",
-        "Bash(go*)",
-    ])
+    allowed_tools = ",".join(
+        [
+            "Read",
+            "Write",
+            "Edit",
+            "Glob",
+            "Grep",
+            "Bash(npm*)",
+            "Bash(pytest*)",
+            "Bash(python*)",
+            "Bash(pnpm*)",
+            "Bash(yarn*)",
+            "Bash(bun*)",
+            "Bash(cargo*)",
+            "Bash(go*)",
+        ]
+    )
 
     cmd = [
         "claude",
@@ -487,6 +525,7 @@ def _parse_worker_output(stdout: str) -> dict:
 
     # Try to extract JSON from text
     import re
+
     json_match = re.search(r"\{[\s\S]*\}", stdout)
     if json_match:
         try:
@@ -585,8 +624,14 @@ def _detect_test_commands(project_dir: Path) -> list[str]:
 def _find_test_files(project_dir: Path) -> list[Path]:
     """Find test files in project."""
     patterns = [
-        "test_*.py", "*_test.py", "*.test.ts", "*.test.js",
-        "*.spec.ts", "*.spec.js", "*_test.go", "*_test.rs"
+        "test_*.py",
+        "*_test.py",
+        "*.test.ts",
+        "*.test.js",
+        "*.spec.ts",
+        "*.spec.js",
+        "*_test.go",
+        "*_test.rs",
     ]
     test_files = []
     for pattern in patterns:

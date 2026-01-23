@@ -32,13 +32,13 @@ Usage:
 import hashlib
 import json
 import logging
-import os
 import threading
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Generator, Iterator, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -461,7 +461,7 @@ class AuditTrail:
         if not self.log_file.exists():
             return
 
-        with open(self.log_file, "r") as f:
+        with open(self.log_file) as f:
             for line in f:
                 line = line.strip()
                 if not line:

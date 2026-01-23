@@ -16,11 +16,12 @@ from typing import Optional
 @dataclass
 class LogRotationConfig:
     """Configuration for log rotation."""
-    max_file_size_mb: float = 10.0      # Rotate when file exceeds this size
-    max_backup_count: int = 5           # Number of backup files to keep
-    max_age_days: int = 7               # Archive files older than this
-    archive_retention_days: int = 30    # Delete archives older than this
-    compress_archives: bool = True      # gzip old logs
+
+    max_file_size_mb: float = 10.0  # Rotate when file exceeds this size
+    max_backup_count: int = 5  # Number of backup files to keep
+    max_age_days: int = 7  # Archive files older than this
+    archive_retention_days: int = 30  # Delete archives older than this
+    compress_archives: bool = True  # gzip old logs
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +46,7 @@ class LogRotationConfig:
 @dataclass
 class CleanupResult:
     """Result of a cleanup operation."""
+
     rotated_files: list[str] = field(default_factory=list)
     archived_files: list[str] = field(default_factory=list)
     deleted_files: list[str] = field(default_factory=list)
@@ -424,7 +426,7 @@ def load_config(workflow_dir: Path) -> LogRotationConfig:
 
     if config_file.exists():
         try:
-            with open(config_file, "r", encoding="utf-8") as f:
+            with open(config_file, encoding="utf-8") as f:
                 data = json.load(f)
                 log_config = data.get("log_management", {})
                 return LogRotationConfig(
@@ -434,7 +436,7 @@ def load_config(workflow_dir: Path) -> LogRotationConfig:
                     archive_retention_days=log_config.get("delete_archives_after_days", 30),
                     compress_archives=log_config.get("compress_archives", True),
                 )
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
 
     return LogRotationConfig()
@@ -453,10 +455,10 @@ def should_auto_cleanup(workflow_dir: Path) -> bool:
 
     if config_file.exists():
         try:
-            with open(config_file, "r", encoding="utf-8") as f:
+            with open(config_file, encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("log_management", {}).get("auto_cleanup_on_start", True)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
 
     return True  # Default to enabled

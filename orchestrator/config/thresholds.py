@@ -8,7 +8,6 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from ..validators.security_scanner import Severity
 
@@ -18,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValidationConfig:
     """Configuration for validation thresholds."""
+
     validation_threshold: float = 6.0  # Phase 2 minimum score
     verification_threshold: float = 7.0  # Phase 4 minimum score
     max_phase_retries: int = 3
@@ -26,6 +26,7 @@ class ValidationConfig:
 @dataclass
 class QualityConfig:
     """Configuration for code quality gates."""
+
     coverage_threshold: float = 70.0
     coverage_blocking: bool = False
     build_required: bool = True
@@ -35,6 +36,7 @@ class QualityConfig:
 @dataclass
 class SecurityConfig:
     """Configuration for security scanning."""
+
     enabled: bool = True
     blocking_severities: list[Severity] = field(
         default_factory=lambda: [Severity.CRITICAL, Severity.HIGH]
@@ -44,25 +46,40 @@ class SecurityConfig:
 @dataclass
 class ResearchConfig:
     """Configuration for research phase."""
+
     # Basic web search is ON by default (free, all CLIs support it)
     web_research_enabled: bool = True
     web_research_timeout: int = 60
 
     # Basic tools (default) - free, built into Claude Code
-    basic_web_tools: list[str] = field(default_factory=lambda: [
-        "WebSearch",
-        "WebFetch",
-    ])
+    basic_web_tools: list[str] = field(
+        default_factory=lambda: [
+            "WebSearch",
+            "WebFetch",
+        ]
+    )
 
     # Deep research tools (optional) - requires Perplexity API
     perplexity_enabled: bool = False
-    perplexity_tools: list[str] = field(default_factory=lambda: [
-        "mcp__perplexity__perplexity_search",
-        "mcp__perplexity__perplexity_ask",
-        "mcp__perplexity__perplexity_research",
-    ])
+    perplexity_tools: list[str] = field(
+        default_factory=lambda: [
+            "mcp__perplexity__perplexity_search",
+            "mcp__perplexity__perplexity_ask",
+            "mcp__perplexity__perplexity_research",
+        ]
+    )
+
+    # Ref MCP tools for documentation access (optional but recommended)
+    ref_enabled: bool = True
+    ref_tools: list[str] = field(
+        default_factory=lambda: [
+            "mcp__Ref__ref_search_documentation",
+            "mcp__Ref__ref_read_url",
+        ]
+    )
 
     fallback_on_web_failure: bool = True
+    ref_fallback_on_failure: bool = True
 
     @property
     def web_tools(self) -> list[str]:
@@ -72,21 +89,78 @@ class ResearchConfig:
             tools.extend(self.perplexity_tools)
         return tools
 
+    @property
+    def documentation_tools(self) -> list[str]:
+        """Get documentation access tools."""
+        if self.ref_enabled:
+            return list(self.ref_tools)
+        # Fallback to basic web tools for docs if ref not available
+        return list(self.basic_web_tools)
+
+
+@dataclass
+class QualityGateConfig:
+    """Configuration for A13 Quality Gate checks."""
+
+    enabled: bool = True
+    typescript_strict: bool = True
+    eslint_required: bool = True
+    naming_conventions: bool = True
+    code_structure: bool = True
+    max_file_lines: int = 500
+    max_function_lines: int = 50
+    # Score threshold - below this fails the gate
+    minimum_score: float = 6.0
+    # What severities block the workflow
+    blocking_severities: list[str] = field(
+        default_factory=lambda: [
+            "CRITICAL",
+            "HIGH",
+        ]
+    )
+
+
+@dataclass
+class DependencyConfig:
+    """Configuration for A14 Dependency Checker."""
+
+    enabled: bool = True
+    check_npm: bool = True
+    check_docker: bool = True
+    check_frameworks: bool = True
+    # Auto-fix patch/minor updates (major requires approval)
+    auto_fix_enabled: bool = False
+    # What severities block the workflow
+    blocking_severities: list[str] = field(
+        default_factory=lambda: [
+            "critical",
+            "high",
+        ]
+    )
+    # Generate dependabot.yml if missing
+    generate_dependabot: bool = True
+    # Generate renovate.json if missing (alternative to dependabot)
+    generate_renovate: bool = False
+
 
 @dataclass
 class WorkflowFeatures:
     """Feature flags for workflow nodes."""
+
     product_validation: bool = True
     environment_check: bool = True
     build_verification: bool = True
     coverage_check: bool = True
     security_scan: bool = True
     approval_gates: bool = False  # Human approval gates
+    quality_gate: bool = True  # A13 - TypeScript/ESLint/naming checks
+    dependency_check: bool = True  # A14 - Outdated packages/Docker security
 
 
 @dataclass
 class WorkflowConfig:
     """Configuration for workflow behavior."""
+
     features: WorkflowFeatures = field(default_factory=WorkflowFeatures)
     approval_phases: list[int] = field(default_factory=list)  # Phases requiring human approval
     parallel_workers: int = 1
@@ -96,12 +170,15 @@ class WorkflowConfig:
 @dataclass
 class ProjectConfig:
     """Complete project configuration."""
+
     project_type: str = "base"
     validation: ValidationConfig = field(default_factory=ValidationConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     workflow: WorkflowConfig = field(default_factory=WorkflowConfig)
     research: ResearchConfig = field(default_factory=ResearchConfig)
+    quality_gate: QualityGateConfig = field(default_factory=QualityGateConfig)
+    dependency: DependencyConfig = field(default_factory=DependencyConfig)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -130,6 +207,8 @@ class ProjectConfig:
                     "coverage_check": self.workflow.features.coverage_check,
                     "security_scan": self.workflow.features.security_scan,
                     "approval_gates": self.workflow.features.approval_gates,
+                    "quality_gate": self.workflow.features.quality_gate,
+                    "dependency_check": self.workflow.features.dependency_check,
                 },
                 "approval_phases": self.workflow.approval_phases,
                 "parallel_workers": self.workflow.parallel_workers,
@@ -141,7 +220,31 @@ class ProjectConfig:
                 "basic_web_tools": self.research.basic_web_tools,
                 "perplexity_enabled": self.research.perplexity_enabled,
                 "perplexity_tools": self.research.perplexity_tools,
+                "ref_enabled": self.research.ref_enabled,
+                "ref_tools": self.research.ref_tools,
                 "fallback_on_web_failure": self.research.fallback_on_web_failure,
+                "ref_fallback_on_failure": self.research.ref_fallback_on_failure,
+            },
+            "quality_gate": {
+                "enabled": self.quality_gate.enabled,
+                "typescript_strict": self.quality_gate.typescript_strict,
+                "eslint_required": self.quality_gate.eslint_required,
+                "naming_conventions": self.quality_gate.naming_conventions,
+                "code_structure": self.quality_gate.code_structure,
+                "max_file_lines": self.quality_gate.max_file_lines,
+                "max_function_lines": self.quality_gate.max_function_lines,
+                "minimum_score": self.quality_gate.minimum_score,
+                "blocking_severities": self.quality_gate.blocking_severities,
+            },
+            "dependency": {
+                "enabled": self.dependency.enabled,
+                "check_npm": self.dependency.check_npm,
+                "check_docker": self.dependency.check_docker,
+                "check_frameworks": self.dependency.check_frameworks,
+                "auto_fix_enabled": self.dependency.auto_fix_enabled,
+                "blocking_severities": self.dependency.blocking_severities,
+                "generate_dependabot": self.dependency.generate_dependabot,
+                "generate_renovate": self.dependency.generate_renovate,
             },
         }
 
@@ -341,7 +444,8 @@ def _merge_config(base: ProjectConfig, custom: dict) -> ProjectConfig:
             base.security.enabled = bool(s["enabled"])
         if "blocking_severities" in s:
             base.security.blocking_severities = [
-                Severity(sev) for sev in s["blocking_severities"]
+                Severity(sev)
+                for sev in s["blocking_severities"]
                 if sev in [e.value for e in Severity]
             ]
 
@@ -382,8 +486,64 @@ def _merge_config(base: ProjectConfig, custom: dict) -> ProjectConfig:
             base.research.perplexity_enabled = bool(r["perplexity_enabled"])
         if "perplexity_tools" in r:
             base.research.perplexity_tools = list(r["perplexity_tools"])
+        if "ref_enabled" in r:
+            base.research.ref_enabled = bool(r["ref_enabled"])
+        if "ref_tools" in r:
+            base.research.ref_tools = list(r["ref_tools"])
         if "fallback_on_web_failure" in r:
             base.research.fallback_on_web_failure = bool(r["fallback_on_web_failure"])
+        if "ref_fallback_on_failure" in r:
+            base.research.ref_fallback_on_failure = bool(r["ref_fallback_on_failure"])
+
+    # Update quality gate config
+    if "quality_gate" in custom:
+        qg = custom["quality_gate"]
+        if "enabled" in qg:
+            base.quality_gate.enabled = bool(qg["enabled"])
+        if "typescript_strict" in qg:
+            base.quality_gate.typescript_strict = bool(qg["typescript_strict"])
+        if "eslint_required" in qg:
+            base.quality_gate.eslint_required = bool(qg["eslint_required"])
+        if "naming_conventions" in qg:
+            base.quality_gate.naming_conventions = bool(qg["naming_conventions"])
+        if "code_structure" in qg:
+            base.quality_gate.code_structure = bool(qg["code_structure"])
+        if "max_file_lines" in qg:
+            base.quality_gate.max_file_lines = int(qg["max_file_lines"])
+        if "max_function_lines" in qg:
+            base.quality_gate.max_function_lines = int(qg["max_function_lines"])
+        if "minimum_score" in qg:
+            base.quality_gate.minimum_score = float(qg["minimum_score"])
+        if "blocking_severities" in qg:
+            base.quality_gate.blocking_severities = list(qg["blocking_severities"])
+
+    # Update dependency config
+    if "dependency" in custom:
+        d = custom["dependency"]
+        if "enabled" in d:
+            base.dependency.enabled = bool(d["enabled"])
+        if "check_npm" in d:
+            base.dependency.check_npm = bool(d["check_npm"])
+        if "check_docker" in d:
+            base.dependency.check_docker = bool(d["check_docker"])
+        if "check_frameworks" in d:
+            base.dependency.check_frameworks = bool(d["check_frameworks"])
+        if "auto_fix_enabled" in d:
+            base.dependency.auto_fix_enabled = bool(d["auto_fix_enabled"])
+        if "blocking_severities" in d:
+            base.dependency.blocking_severities = list(d["blocking_severities"])
+        if "generate_dependabot" in d:
+            base.dependency.generate_dependabot = bool(d["generate_dependabot"])
+        if "generate_renovate" in d:
+            base.dependency.generate_renovate = bool(d["generate_renovate"])
+
+    # Handle workflow features for new flags
+    if "workflow" in custom and "features" in custom["workflow"]:
+        f = custom["workflow"]["features"]
+        if "quality_gate" in f:
+            base.workflow.features.quality_gate = bool(f["quality_gate"])
+        if "dependency_check" in f:
+            base.workflow.features.dependency_check = bool(f["dependency_check"])
 
     return base
 

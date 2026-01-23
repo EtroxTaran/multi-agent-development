@@ -13,18 +13,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ...agents.prompts import format_prompt, load_prompt
+from ...config.models import get_role_assignment, infer_task_type
+from ...review.resolver import ConflictResolver
+from ..integrations.action_logging import get_node_logger
 from ..state import (
-    WorkflowState,
-    PhaseStatus,
-    PhaseState,
     AgentFeedback,
+    PhaseState,
+    PhaseStatus,
+    WorkflowState,
     create_agent_execution,
     create_error_context,
 )
-from ..integrations.action_logging import get_node_logger
-from ...review.resolver import ConflictResolver
-from ...agents.prompts import load_prompt, format_prompt
-from ...config.models import get_role_assignment, infer_task_type
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,11 @@ def _build_validation_correction_prompt(
     if gemini_feedback and gemini_feedback.concerns:
         sections.append("\n### 🏛️ Architecture & Strategy (Gemini)\n")
         for concern in gemini_feedback.concerns[:5]:
-            desc = concern.get("description", str(concern)) if isinstance(concern, dict) else str(concern)
+            desc = (
+                concern.get("description", str(concern))
+                if isinstance(concern, dict)
+                else str(concern)
+            )
             rec = concern.get("recommendation", "") if isinstance(concern, dict) else ""
             if rec:
                 sections.append(f"- {desc}\n  *Recommendation: {rec}*\n")
@@ -65,7 +69,11 @@ def _build_validation_correction_prompt(
     if cursor_feedback and cursor_feedback.concerns:
         sections.append("\n### 🔍 Code Quality & Security (Cursor)\n")
         for concern in cursor_feedback.concerns[:5]:
-            desc = concern.get("description", str(concern)) if isinstance(concern, dict) else str(concern)
+            desc = (
+                concern.get("description", str(concern))
+                if isinstance(concern, dict)
+                else str(concern)
+            )
             sev = concern.get("severity", "medium") if isinstance(concern, dict) else "medium"
             sections.append(f"- [{sev.upper()}] {desc}\n")
 
@@ -189,12 +197,14 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
 
     if not plan:
         return {
-            "errors": [{
-                "type": "validation_error",
-                "agent": "cursor",
-                "message": "No plan to validate",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "validation_error",
+                    "agent": "cursor",
+                    "message": "No plan to validate",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }
 
     # Load prompt from template with fallback to inline
@@ -226,6 +236,7 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
             content = raw_output.get("result", "")
             # Extract JSON from markdown code block
             import re
+
             # Match JSON inside ```json ... ``` or just { ... }
             json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", content)
             if json_match:
@@ -247,6 +258,7 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
         elif result.output:
             # Try to extract JSON from raw output
             import re
+
             json_match = re.search(r"\{[\s\S]*\}", result.output)
             if json_match:
                 try:
@@ -261,7 +273,8 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
             assessment=feedback_data.get("overall_assessment", "unknown"),
             concerns=feedback_data.get("concerns", []),
             blocking_issues=[
-                c["description"] for c in feedback_data.get("concerns", [])
+                c["description"]
+                for c in feedback_data.get("concerns", [])
                 if c.get("severity") == "high"
             ],
             summary=feedback_data.get("summary", ""),
@@ -271,6 +284,7 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
         # Save feedback to database
         from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_cursor_feedback(feedback.to_dict()))
 
@@ -282,8 +296,7 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
             action_logger.log_validation_pass("cursor", feedback.score, phase=2)
         else:
             action_logger.log_validation_fail(
-                "cursor", feedback.score,
-                feedback.summary or "Score below threshold", phase=2
+                "cursor", feedback.score, feedback.summary or "Score below threshold", phase=2
             )
 
         action_logger.log_agent_complete(
@@ -331,7 +344,7 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
             agent="cursor",
             node="cursor_validate",
             template_name="validation",
-            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            prompt=prompt[:5000] if "prompt" in dir() else "",
             output=str(e),
             success=False,
             exit_code=1,
@@ -349,12 +362,14 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
                     summary=str(e),
                 )
             },
-            "errors": [{
-                "type": "validation_error",
-                "agent": "cursor",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "validation_error",
+                    "agent": "cursor",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "error_context": error_context,
             "last_agent_execution": failed_execution,
             "execution_history": [failed_execution],
@@ -382,12 +397,14 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
 
     if not plan:
         return {
-            "errors": [{
-                "type": "validation_error",
-                "agent": "gemini",
-                "message": "No plan to validate",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "validation_error",
+                    "agent": "gemini",
+                    "message": "No plan to validate",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }
 
     # Load prompt from template with fallback to inline
@@ -440,7 +457,8 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
             assessment=feedback_data.get("overall_assessment", "unknown"),
             concerns=concerns,
             blocking_issues=[
-                c["description"] for c in concerns
+                c["description"]
+                for c in concerns
                 if c.get("severity") == "high" or "critical" in c.get("description", "").lower()
             ],
             summary=feedback_data.get("summary", ""),
@@ -450,6 +468,7 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
         # Save feedback to database
         from ...db.repositories.phase_outputs import get_phase_output_repository
         from ...storage.async_utils import run_async
+
         repo = get_phase_output_repository(state["project_name"])
         run_async(repo.save_gemini_feedback(feedback.to_dict()))
 
@@ -461,8 +480,7 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
             action_logger.log_validation_pass("gemini", feedback.score, phase=2)
         else:
             action_logger.log_validation_fail(
-                "gemini", feedback.score,
-                feedback.summary or "Score below threshold", phase=2
+                "gemini", feedback.score, feedback.summary or "Score below threshold", phase=2
             )
 
         action_logger.log_agent_complete(
@@ -510,7 +528,7 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
             agent="gemini",
             node="gemini_validate",
             template_name="validation",
-            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            prompt=prompt[:5000] if "prompt" in dir() else "",
             output=str(e),
             success=False,
             exit_code=1,
@@ -528,12 +546,14 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
                     summary=str(e),
                 )
             },
-            "errors": [{
-                "type": "validation_error",
-                "agent": "gemini",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "validation_error",
+                    "agent": "gemini",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "error_context": error_context,
             "last_agent_execution": failed_execution,
             "execution_history": [failed_execution],
@@ -581,12 +601,14 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
 
         return {
             "phase_status": phase_status,
-            "errors": [{
-                "type": "validation_incomplete",
-                "missing_agents": missing,
-                "message": f"Missing feedback from: {', '.join(missing)}",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "validation_incomplete",
+                    "missing_agents": missing,
+                    "message": f"Missing feedback from: {', '.join(missing)}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",
         }
 
@@ -632,6 +654,7 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
     # Save consolidated feedback to database
     from ...db.repositories.phase_outputs import get_phase_output_repository
     from ...storage.async_utils import run_async
+
     repo = get_phase_output_repository(state["project_name"])
     run_async(repo.save_output(phase=2, output_type="consolidated", content=consolidated))
 
@@ -641,7 +664,9 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
         phase_status["2"] = phase_2
 
         action_logger.log_phase_complete(2, "Validation")
-        action_logger.log_info(f"Validation approved with combined score {combined_score:.1f}", phase=2)
+        action_logger.log_info(
+            f"Validation approved with combined score {combined_score:.1f}", phase=2
+        )
 
         return {
             "phase_status": phase_status,
@@ -659,7 +684,7 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
             action_logger.log_phase_retry(2, phase_2.attempts + 1, phase_2.max_attempts)
             action_logger.log_warning(
                 f"Validation needs changes (score: {combined_score:.1f}, blocking issues: {len(blocking_issues)})",
-                phase=2
+                phase=2,
             )
 
             # Build structured correction prompt for retry
@@ -679,17 +704,21 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
             phase_2.error = f"Validation failed after {phase_2.attempts} attempts"
             phase_status["2"] = phase_2
 
-            action_logger.log_phase_failed(2, "Validation", f"Failed after {phase_2.attempts} attempts")
+            action_logger.log_phase_failed(
+                2, "Validation", f"Failed after {phase_2.attempts} attempts"
+            )
             action_logger.log_escalation("Validation failed - max retries exceeded", phase=2)
 
             return {
                 "phase_status": phase_status,
                 "next_decision": "escalate",
-                "errors": [{
-                    "type": "validation_failed",
-                    "combined_score": combined_score,
-                    "blocking_issues": blocking_issues,
-                    "message": "Plan validation failed",
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "validation_failed",
+                        "combined_score": combined_score,
+                        "blocking_issues": blocking_issues,
+                        "message": "Plan validation failed",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
             }

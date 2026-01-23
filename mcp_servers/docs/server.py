@@ -10,15 +10,11 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import (
-    Tool,
-    TextContent,
-    Resource,
-)
+from mcp.types import Resource, TextContent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -393,16 +389,20 @@ async def search_docs(
 
                 for i, line in enumerate(content.split("\n"), 1):
                     if pattern.search(line):
-                        matches.append({
-                            "line": i,
-                            "text": line.strip()[:200],
-                        })
+                        matches.append(
+                            {
+                                "line": i,
+                                "text": line.strip()[:200],
+                            }
+                        )
 
                 if matches:
-                    results.append({
-                        "file": str(md_file.relative_to(META_ROOT)),
-                        "matches": matches[:5],  # Limit matches per file
-                    })
+                    results.append(
+                        {
+                            "file": str(md_file.relative_to(META_ROOT)),
+                            "matches": matches[:5],  # Limit matches per file
+                        }
+                    )
 
             except Exception as e:
                 logger.warning(f"Error reading {md_file}: {e}")
@@ -469,11 +469,13 @@ async def list_docs(project: str) -> dict:
         except Exception:
             pass
 
-        docs.append({
-            "path": str(md_file.relative_to(project_dir)),
-            "description": description,
-            "size": md_file.stat().st_size,
-        })
+        docs.append(
+            {
+                "path": str(md_file.relative_to(project_dir)),
+                "description": description,
+                "size": md_file.stat().st_size,
+            }
+        )
 
     return {
         "project": project,

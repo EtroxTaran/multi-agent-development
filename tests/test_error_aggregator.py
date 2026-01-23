@@ -1,15 +1,16 @@
 """Tests for ErrorAggregator component."""
 
 import json
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from orchestrator.utils.error_aggregator import (
-    ErrorAggregator,
     AggregatedError,
-    ErrorSource,
+    ErrorAggregator,
     ErrorSeverity,
+    ErrorSource,
     get_error_aggregator,
     reset_error_aggregator,
 )
@@ -283,8 +284,13 @@ class TestErrorAggregator:
         # Create mock action log entries
         entries = [
             {"id": "1", "action_type": "info", "message": "Normal action", "status": "completed"},
-            {"id": "2", "action_type": "error", "message": "Error action", "status": "failed",
-             "error": {"error_type": "TestError", "message": "Something failed"}},
+            {
+                "id": "2",
+                "action_type": "error",
+                "message": "Error action",
+                "status": "failed",
+                "error": {"error_type": "TestError", "message": "Something failed"},
+            },
             {"id": "3", "action_type": "phase_failed", "message": "Phase failed", "phase": 2},
         ]
         with open(action_log_file, "w") as f:

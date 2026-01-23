@@ -109,6 +109,7 @@ class DeploymentController:
     def prompt_repo(self):
         if self._prompt_repo is None:
             from ..db.repositories import get_prompt_version_repository
+
             self._prompt_repo = get_prompt_version_repository(self.project_name)
         return self._prompt_repo
 
@@ -116,6 +117,7 @@ class DeploymentController:
     def eval_repo(self):
         if self._eval_repo is None:
             from ..db.repositories import get_evaluation_repository
+
             self._eval_repo = get_evaluation_repository(self.project_name)
         return self._eval_repo
 
@@ -123,6 +125,7 @@ class DeploymentController:
     def history_repo(self):
         if self._history_repo is None:
             from ..db.repositories import get_optimization_history_repository
+
             self._history_repo = get_optimization_history_repository(self.project_name)
         return self._history_repo
 
@@ -264,10 +267,13 @@ class DeploymentController:
         # Promote to canary
         if self.config.auto_promote:
             await self.prompt_repo.update_status(version_id, "canary")
-            await self.prompt_repo.update_metrics(version_id, {
-                "shadow_score": avg_score,
-                "shadow_count": len(evaluations),
-            })
+            await self.prompt_repo.update_metrics(
+                version_id,
+                {
+                    "shadow_score": avg_score,
+                    "shadow_count": len(evaluations),
+                },
+            )
 
             logger.info(f"Promoted {version_id} to canary (shadow score: {avg_score:.2f})")
 
@@ -324,7 +330,7 @@ class DeploymentController:
 
         evaluations = await self.eval_repo.get_by_prompt_hash(prompt_hash)
         # Filter to only canary-period evaluations
-        canary_evals = evaluations[:self.config.canary_test_count]
+        canary_evals = evaluations[: self.config.canary_test_count]
 
         if len(canary_evals) < self.config.canary_test_count:
             return DeploymentResult(
@@ -383,11 +389,14 @@ class DeploymentController:
         # Promote to production
         if self.config.auto_promote:
             await self.prompt_repo.promote_to_production(version_id)
-            await self.prompt_repo.update_metrics(version_id, {
-                "canary_score": avg_score,
-                "canary_count": len(canary_evals),
-                "promoted_at": datetime.now().isoformat(),
-            })
+            await self.prompt_repo.update_metrics(
+                version_id,
+                {
+                    "canary_score": avg_score,
+                    "canary_count": len(canary_evals),
+                    "promoted_at": datetime.now().isoformat(),
+                },
+            )
 
             logger.info(f"Promoted {version_id} to production (canary score: {avg_score:.2f})")
 
@@ -444,10 +453,13 @@ class DeploymentController:
             )
 
         await self.prompt_repo.update_status(version_id, "draft")
-        await self.prompt_repo.update_metrics(version_id, {
-            "rollback_reason": reason,
-            "rollback_at": datetime.now().isoformat(),
-        })
+        await self.prompt_repo.update_metrics(
+            version_id,
+            {
+                "rollback_reason": reason,
+                "rollback_at": datetime.now().isoformat(),
+            },
+        )
 
         logger.warning(f"Rolled back {version_id} to draft: {reason}")
 
@@ -536,10 +548,13 @@ class DeploymentController:
         current_status = version.get("status")
 
         await self.prompt_repo.promote_to_production(version_id)
-        await self.prompt_repo.update_metrics(version_id, {
-            "force_promoted": True,
-            "force_promoted_at": datetime.now().isoformat(),
-        })
+        await self.prompt_repo.update_metrics(
+            version_id,
+            {
+                "force_promoted": True,
+                "force_promoted_at": datetime.now().isoformat(),
+            },
+        )
 
         logger.warning(f"Force promoted {version_id} to production (was {current_status})")
 

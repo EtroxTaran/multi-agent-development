@@ -281,8 +281,7 @@ class BudgetRepository(BaseRepository[BudgetRecord]):
                 params,
             )
             summary.by_agent = {
-                r.get("agent", "unknown"): r.get("total", 0) or 0
-                for r in agent_results
+                r.get("agent", "unknown"): r.get("total", 0) or 0 for r in agent_results
             }
 
             # By task
@@ -297,8 +296,7 @@ class BudgetRepository(BaseRepository[BudgetRecord]):
                 params,
             )
             summary.by_task = {
-                r.get("task_id", "unknown"): r.get("total", 0) or 0
-                for r in task_results
+                r.get("task_id", "unknown"): r.get("total", 0) or 0 for r in task_results
             }
 
             # By model
@@ -313,8 +311,7 @@ class BudgetRepository(BaseRepository[BudgetRecord]):
                 params,
             )
             summary.by_model = {
-                r.get("model", "unknown"): r.get("total", 0) or 0
-                for r in model_results
+                r.get("model", "unknown"): r.get("total", 0) or 0 for r in model_results
             }
 
             return summary

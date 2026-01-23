@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +45,16 @@ class BrowserTestResult:
 class E2EResult:
     """Complete result of E2E test run."""
 
-    tests: List[BrowserTestResult] = field(default_factory=list)
+    tests: list[BrowserTestResult] = field(default_factory=list)
     total: int = 0
     passed: int = 0
     failed: int = 0
     skipped: int = 0
-    browsers: List[str] = field(default_factory=list)
+    browsers: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
-    screenshots: List[str] = field(default_factory=list)
-    videos: List[str] = field(default_factory=list)
-    traces: List[str] = field(default_factory=list)
+    screenshots: list[str] = field(default_factory=list)
+    videos: list[str] = field(default_factory=list)
+    traces: list[str] = field(default_factory=list)
     output: str = ""
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
@@ -63,7 +63,7 @@ class E2EResult:
         """Check if all tests passed."""
         return self.failed == 0 and self.total > 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total": self.total,
@@ -76,9 +76,7 @@ class E2EResult:
             "screenshots": self.screenshots,
             "traces": self.traces,
             "failed_tests": [
-                {"name": t.name, "error": t.error}
-                for t in self.tests
-                if t.status == "failed"
+                {"name": t.name, "error": t.error} for t in self.tests if t.status == "failed"
             ],
             "timestamp": self.timestamp.isoformat(),
         }
@@ -113,7 +111,7 @@ class PlaywrightRunner:
         self.e2e_dir = self.project_dir / e2e_dir
         self.artifacts_dir = self.project_dir / artifacts_dir
 
-    def discover_tests(self) -> List[Path]:
+    def discover_tests(self) -> list[Path]:
         """Discover E2E test files.
 
         Returns:
@@ -133,8 +131,8 @@ class PlaywrightRunner:
 
     async def run_tests(
         self,
-        test_files: Optional[List[str]] = None,
-        browsers: Optional[List[str]] = None,
+        test_files: Optional[list[str]] = None,
+        browsers: Optional[list[str]] = None,
         headed: bool = False,
         timeout: int = 600,
     ) -> E2EResult:
@@ -167,10 +165,9 @@ class PlaywrightRunner:
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
 
         # Determine if using Playwright CLI or pytest-playwright
-        has_playwright_config = (
-            (self.project_dir / "playwright.config.ts").exists() or
-            (self.project_dir / "playwright.config.js").exists()
-        )
+        has_playwright_config = (self.project_dir / "playwright.config.ts").exists() or (
+            self.project_dir / "playwright.config.js"
+        ).exists()
 
         if has_playwright_config:
             result = await self._run_playwright_cli(files, browsers, headed, timeout)
@@ -184,8 +181,8 @@ class PlaywrightRunner:
 
     async def _run_playwright_cli(
         self,
-        files: List[Path],
-        browsers: List[str],
+        files: list[Path],
+        browsers: list[str],
         headed: bool,
         timeout: int,
     ) -> E2EResult:
@@ -205,14 +202,18 @@ class PlaywrightRunner:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Build command as list to avoid shell injection
-        cmd = [
-            "npx",
-            "playwright",
-            "test",
-        ] + file_paths + [
-            f"--output={output_dir}",
-            "--reporter=json",
-        ]
+        cmd = (
+            [
+                "npx",
+                "playwright",
+                "test",
+            ]
+            + file_paths
+            + [
+                f"--output={output_dir}",
+                "--reporter=json",
+            ]
+        )
 
         if headed:
             cmd.append("--headed")
@@ -250,8 +251,8 @@ class PlaywrightRunner:
 
     async def _run_pytest_playwright(
         self,
-        files: List[Path],
-        browsers: List[str],
+        files: list[Path],
+        browsers: list[str],
         headed: bool,
         timeout: int,
     ) -> E2EResult:
@@ -272,14 +273,18 @@ class PlaywrightRunner:
             file_paths = [str(f) for f in files]
 
             # Build command as list to avoid shell injection
-            cmd = [
-                "pytest",
-            ] + file_paths + [
-                f"--browser={browser}",
-                "-v",
-                "--json-report",
-                f"--json-report-file={self.artifacts_dir}/pytest_{browser}.json",
-            ]
+            cmd = (
+                [
+                    "pytest",
+                ]
+                + file_paths
+                + [
+                    f"--browser={browser}",
+                    "-v",
+                    "--json-report",
+                    f"--json-report-file={self.artifacts_dir}/pytest_{browser}.json",
+                ]
+            )
 
             if headed:
                 cmd.append("--headed")
@@ -352,7 +357,9 @@ class PlaywrightRunner:
                                     name=spec.get("title", "unknown"),
                                     file=spec.get("file", "unknown"),
                                     browser=test.get("projectName", "chromium"),
-                                    status="passed" if test.get("status") == "expected" else "failed",
+                                    status="passed"
+                                    if test.get("status") == "expected"
+                                    else "failed",
                                     duration_seconds=test.get("duration", 0) / 1000,
                                 )
                             )
@@ -417,7 +424,7 @@ class PlaywrightRunner:
 
         return result
 
-    def _collect_artifacts(self, pattern: str) -> List[str]:
+    def _collect_artifacts(self, pattern: str) -> list[str]:
         """Collect artifact files matching pattern.
 
         Args:
@@ -473,7 +480,7 @@ class PlaywrightRunner:
 
     async def run_visual_comparison(
         self,
-        test_files: List[str],
+        test_files: list[str],
         baseline_dir: str = "visual-baselines",
     ) -> E2EResult:
         """Run visual regression tests.

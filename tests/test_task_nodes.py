@@ -12,15 +12,13 @@ Run with: pytest tests/test_task_nodes.py -v
 """
 
 import json
-import pytest
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch
 
+import pytest
 
 # =============================================================================
 # Test Task Data Model
 # =============================================================================
+
 
 class TestTaskModel:
     """Test Task and Milestone data models."""
@@ -37,7 +35,7 @@ class TestTaskModel:
 
     def test_create_task(self):
         """Test task creation helper."""
-        from orchestrator.langgraph.state import create_task, TaskStatus
+        from orchestrator.langgraph.state import TaskStatus, create_task
 
         task = create_task(
             task_id="T1",
@@ -99,7 +97,7 @@ class TestTaskReducers:
 
     def test_merge_tasks_reducer(self):
         """Test task merging reducer."""
-        from orchestrator.langgraph.state import _merge_tasks, TaskStatus
+        from orchestrator.langgraph.state import TaskStatus, _merge_tasks
 
         existing = [
             {"id": "T1", "status": TaskStatus.PENDING, "attempts": 0},
@@ -130,7 +128,7 @@ class TestTaskHelpers:
 
     def test_get_task_by_id(self):
         """Test retrieving task by ID."""
-        from orchestrator.langgraph.state import get_task_by_id, TaskStatus
+        from orchestrator.langgraph.state import TaskStatus, get_task_by_id
 
         state = {
             "tasks": [
@@ -149,7 +147,7 @@ class TestTaskHelpers:
 
     def test_get_pending_tasks(self):
         """Test getting pending tasks."""
-        from orchestrator.langgraph.state import get_pending_tasks, TaskStatus
+        from orchestrator.langgraph.state import TaskStatus, get_pending_tasks
 
         state = {
             "tasks": [
@@ -165,7 +163,7 @@ class TestTaskHelpers:
 
     def test_get_available_tasks(self):
         """Test getting tasks with satisfied dependencies."""
-        from orchestrator.langgraph.state import get_available_tasks, TaskStatus
+        from orchestrator.langgraph.state import TaskStatus, get_available_tasks
 
         state = {
             "tasks": [
@@ -216,6 +214,7 @@ class TestTaskHelpers:
 # =============================================================================
 # Test Task Breakdown Node
 # =============================================================================
+
 
 class TestTaskBreakdownNode:
     """Test task breakdown node logic."""
@@ -287,8 +286,18 @@ class TestTaskBreakdownNode:
         from orchestrator.langgraph.nodes.task_breakdown import _assign_dependencies
 
         tasks = [
-            {"id": "T1", "files_to_create": ["src/core.py"], "files_to_modify": [], "dependencies": []},
-            {"id": "T2", "files_to_create": [], "files_to_modify": ["src/core.py"], "dependencies": []},
+            {
+                "id": "T1",
+                "files_to_create": ["src/core.py"],
+                "files_to_modify": [],
+                "dependencies": [],
+            },
+            {
+                "id": "T2",
+                "files_to_create": [],
+                "files_to_modify": ["src/core.py"],
+                "dependencies": [],
+            },
         ]
 
         result = _assign_dependencies(tasks)
@@ -301,6 +310,7 @@ class TestTaskBreakdownNode:
 # =============================================================================
 # Test Select Task Node
 # =============================================================================
+
 
 class TestSelectTaskNode:
     """Test select task node logic."""
@@ -363,6 +373,7 @@ class TestSelectTaskNode:
 # =============================================================================
 # Test Task Routers
 # =============================================================================
+
 
 class TestTaskRouters:
     """Test task loop routing logic."""
@@ -473,6 +484,7 @@ class TestTaskRouters:
 # Test Verify Task Node
 # =============================================================================
 
+
 class TestVerifyTaskNode:
     """Test verify task node logic."""
 
@@ -513,9 +525,7 @@ class TestVerifyTaskNode:
         """Test test command detection for Node.js."""
         from orchestrator.langgraph.nodes.verify_task import _detect_test_command
 
-        (temp_project_dir / "package.json").write_text(json.dumps({
-            "scripts": {"test": "jest"}
-        }))
+        (temp_project_dir / "package.json").write_text(json.dumps({"scripts": {"test": "jest"}}))
 
         cmd = _detect_test_command(temp_project_dir)
         assert cmd == "npm test"
@@ -524,6 +534,7 @@ class TestVerifyTaskNode:
 # =============================================================================
 # Test Implement Task Node
 # =============================================================================
+
 
 class TestImplementTaskNode:
     """Test implement task node logic."""
@@ -586,6 +597,7 @@ class TestImplementTaskNode:
 # Test Initial State with Tasks
 # =============================================================================
 
+
 class TestInitialStateWithTasks:
     """Test initial state includes task fields."""
 
@@ -610,9 +622,9 @@ class TestInitialStateWithTasks:
     def test_workflow_summary_includes_tasks(self):
         """Test workflow summary includes task info."""
         from orchestrator.langgraph.state import (
+            TaskStatus,
             create_initial_state,
             get_workflow_summary,
-            TaskStatus,
         )
 
         state = create_initial_state("/project", "test")

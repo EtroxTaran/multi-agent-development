@@ -1,16 +1,16 @@
 """Unit tests for ErrorContextManager."""
 
-import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from orchestrator.agents.error_context import (
     ErrorContext,
     ErrorContextManager,
     ErrorType,
     classify_error,
-    extract_suggestions,
     extract_files_from_error,
+    extract_suggestions,
 )
 
 
@@ -227,11 +227,11 @@ class TestExtractFilesFromError:
 
     def test_extract_multiple_files(self):
         """Test extracting multiple files."""
-        error = '''
+        error = """
         File "src/main.py", line 5
         File "src/utils.py", line 10
         at handler (app.ts:20:5)
-        '''
+        """
         files = extract_files_from_error(error)
 
         assert len(files) >= 2

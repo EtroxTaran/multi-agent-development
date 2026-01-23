@@ -17,7 +17,8 @@ class MigrationPhaseOutputsLogs(BaseMigration):
 
     async def up(self, ctx: MigrationContext) -> None:
         """Apply the migration."""
-        await ctx.execute("""
+        await ctx.execute(
+            """
 -- ============================================
 -- Phase Outputs (plan.json, feedback, reviews)
 -- ============================================
@@ -58,7 +59,8 @@ DEFINE FIELD IF NOT EXISTS created_at ON TABLE logs TYPE datetime DEFAULT time::
 DEFINE INDEX IF NOT EXISTS idx_logs_type ON TABLE logs COLUMNS log_type;
 DEFINE INDEX IF NOT EXISTS idx_logs_task ON TABLE logs COLUMNS task_id;
 DEFINE INDEX IF NOT EXISTS idx_logs_time ON TABLE logs COLUMNS created_at;
-        """)
+        """
+        )
 
     async def down(self, ctx: MigrationContext) -> None:
         """Rollback by removing tables."""

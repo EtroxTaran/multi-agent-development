@@ -4,21 +4,17 @@ Verifies that ALL agent executions are tracked and evaluated
 with template-specific criteria.
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.langgraph.state import (
-    WorkflowState,
-    create_initial_state,
-    create_agent_execution,
-    AgentExecution,
-)
+import pytest
+
 from orchestrator.langgraph.nodes.evaluate_agent import (
+    TEMPLATE_CRITERIA,
+    _get_template_requirements,
     evaluate_agent_node,
     get_template_criteria,
-    _get_template_requirements,
-    TEMPLATE_CRITERIA,
 )
+from orchestrator.langgraph.state import create_agent_execution, create_initial_state
 
 
 @pytest.fixture
@@ -284,34 +280,40 @@ class TestAgentExecutionTracking:
 class TestAllTemplatesEvaluated:
     """Tests to verify all 9 template types can be evaluated."""
 
-    @pytest.mark.parametrize("template_name,agent", [
-        ("planning", "claude"),
-        ("validation", "cursor"),
-        ("validation", "gemini"),
-        ("code_review", "cursor"),
-        ("architecture_review", "gemini"),
-        ("task_implementation", "claude"),
-        ("test_writing", "claude"),
-        ("bug_fix", "claude"),
-        ("fixer_diagnose", "claude"),
-        ("fixer_apply", "claude"),
-    ])
+    @pytest.mark.parametrize(
+        "template_name,agent",
+        [
+            ("planning", "claude"),
+            ("validation", "cursor"),
+            ("validation", "gemini"),
+            ("code_review", "cursor"),
+            ("architecture_review", "gemini"),
+            ("task_implementation", "claude"),
+            ("test_writing", "claude"),
+            ("bug_fix", "claude"),
+            ("fixer_diagnose", "claude"),
+            ("fixer_apply", "claude"),
+        ],
+    )
     def test_template_has_criteria(self, template_name, agent):
         """Test each template type has evaluation criteria."""
         criteria = get_template_criteria(template_name)
         assert len(criteria) > 0, f"No criteria for {template_name}"
 
-    @pytest.mark.parametrize("template_name", [
-        "planning",
-        "validation",
-        "code_review",
-        "architecture_review",
-        "task_implementation",
-        "test_writing",
-        "bug_fix",
-        "fixer_diagnose",
-        "fixer_apply",
-    ])
+    @pytest.mark.parametrize(
+        "template_name",
+        [
+            "planning",
+            "validation",
+            "code_review",
+            "architecture_review",
+            "task_implementation",
+            "test_writing",
+            "bug_fix",
+            "fixer_diagnose",
+            "fixer_apply",
+        ],
+    )
     def test_template_has_requirements(self, template_name, initial_state):
         """Test each template type has specific requirements."""
         reqs = _get_template_requirements(initial_state, template_name)

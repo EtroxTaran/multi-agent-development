@@ -1,19 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { OrchestratorClientService } from '../orchestrator-client/orchestrator-client.service';
-import { WorkflowStatus } from '../common/enums';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { OrchestratorClientService } from "../orchestrator-client/orchestrator-client.service";
+import { WorkflowStatus } from "../common/enums";
 import {
   WorkflowStatusResponseDto,
   WorkflowHealthResponseDto,
   WorkflowStartRequestDto,
   WorkflowStartResponseDto,
   WorkflowRollbackResponseDto,
-} from './dto';
+} from "./dto";
 
 @Injectable()
 export class WorkflowService {
-  constructor(
-    private readonly orchestratorClient: OrchestratorClientService,
-  ) {}
+  constructor(private readonly orchestratorClient: OrchestratorClientService) {}
 
   async getStatus(projectName: string): Promise<WorkflowStatusResponseDto> {
     try {
@@ -22,7 +24,10 @@ export class WorkflowService {
       )) as any;
       return this.mapToStatusResponse(status);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -36,7 +41,10 @@ export class WorkflowService {
       )) as any;
       return this.mapToHealthResponse(health);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -47,7 +55,10 @@ export class WorkflowService {
     try {
       return await this.orchestratorClient.getWorkflowGraph(projectName);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -67,10 +78,13 @@ export class WorkflowService {
       })) as any;
       return this.mapToStartResponse(result);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
-      if (error.message?.includes('Prerequisites')) {
+      if (error.message?.includes("Prerequisites")) {
         throw new BadRequestException(error.message);
       }
       throw error;
@@ -88,7 +102,10 @@ export class WorkflowService {
       )) as any;
       return this.mapToStartResponse(result);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -98,7 +115,9 @@ export class WorkflowService {
   async pause(projectName: string): Promise<{ message: string }> {
     // Note: Actual pause is handled via WebSocket broadcast
     // This just returns the intent to pause
-    return { message: 'Pause requested - workflow will pause at next checkpoint' };
+    return {
+      message: "Pause requested - workflow will pause at next checkpoint",
+    };
   }
 
   async rollback(
@@ -106,7 +125,7 @@ export class WorkflowService {
     phase: number,
   ): Promise<WorkflowRollbackResponseDto> {
     if (phase < 1 || phase > 5) {
-      throw new BadRequestException('Phase must be between 1 and 5');
+      throw new BadRequestException("Phase must be between 1 and 5");
     }
 
     try {
@@ -122,10 +141,13 @@ export class WorkflowService {
         error: result.error,
       };
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
-      throw new BadRequestException(error.message || 'Rollback failed');
+      throw new BadRequestException(error.message || "Rollback failed");
     }
   }
 
@@ -134,9 +156,12 @@ export class WorkflowService {
       const result = (await this.orchestratorClient.resetWorkflow(
         projectName,
       )) as any;
-      return { message: result.message || 'Workflow reset' };
+      return { message: result.message || "Workflow reset" };
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -145,7 +170,7 @@ export class WorkflowService {
 
   private mapToStatusResponse(data: any): WorkflowStatusResponseDto {
     return {
-      mode: data.mode ?? 'langgraph',
+      mode: data.mode ?? "langgraph",
       status: (data.status as WorkflowStatus) ?? WorkflowStatus.NOT_STARTED,
       project: data.project,
       currentPhase: data.current_phase,
@@ -157,7 +182,7 @@ export class WorkflowService {
 
   private mapToHealthResponse(data: any): WorkflowHealthResponseDto {
     return {
-      status: data.status ?? 'unknown',
+      status: data.status ?? "unknown",
       project: data.project,
       currentPhase: data.current_phase,
       phaseStatus: data.phase_status,
@@ -173,7 +198,7 @@ export class WorkflowService {
   private mapToStartResponse(data: any): WorkflowStartResponseDto {
     return {
       success: data.success,
-      mode: data.mode ?? 'langgraph',
+      mode: data.mode ?? "langgraph",
       paused: data.paused ?? false,
       message: data.message,
       error: data.error,

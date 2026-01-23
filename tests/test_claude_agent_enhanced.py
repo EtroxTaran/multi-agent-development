@@ -1,14 +1,11 @@
 """Unit tests for enhanced ClaudeAgent features."""
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from orchestrator.agents.claude_agent import (
-    ClaudeAgent,
-    PLAN_MODE_FILE_THRESHOLD,
-    PLAN_MODE_ALWAYS_COMPLEXITIES,
-)
+import pytest
+
+from orchestrator.agents.claude_agent import ClaudeAgent
 
 
 @pytest.fixture

@@ -1,3 +1,12 @@
+---
+name: resolve-conflict
+description: Resolve disagreements between Cursor and Gemini feedback using weighted expertise.
+version: 1.1.0
+tags: [conflict, review, governance]
+owner: orchestration
+status: active
+---
+
 # Resolve Conflict Skill
 
 Resolve disagreements between Cursor and Gemini agents.
@@ -5,6 +14,16 @@ Resolve disagreements between Cursor and Gemini agents.
 ## Overview
 
 When agents disagree on approval or have conflicting assessments, this skill provides structured conflict resolution using weighted expertise and escalation rules.
+
+## Usage
+
+```
+/resolve-conflict
+```
+
+## Prerequisites
+
+- Cursor and Gemini feedback available in `phase_outputs`.
 
 ## When to Use
 
@@ -87,8 +106,8 @@ Escalate to human when:
 ### 1. Load Feedback
 
 ```python
-cursor_feedback = read(".workflow/phases/{phase}/cursor-feedback.json")
-gemini_feedback = read(".workflow/phases/{phase}/gemini-feedback.json")
+cursor_feedback = phase_outputs_repo.get_by_type(phase=phase, output_type="cursor_feedback")
+gemini_feedback = phase_outputs_repo.get_by_type(phase=phase, output_type="gemini_feedback")
 ```
 
 ### 2. Identify Conflicts
@@ -148,7 +167,7 @@ for conflict in conflicts:
 
 ### 4. Generate Resolution Document
 
-Write `.workflow/phases/{phase}/conflict-resolution.json`:
+Write conflict resolution output to `phase_outputs` (type=validation_consolidated or verification_consolidated):
 
 ```json
 {
@@ -241,6 +260,15 @@ if cursor_result.approved != gemini_result.approved:
     else:
         apply_resolution(resolution)
 ```
+
+## Outputs
+
+- Consolidated decision stored in `phase_outputs` (validation_consolidated or verification_consolidated).
+
+## Error Handling
+
+- If one agent output is missing, proceed with available feedback and mark as partial.
+- If both outputs are missing, escalate to human review.
 
 ## Related Skills
 

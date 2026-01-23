@@ -2,7 +2,7 @@
  * API mock handlers for E2E tests
  */
 
-import { Page, Route } from '@playwright/test';
+import { Page, Route } from "@playwright/test";
 import {
   mockProjects,
   mockWorkflowStatus,
@@ -12,10 +12,13 @@ import {
   mockAgents,
   mockWorkflowGraph,
   mockProject,
-} from './mock-data';
+} from "./mock-data";
 
 export type MockConfig = {
-  projects?: typeof mockProjects.single | typeof mockProjects.multiple | typeof mockProjects.empty;
+  projects?:
+    | typeof mockProjects.single
+    | typeof mockProjects.multiple
+    | typeof mockProjects.empty;
   workflowStatus?: (typeof mockWorkflowStatus)[keyof typeof mockWorkflowStatus];
   workflowHealth?: (typeof mockWorkflowHealth)[keyof typeof mockWorkflowHealth];
   tasks?: (typeof mockTasks)[keyof typeof mockTasks];
@@ -41,18 +44,23 @@ export async function setupApiMocks(page: Page, config: MockConfig = {}) {
   } = config;
 
   // Projects list
-  await page.route('/api/projects', async (route) => {
+  await page.route("/api/projects", async (route) => {
     await route.fulfill({ json: projects });
   });
 
   // Project details
-  await page.route('/api/projects/*', async (route) => {
+  await page.route("/api/projects/*", async (route) => {
     const url = route.request().url();
 
     // Skip if this is a more specific route
-    if (url.includes('/workflow') || url.includes('/tasks') ||
-        url.includes('/budget') || url.includes('/agents') ||
-        url.includes('/audit') || url.includes('/init')) {
+    if (
+      url.includes("/workflow") ||
+      url.includes("/tasks") ||
+      url.includes("/budget") ||
+      url.includes("/agents") ||
+      url.includes("/audit") ||
+      url.includes("/init")
+    ) {
       return route.continue();
     }
 
@@ -60,51 +68,53 @@ export async function setupApiMocks(page: Page, config: MockConfig = {}) {
   });
 
   // Workflow status
-  await page.route('/api/projects/*/workflow/status', async (route) => {
+  await page.route("/api/projects/*/workflow/status", async (route) => {
     await route.fulfill({ json: workflowStatus });
   });
 
   // Workflow health
-  await page.route('/api/projects/*/workflow/health', async (route) => {
+  await page.route("/api/projects/*/workflow/health", async (route) => {
     await route.fulfill({ json: workflowHealth });
   });
 
   // Workflow graph
-  await page.route('/api/projects/*/workflow/graph', async (route) => {
+  await page.route("/api/projects/*/workflow/graph", async (route) => {
     await route.fulfill({ json: graph });
   });
 
   // Tasks
-  await page.route('/api/projects/*/tasks', async (route) => {
+  await page.route("/api/projects/*/tasks", async (route) => {
     await route.fulfill({ json: tasks });
   });
 
   // Budget
-  await page.route('/api/projects/*/budget', async (route) => {
+  await page.route("/api/projects/*/budget", async (route) => {
     await route.fulfill({ json: budget });
   });
 
   // Budget report
-  await page.route('/api/projects/*/budget/report', async (route) => {
+  await page.route("/api/projects/*/budget/report", async (route) => {
     await route.fulfill({
       json: {
         status: budget,
-        task_spending: Object.entries(budget.task_spent || {}).map(([task_id, spent_usd]) => ({
-          task_id,
-          spent_usd,
-          budget_usd: 2.0,
-        })),
+        task_spending: Object.entries(budget.task_spent || {}).map(
+          ([task_id, spent_usd]) => ({
+            task_id,
+            spent_usd,
+            budget_usd: 2.0,
+          }),
+        ),
       },
     });
   });
 
   // Agents
-  await page.route('/api/projects/*/agents', async (route) => {
+  await page.route("/api/projects/*/agents", async (route) => {
     await route.fulfill({ json: agents });
   });
 
   // Audit
-  await page.route('/api/projects/*/audit', async (route) => {
+  await page.route("/api/projects/*/audit", async (route) => {
     await route.fulfill({
       json: {
         entries: [],
@@ -114,7 +124,7 @@ export async function setupApiMocks(page: Page, config: MockConfig = {}) {
   });
 
   // Audit statistics
-  await page.route('/api/projects/*/audit/statistics', async (route) => {
+  await page.route("/api/projects/*/audit/statistics", async (route) => {
     await route.fulfill({
       json: {
         total: 50,
@@ -132,73 +142,73 @@ export async function setupApiMocks(page: Page, config: MockConfig = {}) {
   });
 
   // Project init
-  await page.route('/api/projects/*/init', async (route) => {
+  await page.route("/api/projects/*/init", async (route) => {
     await route.fulfill({
       json: {
         success: true,
-        project_dir: '/tmp/new-project',
-        message: 'Project initialized',
+        project_dir: "/tmp/new-project",
+        message: "Project initialized",
       },
     });
   });
 
   // Workflow start
-  await page.route('/api/projects/*/workflow/start', async (route) => {
-    if (route.request().method() === 'POST') {
+  await page.route("/api/projects/*/workflow/start", async (route) => {
+    if (route.request().method() === "POST") {
       await route.fulfill({
         json: {
           success: true,
-          mode: 'langgraph',
-          message: 'Workflow started',
+          mode: "langgraph",
+          message: "Workflow started",
         },
       });
     }
   });
 
   // Workflow resume
-  await page.route('/api/projects/*/workflow/resume', async (route) => {
-    if (route.request().method() === 'POST') {
+  await page.route("/api/projects/*/workflow/resume", async (route) => {
+    if (route.request().method() === "POST") {
       await route.fulfill({
         json: {
           success: true,
-          mode: 'langgraph',
-          message: 'Workflow resumed',
+          mode: "langgraph",
+          message: "Workflow resumed",
         },
       });
     }
   });
 
   // Workflow reset
-  await page.route('/api/projects/*/workflow/reset', async (route) => {
-    if (route.request().method() === 'POST') {
+  await page.route("/api/projects/*/workflow/reset", async (route) => {
+    if (route.request().method() === "POST") {
       await route.fulfill({
         json: {
-          message: 'Workflow reset',
+          message: "Workflow reset",
         },
       });
     }
   });
 
   // Workflow rollback
-  await page.route('/api/projects/*/workflow/rollback/*', async (route) => {
-    if (route.request().method() === 'POST') {
+  await page.route("/api/projects/*/workflow/rollback/*", async (route) => {
+    if (route.request().method() === "POST") {
       await route.fulfill({
         json: {
           success: true,
-          rolled_back_to: 'checkpoint_phase_2',
+          rolled_back_to: "checkpoint_phase_2",
           current_phase: 2,
-          message: 'Rolled back successfully',
+          message: "Rolled back successfully",
         },
       });
     }
   });
 
   // Chat
-  await page.route('/api/chat', async (route) => {
-    if (route.request().method() === 'POST') {
+  await page.route("/api/chat", async (route) => {
+    if (route.request().method() === "POST") {
       await route.fulfill({
         json: {
-          message: 'This is a mock response from Claude.',
+          message: "This is a mock response from Claude.",
           streaming: false,
         },
       });
@@ -206,12 +216,12 @@ export async function setupApiMocks(page: Page, config: MockConfig = {}) {
   });
 
   // Chat command
-  await page.route('/api/chat/command', async (route) => {
-    if (route.request().method() === 'POST') {
+  await page.route("/api/chat/command", async (route) => {
+    if (route.request().method() === "POST") {
       await route.fulfill({
         json: {
           success: true,
-          output: 'Command executed successfully',
+          output: "Command executed successfully",
         },
       });
     }
@@ -225,7 +235,7 @@ export async function overrideApiMock(
   page: Page,
   pattern: string,
   response: unknown,
-  method?: string
+  method?: string,
 ) {
   await page.route(pattern, async (route) => {
     if (!method || route.request().method() === method) {
@@ -243,7 +253,7 @@ export async function failApiMock(
   page: Page,
   pattern: string,
   status: number = 500,
-  message: string = 'Internal Server Error'
+  message: string = "Internal Server Error",
 ) {
   await page.route(pattern, async (route) => {
     await route.fulfill({
@@ -259,10 +269,10 @@ export async function failApiMock(
 export async function timeoutApiMock(
   page: Page,
   pattern: string,
-  delayMs: number = 30000
+  delayMs: number = 30000,
 ) {
   await page.route(pattern, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
-    await route.abort('timedout');
+    await route.abort("timedout");
   });
 }

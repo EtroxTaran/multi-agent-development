@@ -489,3 +489,4 @@ docs/api/
 *.bz2
 *.xz
 dashboard/backend-nestjs/node_modules_old/
+.claude/skills/ui-design-system/reference

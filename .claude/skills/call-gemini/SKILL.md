@@ -1,3 +1,12 @@
+---
+name: call-gemini
+description: Invoke the Gemini CLI for architecture and scalability review.
+version: 1.1.0
+tags: [gemini, architecture, review, validation]
+owner: orchestration
+status: active
+---
+
 # Call Gemini Skill
 
 Wrapper for invoking Gemini agent via CLI for architecture and scalability review.
@@ -9,6 +18,16 @@ Gemini is specialized for:
 - Scalability assessment
 - Design principle compliance
 - Technical debt evaluation
+
+## Prerequisites
+
+- `gemini` CLI installed and accessible on PATH.
+
+## Usage
+
+```
+/call-gemini
+```
 
 ## Expertise Weights
 
@@ -44,7 +63,7 @@ gemini --yolo "<prompt>"
 gemini --yolo "
 You are reviewing an implementation plan for architecture and scalability.
 
-Read the plan at: .workflow/phases/planning/plan.json
+Read the plan JSON provided by the orchestrator (phase_outputs export).
 
 Evaluate for:
 1. Architecture patterns - Are they appropriate for the use case?
@@ -172,19 +191,19 @@ else:
 
 ### Agent Unavailable
 - If gemini not installed: Skip with warning
-- Log to state.errors
+- Log to `logs` with type `escalation` or `blocker`
 - Cursor alone can proceed for security-critical reviews
 
 ## Integration with Workflow
 
 1. **Phase 2 (Validation)**:
    - Run in parallel with Cursor
-   - Save output to `.workflow/phases/validation/gemini-feedback.json`
+   - Store output in `phase_outputs` as `gemini_feedback`
    - Weight: 0.7 for architecture concerns
 
 2. **Phase 4 (Verification)**:
    - Run in parallel with Cursor
-   - Save output to `.workflow/phases/verification/gemini-review.json`
+   - Store output in `phase_outputs` as `gemini_review`
    - Must approve for workflow to complete
 
 ## Approval Thresholds
@@ -194,6 +213,10 @@ else:
 | Validation | 6.0 | None allowed |
 | Verification | 7.0 | None allowed |
 
+## Outputs
+
+- JSON review payload for validation or verification phases.
+
 ## Example Usage
 
 ```bash
@@ -201,10 +224,10 @@ else:
 cd projects/my-app
 
 # Run validation
-gemini --yolo "Review plan at .workflow/phases/planning/plan.json for architecture..." > .workflow/phases/validation/gemini-feedback.json
+gemini --yolo "Review the plan JSON provided in this prompt for architecture..."
 
 # Parse the output (may need to extract JSON from markdown)
-cat .workflow/phases/validation/gemini-feedback.json
+cat gemini-output.txt
 ```
 
 ## Conflict Resolution
@@ -228,3 +251,9 @@ gemini --model gemini-2.0-flash --yolo "prompt"
 # - gemini-2.0-flash (default, fastest)
 # - gemini-2.0-pro (more thorough)
 ```
+
+## Related Skills
+
+- `/validate` - Plan validation workflow
+- `/verify` - Code review workflow
+- `/resolve-conflict` - Merge Cursor and Gemini feedback

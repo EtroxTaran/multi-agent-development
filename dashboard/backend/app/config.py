@@ -1,6 +1,5 @@
 """Application configuration."""
 
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -43,7 +42,9 @@ class Settings(BaseSettings):
     surrealdb_database: str = Field(default="dashboard", description="SurrealDB database")
 
     # WebSocket settings
-    ws_heartbeat_interval: int = Field(default=30, description="WebSocket heartbeat interval in seconds")
+    ws_heartbeat_interval: int = Field(
+        default=30, description="WebSocket heartbeat interval in seconds"
+    )
 
     # Chat settings
     claude_timeout: int = Field(default=300, description="Claude CLI timeout in seconds")

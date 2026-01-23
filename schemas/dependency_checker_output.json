@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DependencyCheckerOutput",
+  "description": "Schema for A14 Dependency Checker agent output",
+  "type": "object",
+  "required": ["agent", "task_id", "status", "passed", "total_findings", "blocking_findings"],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "const": "A14",
+      "description": "Agent identifier"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "Task identifier (typically 'dependency-check')"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "warning", "error"],
+      "description": "Overall check status"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "Whether the dependency check passed"
+    },
+    "total_findings": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of findings"
+    },
+    "blocking_findings": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of findings that block the workflow"
+    },
+    "npm_analysis": {
+      "type": "object",
+      "properties": {
+        "outdated_count": { "type": "integer", "minimum": 0 },
+        "vulnerability_count": { "type": "integer", "minimum": 0 },
+        "deprecated_count": { "type": "integer", "minimum": 0 },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "current": { "type": "string" },
+              "wanted": { "type": "string" },
+              "latest": { "type": "string" },
+              "type": { "type": "string", "enum": ["patch", "minor", "major", "vulnerability", "outdated"] },
+              "auto_fixable": { "type": "boolean" }
+            }
+          }
+        },
+        "vulnerabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "package": { "type": "string" },
+              "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
+              "cve": { "type": "string" },
+              "title": { "type": "string" },
+              "recommendation": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "docker_analysis": {
+      "type": "object",
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] },
+              "issue": { "type": "string" },
+              "current": { "type": "string" },
+              "recommended": { "type": "string" },
+              "remediation": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "framework_analysis": {
+      "type": "object",
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "framework": { "type": "string" },
+              "current": { "type": "string" },
+              "latest_lts": { "type": "string" },
+              "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] },
+              "eol_date": { "type": "string" },
+              "message": { "type": "string" },
+              "breaking_changes": { "type": "array", "items": { "type": "string" } },
+              "upgrade_guide": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "priority": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "action": { "type": "string" },
+          "package": { "type": "string" },
+          "command": { "type": "string" },
+          "note": { "type": "string" },
+          "guide": { "type": "string" }
+        }
+      }
+    },
+    "auto_fixable": {
+      "type": "object",
+      "properties": {
+        "patch_updates": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "command": { "type": "string" }
+      }
+    },
+    "blocking_issues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of issues that block the workflow"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Brief summary of dependency check results"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

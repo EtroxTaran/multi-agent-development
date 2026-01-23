@@ -6,9 +6,10 @@ Provides real-time event streaming via WebSocket and optional SurrealDB live que
 import asyncio
 import json
 import logging
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, Optional
+from typing import Optional
 
 from ..config import get_settings
 from ..websocket import get_connection_manager
@@ -67,7 +68,7 @@ class EventService:
                     current_size = log_path.stat().st_size
                     if current_size > last_position:
                         # Read new content
-                        with open(log_path, "r") as f:
+                        with open(log_path) as f:
                             f.seek(last_position)
                             new_content = f.read()
 
@@ -140,7 +141,7 @@ class EventService:
         if not log_path.exists():
             return
 
-        with open(log_path, "r") as f:
+        with open(log_path) as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -181,7 +182,7 @@ class EventService:
             return []
 
         events = []
-        with open(log_path, "r") as f:
+        with open(log_path) as f:
             for line in f:
                 if not line.strip():
                     continue

@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 class CircuitState(str, Enum):
     """Circuit breaker states."""
 
-    CLOSED = "closed"      # Normal operation, fixes are attempted
-    OPEN = "open"          # Circuit tripped, fixes are blocked
+    CLOSED = "closed"  # Normal operation, fixes are attempted
+    OPEN = "open"  # Circuit tripped, fixes are blocked
     HALF_OPEN = "half_open"  # Testing if circuit can be closed
 
 
@@ -128,12 +128,12 @@ class CircuitBreaker:
         """Load circuit state from disk."""
         if self.state_file.exists():
             try:
-                with open(self.state_file, "r") as f:
+                with open(self.state_file) as f:
                     data = json.load(f)
                     self._state = CircuitState(data.get("state", "closed"))
                     self._opened_at = data.get("opened_at")
                     self._stats = CircuitStats.from_dict(data.get("stats", {}))
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Could not load circuit state: {e}")
 
     def _save_state(self) -> None:
@@ -148,7 +148,7 @@ class CircuitBreaker:
         try:
             with open(self.state_file, "w") as f:
                 json.dump(data, f, indent=2)
-        except IOError as e:
+        except OSError as e:
             logger.warning(f"Could not save circuit state: {e}")
 
     @property
@@ -201,12 +201,14 @@ class CircuitBreaker:
             self._opened_at = None
 
         # Record state change
-        self._stats.state_changes.append({
-            "from": old_state.value,
-            "to": new_state.value,
-            "reason": reason,
-            "timestamp": datetime.now().isoformat(),
-        })
+        self._stats.state_changes.append(
+            {
+                "from": old_state.value,
+                "to": new_state.value,
+                "reason": reason,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
         logger.info(f"Circuit breaker: {old_state.value} -> {new_state.value} ({reason})")
         self._save_state()
@@ -259,7 +261,7 @@ class CircuitBreaker:
                 if self._stats.consecutive_failures >= self.failure_threshold:
                     self._transition_to(
                         CircuitState.OPEN,
-                        f"failure_threshold_reached ({self._stats.consecutive_failures} failures)"
+                        f"failure_threshold_reached ({self._stats.consecutive_failures} failures)",
                     )
             elif self._state == CircuitState.HALF_OPEN:
                 # Immediately trip back to OPEN on failure in half-open

@@ -31,7 +31,7 @@ async def fixer_verify_node(state: WorkflowState) -> dict[str, Any]:
     Returns:
         State updates with verification result
     """
-    from ...fixer import FixValidator, FixResult, FixStatus
+    from ...fixer import FixValidator
 
     project_dir = Path(state["project_dir"])
     workflow_dir = project_dir / ".workflow"
@@ -70,7 +70,7 @@ async def fixer_verify_node(state: WorkflowState) -> dict[str, Any]:
     validator = FixValidator(project_dir)
 
     # Reconstruct FixResult for validation
-    from ...fixer import FixPlan, DiagnosisResult, FixerError, ErrorCategory, RootCause, DiagnosisConfidence
+    from ...fixer import FixerError
 
     error_data = diagnosis_data.get("error", {})
     error = FixerError.from_dict(error_data)
@@ -160,11 +160,13 @@ async def fixer_verify_node(state: WorkflowState) -> dict[str, Any]:
             "current_fix_attempt": None,
             "fix_history": [fix_record],
             "next_decision": "resume",
-            "errors": [{
-                "type": "fixer_partial_success",
-                "message": "Fix applied but some tests failed",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "fixer_partial_success",
+                    "message": "Fix applied but some tests failed",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "updated_at": datetime.now().isoformat(),
         }
     else:
@@ -183,11 +185,13 @@ async def fixer_verify_node(state: WorkflowState) -> dict[str, Any]:
             "current_fix_attempt": None,
             "fix_history": [fix_record],
             "next_decision": "escalate",
-            "errors": [{
-                "type": "fixer_verification_failed",
-                "message": "Fix did not resolve the error",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "fixer_verification_failed",
+                    "message": "Fix did not resolve the error",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "updated_at": datetime.now().isoformat(),
         }
 
@@ -213,9 +217,12 @@ def _send_security_notification(
         "error_id": fix_attempt.get("error_id"),
         "vulnerability_type": fix_attempt.get("triage", {}).get("category"),
         "severity": "high",  # Assume high for security fixes
-        "fix_description": fix_attempt.get("plan", {}).get("actions", [{}])[0].get("description", "Unknown"),
+        "fix_description": fix_attempt.get("plan", {})
+        .get("actions", [{}])[0]
+        .get("description", "Unknown"),
         "files_changed": [
-            a.get("target") for a in fix_attempt.get("plan", {}).get("actions", [])
+            a.get("target")
+            for a in fix_attempt.get("plan", {}).get("actions", [])
             if a.get("target")
         ],
         "lines_changed": fix_attempt.get("result", {}).get("actions_completed", 0),

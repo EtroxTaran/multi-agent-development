@@ -5,7 +5,6 @@ automated resolution fails. In autonomous mode (afk), makes
 best-practice decisions automatically without human input.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +12,7 @@ from typing import Any
 
 from langgraph.types import interrupt
 
-from ..state import WorkflowState, PhaseStatus
+from ..state import PhaseStatus, WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,9 @@ def _make_autonomous_decision(
     # Decision logic based on error type
     if error_type == "planning_error":
         if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
-            logger.info(f"[AUTONOMOUS] Retrying planning (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+            logger.info(
+                f"[AUTONOMOUS] Retrying planning (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})"
+            )
             return {
                 "next_decision": "retry",
                 "updated_at": datetime.now().isoformat(),
@@ -66,23 +67,29 @@ def _make_autonomous_decision(
             logger.warning("[AUTONOMOUS] Planning failed after max retries, aborting")
             return {
                 "next_decision": "abort",
-                "errors": [{
-                    "type": "autonomous_abort",
-                    "message": f"Planning failed after {AUTONOMOUS_MAX_RETRIES} attempts in autonomous mode",
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "autonomous_abort",
+                        "message": f"Planning failed after {AUTONOMOUS_MAX_RETRIES} attempts in autonomous mode",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
             }
 
     elif error_type == "validation_failed":
         if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
-            logger.info(f"[AUTONOMOUS] Retrying validation (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+            logger.info(
+                f"[AUTONOMOUS] Retrying validation (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})"
+            )
             return {
                 "next_decision": "retry",
                 "updated_at": datetime.now().isoformat(),
             }
         else:
             # Skip validation and continue to implementation
-            logger.warning("[AUTONOMOUS] Validation failed after max retries, skipping to implementation")
+            logger.warning(
+                "[AUTONOMOUS] Validation failed after max retries, skipping to implementation"
+            )
             return {
                 "current_phase": 3,  # Skip to implementation
                 "next_decision": "continue",
@@ -96,14 +103,18 @@ def _make_autonomous_decision(
         clarifications = escalation.get("clarifications", [])
         if clarifications:
             # In autonomous mode, proceed with best-guess implementation
-            logger.info("[AUTONOMOUS] Clarification needed but proceeding with best-guess implementation")
+            logger.info(
+                "[AUTONOMOUS] Clarification needed but proceeding with best-guess implementation"
+            )
             return {
                 "next_decision": "retry",
                 "updated_at": datetime.now().isoformat(),
             }
         else:
             if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
-                logger.info(f"[AUTONOMOUS] Retrying implementation (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+                logger.info(
+                    f"[AUTONOMOUS] Retrying implementation (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})"
+                )
                 return {
                     "next_decision": "retry",
                     "updated_at": datetime.now().isoformat(),
@@ -112,23 +123,29 @@ def _make_autonomous_decision(
                 logger.warning("[AUTONOMOUS] Implementation failed after max retries, aborting")
                 return {
                     "next_decision": "abort",
-                    "errors": [{
-                        "type": "autonomous_abort",
-                        "message": f"Implementation failed after {AUTONOMOUS_MAX_RETRIES} attempts in autonomous mode",
-                        "timestamp": datetime.now().isoformat(),
-                    }],
+                    "errors": [
+                        {
+                            "type": "autonomous_abort",
+                            "message": f"Implementation failed after {AUTONOMOUS_MAX_RETRIES} attempts in autonomous mode",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    ],
                 }
 
     elif error_type == "verification_failed":
         if phase_retry_count < AUTONOMOUS_MAX_RETRIES:
-            logger.info(f"[AUTONOMOUS] Retrying verification (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})")
+            logger.info(
+                f"[AUTONOMOUS] Retrying verification (attempt {phase_retry_count + 1}/{AUTONOMOUS_MAX_RETRIES})"
+            )
             return {
                 "next_decision": "retry",
                 "updated_at": datetime.now().isoformat(),
             }
         else:
             # Skip verification and complete (not recommended but autonomous mode)
-            logger.warning("[AUTONOMOUS] Verification failed after max retries, completing with warnings")
+            logger.warning(
+                "[AUTONOMOUS] Verification failed after max retries, completing with warnings"
+            )
             return {
                 "current_phase": 5,  # Skip to completion
                 "next_decision": "continue",
@@ -149,11 +166,13 @@ def _make_autonomous_decision(
             logger.warning("[AUTONOMOUS] Unknown error persists, aborting")
             return {
                 "next_decision": "abort",
-                "errors": [{
-                    "type": "autonomous_abort",
-                    "message": f"Unknown error in autonomous mode: {issue_summary}",
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "autonomous_abort",
+                        "message": f"Unknown error in autonomous mode: {issue_summary}",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
             }
 
 
@@ -232,7 +251,9 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
             # Check if this is a clarification request
             clarifications = last_error.get("clarifications", [])
             if clarifications:
-                issue_summary = f"Worker needs clarification: {clarifications[0].get('question', 'Unknown')}"
+                issue_summary = (
+                    f"Worker needs clarification: {clarifications[0].get('question', 'Unknown')}"
+                )
                 suggested_actions = [
                     "Answer the clarification question below",
                     "Update the plan with more specific requirements",
@@ -275,7 +296,7 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
     }
     run_async(repo.create_log(log_type="blocker", content=blocker_entry))
 
-    logger.info(f"Escalation saved to database")
+    logger.info("Escalation saved to database")
 
     # Check execution mode
     execution_mode = state.get("execution_mode", "hitl")
@@ -296,28 +317,32 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
     # 1. Modify state and resume
     # 2. Skip to a specific phase
     # 3. Abort the workflow
-    human_response = interrupt({
-        "type": "escalation",
-        "project": state["project_name"],
-        "phase": current_phase,
-        "issue": issue_summary,
-        "suggested_actions": suggested_actions,
-        "message": (
-            f"Workflow paused at phase {current_phase}: {issue_summary}. "
-            f"Please resolve the issue and resume."
-        ),
-    })
+    human_response = interrupt(
+        {
+            "type": "escalation",
+            "project": state["project_name"],
+            "phase": current_phase,
+            "issue": issue_summary,
+            "suggested_actions": suggested_actions,
+            "message": (
+                f"Workflow paused at phase {current_phase}: {issue_summary}. "
+                f"Please resolve the issue and resume."
+            ),
+        }
+    )
 
     # Process human response
     if human_response is None:
         # Timeout or no response - abort
         return {
             "next_decision": "abort",
-            "errors": [{
-                "type": "escalation_timeout",
-                "message": "Human escalation timed out",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "escalation_timeout",
+                    "message": "Human escalation timed out",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }
 
     action = human_response.get("action", "abort")
@@ -356,10 +381,15 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         answers = human_response.get("answers", {})
         if answers:
             # Save clarification answers to database
-            run_async(repo.create_log(log_type="clarification_answers", content={
-                "answers": answers,
-                "timestamp": datetime.now().isoformat(),
-            }))
+            run_async(
+                repo.create_log(
+                    log_type="clarification_answers",
+                    content={
+                        "answers": answers,
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                )
+            )
             logger.info(f"Saved clarification answers to database: {list(answers.keys())}")
 
         return {
@@ -370,9 +400,11 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         # Abort
         return {
             "next_decision": "abort",
-            "errors": [{
-                "type": "user_abort",
-                "message": "Workflow aborted by user",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "user_abort",
+                    "message": "Workflow aborted by user",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
         }

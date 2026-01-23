@@ -5,8 +5,9 @@ for workflow phases and agent invocations.
 """
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
 from .config import get_config
 
@@ -18,11 +19,12 @@ _tracer: Optional["TracingManager"] = None
 # Optional import - graceful degradation if opentelemetry not installed
 try:
     from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.trace import Status, StatusCode, Span
+    from opentelemetry.trace import Span, Status, StatusCode
+
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
@@ -55,10 +57,12 @@ class TracingManager:
 
         try:
             # Create resource with service information
-            resource = Resource.create({
-                "service.name": self.config.service_name,
-                "service.version": "1.0.0",
-            })
+            resource = Resource.create(
+                {
+                    "service.name": self.config.service_name,
+                    "service.version": "1.0.0",
+                }
+            )
 
             # Create tracer provider
             provider = TracerProvider(resource=resource)
@@ -91,8 +95,7 @@ class TracingManager:
 
             self._initialized = True
             logger.info(
-                f"OpenTelemetry tracing initialized, "
-                f"exporting to {self.config.endpoint}"
+                f"OpenTelemetry tracing initialized, " f"exporting to {self.config.endpoint}"
             )
             return True
 

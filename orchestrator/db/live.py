@@ -5,12 +5,13 @@ Provides event-driven subscriptions to database changes.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
-from .connection import get_pool, Connection, ConnectionPool
+from .connection import Connection, ConnectionPool, get_pool
 
 logger = logging.getLogger(__name__)
 

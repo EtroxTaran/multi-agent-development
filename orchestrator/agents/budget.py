@@ -27,8 +27,8 @@ Usage:
 import json
 import logging
 import threading
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -275,7 +275,11 @@ class BudgetManager:
         with self._lock:
             self._state.config.project_budget_usd = max_usd
             self._save_state()
-            logger.info(f"Set project budget: ${max_usd:.2f}" if max_usd else "Set project budget: unlimited")
+            logger.info(
+                f"Set project budget: ${max_usd:.2f}"
+                if max_usd
+                else "Set project budget: unlimited"
+            )
 
     def set_task_budget(self, task_id: str, max_usd: Optional[float]) -> None:
         """Set budget limit for a specific task.
@@ -290,7 +294,11 @@ class BudgetManager:
             else:
                 self._state.config.task_budgets[task_id] = max_usd
             self._save_state()
-            logger.info(f"Set task {task_id} budget: ${max_usd:.2f}" if max_usd else f"Removed task {task_id} budget limit")
+            logger.info(
+                f"Set task {task_id} budget: ${max_usd:.2f}"
+                if max_usd
+                else f"Removed task {task_id} budget limit"
+            )
 
     def set_default_task_budget(self, max_usd: Optional[float]) -> None:
         """Set default budget for all tasks.
@@ -577,12 +585,10 @@ class BudgetManager:
             "project_spent_usd": self._state.total_spent_usd,
             "project_remaining_usd": project_remaining,
             "project_exceeded": (
-                project_budget is not None and
-                self._state.total_spent_usd >= project_budget
+                project_budget is not None and self._state.total_spent_usd >= project_budget
             ),
             "project_percent_used": (
-                self._state.total_spent_usd / project_budget * 100
-                if project_budget else 0
+                self._state.total_spent_usd / project_budget * 100 if project_budget else 0
             ),
             "task_budgets_set": len(self._state.config.task_budgets),
             "default_task_budget_usd": self._state.config.task_budget_usd,
@@ -679,9 +685,7 @@ class BudgetManager:
             "project_budget_usd": project_budget,
             "project_remaining_usd": project_remaining,
             "project_used_percent": (
-                self._state.total_spent_usd / project_budget * 100
-                if project_budget
-                else None
+                self._state.total_spent_usd / project_budget * 100 if project_budget else None
             ),
             "task_count": len(self._state.task_spent),
             "record_count": len(self._state.records),
@@ -701,13 +705,15 @@ class BudgetManager:
             budget = self.get_task_budget(task_id)
             remaining = budget - spent if budget else None
 
-            report.append({
-                "task_id": task_id,
-                "spent_usd": spent,
-                "budget_usd": budget,
-                "remaining_usd": remaining,
-                "used_percent": spent / budget * 100 if budget else None,
-            })
+            report.append(
+                {
+                    "task_id": task_id,
+                    "spent_usd": spent,
+                    "budget_usd": budget,
+                    "remaining_usd": remaining,
+                    "used_percent": spent / budget * 100 if budget else None,
+                }
+            )
 
         return sorted(report, key=lambda x: x["spent_usd"], reverse=True)
 
@@ -728,9 +734,7 @@ class BudgetManager:
             self._state.total_spent_usd -= amount
 
             # Remove task-specific records
-            self._state.records = [
-                r for r in self._state.records if r.get("task_id") != task_id
-            ]
+            self._state.records = [r for r in self._state.records if r.get("task_id") != task_id]
 
             self._save_state()
             logger.info(f"Reset spending for task {task_id}: ${amount:.2f}")

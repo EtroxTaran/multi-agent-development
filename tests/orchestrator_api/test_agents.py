@@ -1,7 +1,6 @@
 """Tests for agent and audit endpoints."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestGetAgents:
@@ -96,9 +95,7 @@ class TestGetAudit:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit?agent=claude"
-                )
+                response = test_client.get("/projects/test-project/audit?agent=claude")
 
         assert response.status_code == 200
         mock_audit_storage.query.assert_called_once()
@@ -113,9 +110,7 @@ class TestGetAudit:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit?task_id=T1"
-                )
+                response = test_client.get("/projects/test-project/audit?task_id=T1")
 
         assert response.status_code == 200
         mock_audit_storage.query.assert_called_once()
@@ -130,9 +125,7 @@ class TestGetAudit:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit?status=success"
-                )
+                response = test_client.get("/projects/test-project/audit?status=success")
 
         assert response.status_code == 200
         mock_audit_storage.query.assert_called_once()
@@ -147,9 +140,7 @@ class TestGetAudit:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit?since_hours=24"
-                )
+                response = test_client.get("/projects/test-project/audit?since_hours=24")
 
         assert response.status_code == 200
         mock_audit_storage.query.assert_called_once()
@@ -193,9 +184,7 @@ class TestGetAuditStatistics:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit/statistics"
-                )
+                response = test_client.get("/projects/test-project/audit/statistics")
 
         assert response.status_code == 200
         data = response.json()
@@ -211,9 +200,7 @@ class TestGetAuditStatistics:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit/statistics"
-                )
+                response = test_client.get("/projects/test-project/audit/statistics")
 
         assert response.status_code == 200
         data = response.json()
@@ -228,9 +215,7 @@ class TestGetAuditStatistics:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit/statistics"
-                )
+                response = test_client.get("/projects/test-project/audit/statistics")
 
         assert response.status_code == 200
         data = response.json()
@@ -245,9 +230,7 @@ class TestGetAuditStatistics:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit/statistics"
-                )
+                response = test_client.get("/projects/test-project/audit/statistics")
 
         assert response.status_code == 200
         data = response.json()
@@ -262,9 +245,7 @@ class TestGetAuditStatistics:
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             with patch("main.get_audit_storage", return_value=mock_audit_storage):
-                response = test_client.get(
-                    "/projects/test-project/audit/statistics?since_hours=24"
-                )
+                response = test_client.get("/projects/test-project/audit/statistics?since_hours=24")
 
         assert response.status_code == 200
         mock_audit_storage.get_statistics.assert_called_once()

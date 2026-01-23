@@ -4,9 +4,10 @@ Provides database access for complex queries and live subscriptions.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, Optional
 
 from ..config import get_settings
 
@@ -49,6 +50,7 @@ class DatabaseService:
         if self._connection is None:
             try:
                 from orchestrator.db import get_connection
+
                 self._connection = await get_connection()
             except ImportError:
                 raise RuntimeError("SurrealDB module not available")

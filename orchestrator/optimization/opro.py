@@ -4,19 +4,17 @@ Uses LLM to generate improved prompts based on examples
 of high and low scoring outputs.
 """
 
-import json
 import logging
 import os
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Meta-prompt for OPRO optimization
-OPRO_META_PROMPT = '''You are an expert prompt engineer optimizing prompts for AI agents.
+OPRO_META_PROMPT = """You are an expert prompt engineer optimizing prompts for AI agents.
 
 ## Current Prompt
 ```
@@ -56,7 +54,7 @@ Provide ONLY the improved prompt, no explanations or commentary.
 The prompt should be ready to use directly.
 
 ---
-Improved Prompt:'''
+Improved Prompt:"""
 
 
 @dataclass
@@ -132,8 +130,8 @@ class OPROOptimizer:
         )
 
         # Get top and bottom examples
-        top_examples = sorted_evals[-self.top_k:]
-        bottom_examples = sorted_evals[:self.bottom_k]
+        top_examples = sorted_evals[-self.top_k :]
+        bottom_examples = sorted_evals[: self.bottom_k]
 
         # Format examples
         high_scoring = self._format_examples(top_examples, "high")
@@ -241,9 +239,12 @@ class OPROOptimizer:
         try:
             cmd = [
                 "claude",
-                "-p", prompt,
-                "--output-format", "text",
-                "--max-turns", "1",
+                "-p",
+                prompt,
+                "--output-format",
+                "text",
+                "--max-turns",
+                "1",
             ]
 
             result = subprocess.run(

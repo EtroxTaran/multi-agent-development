@@ -9,15 +9,16 @@ Includes progress files support for agentic memory across sessions.
 import hashlib
 import json
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional
-from enum import Enum
 
 
 class CheckpointTrigger(Enum):
     """Triggers for creating checkpoints."""
+
     PHASE_TRANSITION = "phase_transition"
     FEEDBACK_RECEIVED = "feedback_received"
     IMPLEMENTATION_MILESTONE = "implementation_milestone"
@@ -28,6 +29,7 @@ class CheckpointTrigger(Enum):
 @dataclass
 class ProgressEntry:
     """A single progress entry for agentic memory."""
+
     timestamp: str
     action: str
     details: str
@@ -45,6 +47,7 @@ class ProgressEntry:
 @dataclass
 class Checkpoint:
     """Checkpoint for resumable workflows."""
+
     checkpoint_id: str
     timestamp: str
     phase: int
@@ -65,6 +68,7 @@ class Checkpoint:
 @dataclass
 class FileChecksum:
     """Checksum information for a tracked file."""
+
     path: str
     checksum: str
     last_modified: str
@@ -83,6 +87,7 @@ class FileChecksum:
 @dataclass
 class ContextState:
     """State of all tracked context files."""
+
     files: dict[str, FileChecksum] = field(default_factory=dict)
     captured_at: str = field(default_factory=lambda: datetime.now().isoformat())
     version: str = "1.0"
@@ -98,10 +103,7 @@ class ContextState:
     @classmethod
     def from_dict(cls, data: dict) -> "ContextState":
         """Create from dictionary."""
-        files = {
-            k: FileChecksum.from_dict(v)
-            for k, v in data.get("files", {}).items()
-        }
+        files = {k: FileChecksum.from_dict(v) for k, v in data.get("files", {}).items()}
         return cls(
             files=files,
             captured_at=data.get("captured_at", datetime.now().isoformat()),
@@ -112,6 +114,7 @@ class ContextState:
 @dataclass
 class DriftResult:
     """Result of drift detection."""
+
     has_drift: bool
     changed_files: list[str] = field(default_factory=list)
     added_files: list[str] = field(default_factory=list)
@@ -348,7 +351,7 @@ class ContextManager:
         if not input_path.exists():
             return None
 
-        with open(input_path, "r") as f:
+        with open(input_path) as f:
             data = json.load(f)
 
         return ContextState.from_dict(data)
@@ -597,7 +600,7 @@ class ContextManager:
         if not latest_path.exists():
             return None
 
-        with open(latest_path, "r") as f:
+        with open(latest_path) as f:
             data = json.load(f)
         return Checkpoint.from_dict(data)
 
@@ -613,7 +616,7 @@ class ContextManager:
 
         checkpoints = []
         for path in checkpoint_dir.glob("checkpoint-*.json"):
-            with open(path, "r") as f:
+            with open(path) as f:
                 data = json.load(f)
             checkpoints.append(Checkpoint.from_dict(data))
 

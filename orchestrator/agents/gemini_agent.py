@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from ..config.models import GEMINI_MODELS, DEFAULT_GEMINI_MODEL, DEFAULT_ARCHITECT_MODEL
+from ..config.models import DEFAULT_ARCHITECT_MODEL, DEFAULT_GEMINI_MODEL, GEMINI_MODELS
 from .base import BaseAgent
-from .prompts import load_prompt, format_prompt
-
+from .prompts import format_prompt, load_prompt
 
 # Available Gemini models
 # Managed in orchestrator.config.models
@@ -88,6 +87,79 @@ class GeminiAgent(BaseAgent):
         command.append(prompt)
 
         return command
+
+    def run(
+        self,
+        prompt: str,
+        output_file: Optional[Path] = None,
+        phase: Optional[int] = None,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        **kwargs,
+    ) -> "AgentResult":
+        """Execute the agent with auto-fallback to Claude on quota limits."""
+        # Initial run
+        result = super().run(prompt, output_file, phase, task_id, session_id, **kwargs)
+
+        # Check for quota/rate limit errors
+        error_indicators = [
+            "quota",
+            "rate limit",
+            "429",
+            "too many requests",
+            "exhausted",
+            "resource exhausted",
+        ]
+        output_check = (result.output or "") + (result.error or "")
+        is_quota_error = any(
+            indicator.lower() in output_check.lower() for indicator in error_indicators
+        )
+
+        if not result.success and is_quota_error:
+            # Fallback to Claude
+            try:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Gemini quota exhausted (model {kwargs.get('model', self.model)}). "
+                    "Falling back to Claude."
+                )
+
+                # Import locally to avoid circular imports
+                from .claude_agent import ClaudeAgent
+
+                # Instantiate Claude agent
+                # Note: valid defaults are handled in ClaudeAgent.__init__
+                claude = ClaudeAgent(self.project_dir)
+
+                # Prepare kwargs for Claude
+                fallback_kwargs = kwargs.copy()
+
+                # Remove Gemini-specific kwargs that might confuse Claude
+                if "model" in fallback_kwargs:
+                    del fallback_kwargs["model"]
+
+                # Set specific fallback model for robustness (User mentioned Sonnet or Opus)
+                # User preference: Opus for highest quality.
+                # We use the configured latest Opus model (2026 standard).
+                from ..config.models import CLAUDE_OPUS
+
+                claude_model = CLAUDE_OPUS
+                fallback_kwargs["fallback_model"] = claude_model
+
+                logger.info(f"Retrying request with Claude Agent (model: {claude_model})...")
+
+                return claude.run(
+                    prompt, output_file, phase, task_id, session_id, **fallback_kwargs
+                )
+            except Exception as e:
+                logger.error(f"Fallback to Claude failed: {e}")
+                # Return original result if fallback fails to avoid masking the original error
+                # unless we want to try another fallback, but let's stick to one level for now.
+                return result
+
+        return result
 
     def run_validation(
         self,

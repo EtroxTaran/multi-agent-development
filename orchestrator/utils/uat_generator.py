@@ -212,9 +212,7 @@ class UATDocument:
 
         # Implementation notes
         if self.implementation_notes:
-            lines.extend(
-                ["## Implementation Notes", "", self.implementation_notes, ""]
-            )
+            lines.extend(["## Implementation Notes", "", self.implementation_notes, ""])
 
         # Known limitations
         if self.known_limitations:
@@ -298,8 +296,7 @@ class UATGenerator:
             uat.acceptance_criteria = list(task["acceptance_criteria"])
             # Also add to verification checklist
             uat.verification_checklist = [
-                f"Verify: {criterion}"
-                for criterion in task["acceptance_criteria"]
+                f"Verify: {criterion}" for criterion in task["acceptance_criteria"]
             ]
 
         # Parse test output if provided
@@ -330,24 +327,22 @@ class UATGenerator:
         # Try pytest format: "X passed, Y failed"
         import re
 
-        pytest_match = re.search(
-            r"(\d+) passed(?:,\s*(\d+) failed)?", output, re.IGNORECASE
-        )
+        pytest_match = re.search(r"(\d+) passed(?:,\s*(\d+) failed)?", output, re.IGNORECASE)
         if pytest_match:
             results.unit_passed = int(pytest_match.group(1))
             if pytest_match.group(2):
                 results.unit_failed = int(pytest_match.group(2))
 
         # Try jest format: "Tests: X passed, Y failed, Z total"
-        jest_match = re.search(
-            r"Tests:\s*(\d+)\s*passed,\s*(\d+)\s*failed", output, re.IGNORECASE
-        )
+        jest_match = re.search(r"Tests:\s*(\d+)\s*passed,\s*(\d+)\s*failed", output, re.IGNORECASE)
         if jest_match:
             results.unit_passed = int(jest_match.group(1))
             results.unit_failed = int(jest_match.group(2))
 
         # Try coverage percentage
-        coverage_match = re.search(r"(\d+(?:\.\d+)?)\s*%\s*(?:coverage|covered)", output, re.IGNORECASE)
+        coverage_match = re.search(
+            r"(\d+(?:\.\d+)?)\s*%\s*(?:coverage|covered)", output, re.IGNORECASE
+        )
         if coverage_match:
             results.coverage_percentage = float(coverage_match.group(1))
 
@@ -425,9 +420,7 @@ class UATGenerator:
             extracted["features"].append(match.group(1).strip())
 
         # Endpoints: "GET /api/..." or "POST /api/..."
-        for match in re.finditer(
-            r"(GET|POST|PUT|DELETE|PATCH)\s+(/[^\s]+)", output
-        ):
+        for match in re.finditer(r"(GET|POST|PUT|DELETE|PATCH)\s+(/[^\s]+)", output):
             extracted["endpoints"].append(f"{match.group(1)} {match.group(2)}")
 
         # Components: "Component: ..." or React component patterns

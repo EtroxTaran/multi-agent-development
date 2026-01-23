@@ -9,25 +9,15 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-from ..agents.base import BaseAgent, AgentResult
-from .circuit_breaker import CircuitBreaker, CircuitState
+from ..agents.base import BaseAgent
+from .circuit_breaker import CircuitBreaker
 from .diagnosis import DiagnosisEngine, DiagnosisResult
 from .known_fixes import KnownFixDatabase
-from .strategies import (
-    FixPlan,
-    FixResult,
-    FixStatus,
-    get_strategy_for_error,
-)
-from .triage import (
-    ErrorTriage,
-    TriageResult,
-    TriageDecision,
-    FixerError,
-)
-from .validator import FixValidator, PreValidation, PostValidation
+from .strategies import FixPlan, FixResult, FixStatus, get_strategy_for_error
+from .triage import ErrorTriage, FixerError, TriageDecision, TriageResult
+from .validator import FixValidator, PostValidation, PreValidation
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +167,9 @@ class FixerAgent(BaseAgent):
         if isinstance(error, dict):
             error = FixerError.from_dict(error)
 
-        fixer_enabled = workflow_state.get("fixer_enabled", True) if workflow_state else self.enabled
+        fixer_enabled = (
+            workflow_state.get("fixer_enabled", True) if workflow_state else self.enabled
+        )
         circuit_open = self.circuit_breaker.is_open
         fix_history = workflow_state.get("fix_history", []) if workflow_state else []
 
@@ -434,9 +426,13 @@ Respond with JSON:
             "error_id": attempt.error_id,
             "category": attempt.triage.category.value if attempt.triage else None,
             "root_cause": attempt.diagnosis.root_cause.value if attempt.diagnosis else None,
-            "fix_description": attempt.plan.actions[0].description if attempt.plan and attempt.plan.actions else "Unknown",
+            "fix_description": attempt.plan.actions[0].description
+            if attempt.plan and attempt.plan.actions
+            else "Unknown",
             "files_changed": [a.target for a in (attempt.plan.actions if attempt.plan else [])],
-            "verification_status": attempt.post_validation.status.value if attempt.post_validation else "unknown",
+            "verification_status": attempt.post_validation.status.value
+            if attempt.post_validation
+            else "unknown",
         }
 
         # Log to security fixes file
@@ -506,6 +502,10 @@ def create_fixer_agent(
         max_attempts_per_error=fixer_config.get("max_attempts_per_error", 2),
         max_attempts_per_session=fixer_config.get("max_attempts_per_session", 10),
         validation_agent=fixer_config.get("validation_agent", "cursor"),
-        circuit_breaker_threshold=fixer_config.get("circuit_breaker", {}).get("failure_threshold", 5),
-        circuit_breaker_timeout=fixer_config.get("circuit_breaker", {}).get("reset_timeout_seconds", 300),
+        circuit_breaker_threshold=fixer_config.get("circuit_breaker", {}).get(
+            "failure_threshold", 5
+        ),
+        circuit_breaker_timeout=fixer_config.get("circuit_breaker", {}).get(
+            "reset_timeout_seconds", 300
+        ),
     )

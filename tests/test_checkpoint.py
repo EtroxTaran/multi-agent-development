@@ -1,10 +1,9 @@
 """Tests for checkpoint utility."""
 
 import json
-import pytest
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+
+import pytest
 
 from orchestrator.utils.checkpoint import (
     Checkpoint,
@@ -244,6 +243,7 @@ class TestCheckpointManager:
         """Test checkpoint with file snapshot."""
         # Initialize git repo
         import subprocess
+
         subprocess.run(["git", "init"], cwd=temp_project, capture_output=True)
 
         # Create and add a file

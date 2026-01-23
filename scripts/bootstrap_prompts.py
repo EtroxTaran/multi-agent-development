@@ -52,9 +52,9 @@ async def bootstrap_prompts(project_name: str, force: bool = False) -> dict:
         Dict with counts: {"created": N, "skipped": N, "errors": N}
     """
     from orchestrator.db.repositories import (
-        get_prompt_version_repository,
-        PromptStatus,
         OptimizationMethod,
+        PromptStatus,
+        get_prompt_version_repository,
     )
 
     repo = get_prompt_version_repository(project_name)
@@ -224,7 +224,7 @@ Examples:
     print(f"Bootstrapping prompts for project: {args.project}")
     results = await bootstrap_prompts(args.project, args.force)
 
-    print(f"\nBootstrap complete:")
+    print("\nBootstrap complete:")
     print(f"  Created: {results['created']}")
     print(f"  Skipped: {results['skipped']}")
     print(f"  Errors:  {results['errors']}")

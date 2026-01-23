@@ -5,39 +5,36 @@ Breakdown -> Select -> Write Tests -> Implement -> Verify -> Loop
 """
 
 import logging
-from typing import Optional, Any
 
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
 
-from ..state import WorkflowState
-from ..nodes import (
-    task_breakdown_node,
-    select_next_task_node,
-    write_tests_node,
+from ..nodes import (  # Auto-improvement nodes
+    analyze_output_node,
+    evaluate_agent_node,
+    fix_bug_node,
     implement_task_node,
     implement_tasks_parallel_node,
+    optimize_prompts_node,
+    select_next_task_node,
+    task_breakdown_node,
     verify_task_node,
     verify_tasks_parallel_node,
-    fix_bug_node,
-    # Auto-improvement nodes
-    evaluate_agent_node,
-    analyze_output_node,
-    optimize_prompts_node,
+    write_tests_node,
 )
 from ..routers import (
-    task_breakdown_router,
-    select_task_router,
-    write_tests_router,
+    analyze_output_router,
+    evaluate_agent_router,
+    fix_bug_router,
     implement_task_router,
     implement_tasks_parallel_router,
+    select_task_router,
+    task_breakdown_router,
     verify_task_router,
     verify_tasks_parallel_router,
-    fix_bug_router,
-    evaluate_agent_router,
-    analyze_output_router,
-    optimize_prompts_router,
+    write_tests_router,
 )
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -65,30 +62,36 @@ def create_task_subgraph(
     graph = StateGraph(WorkflowState)
 
     # Retry policy
-    implementation_retry_policy = RetryPolicy(
-        max_attempts=2,
-        initial_interval=5.0,
-        backoff_factor=2.0,
-        jitter=True,
-    ) if enable_retry_policy else None
+    implementation_retry_policy = (
+        RetryPolicy(
+            max_attempts=2,
+            initial_interval=5.0,
+            backoff_factor=2.0,
+            jitter=True,
+        )
+        if enable_retry_policy
+        else None
+    )
 
     # Add nodes
     graph.add_node("task_breakdown", task_breakdown_node)
     graph.add_node("select_task", select_next_task_node)
     graph.add_node("write_tests", write_tests_node)
     graph.add_node("implement_task", implement_task_node, retry=implementation_retry_policy)
-    graph.add_node("implement_tasks_parallel", implement_tasks_parallel_node, retry=implementation_retry_policy)
+    graph.add_node(
+        "implement_tasks_parallel", implement_tasks_parallel_node, retry=implementation_retry_policy
+    )
     graph.add_node("fix_bug", fix_bug_node)
     graph.add_node("verify_task", verify_task_node)
     graph.add_node("verify_tasks_parallel", verify_tasks_parallel_node)
-    
+
     # Auto-improvement nodes
     graph.add_node("evaluate_agent", evaluate_agent_node)
     graph.add_node("analyze_output", analyze_output_node)
     graph.add_node("optimize_prompts", optimize_prompts_node)
 
     # Define edges
-    
+
     # Start -> Task Breakdown
     graph.add_edge(START, "task_breakdown")
 
@@ -98,7 +101,7 @@ def create_task_subgraph(
         task_breakdown_router,
         {
             "select_task": "select_task",
-            "human_escalation": END, # Exit to parent
+            "human_escalation": END,  # Exit to parent
             "__end__": END,
         },
     )
@@ -108,10 +111,10 @@ def create_task_subgraph(
         "select_task",
         select_task_router,
         {
-            "implement_task": "write_tests", # Go to write_tests first
+            "implement_task": "write_tests",  # Go to write_tests first
             "implement_tasks_parallel": "implement_tasks_parallel",
             "build_verification": END,  # Exit to parent (success)
-            "human_escalation": END,    # Exit to parent
+            "human_escalation": END,  # Exit to parent
         },
     )
 
@@ -142,7 +145,7 @@ def create_task_subgraph(
         verify_task_router,
         {
             "select_task": "evaluate_agent",  # Evaluate before loop back
-            "implement_task": "fix_bug",      # Retry via Bug Fixer
+            "implement_task": "fix_bug",  # Retry via Bug Fixer
             "human_escalation": END,
         },
     )
@@ -163,7 +166,7 @@ def create_task_subgraph(
         implement_tasks_parallel_router,
         {
             "verify_tasks_parallel": "verify_tasks_parallel",
-            "implement_tasks_parallel": "implement_tasks_parallel", # Retry
+            "implement_tasks_parallel": "implement_tasks_parallel",  # Retry
             "human_escalation": END,
         },
     )
@@ -174,7 +177,7 @@ def create_task_subgraph(
         verify_tasks_parallel_router,
         {
             "select_task": "select_task",  # Loop back
-            "implement_tasks_parallel": "implement_tasks_parallel", # Retry batch
+            "implement_tasks_parallel": "implement_tasks_parallel",  # Retry batch
             "human_escalation": END,
         },
     )
@@ -185,7 +188,7 @@ def create_task_subgraph(
         evaluate_agent_router,
         {
             "analyze_output": "analyze_output",
-            "continue_workflow": "select_task", # Loop back
+            "continue_workflow": "select_task",  # Loop back
         },
     )
 
@@ -195,7 +198,7 @@ def create_task_subgraph(
         analyze_output_router,
         {
             "optimize_prompts": "optimize_prompts",
-            "continue_workflow": "select_task", # Loop back
+            "continue_workflow": "select_task",  # Loop back
         },
     )
 

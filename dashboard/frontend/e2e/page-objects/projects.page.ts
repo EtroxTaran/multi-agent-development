@@ -2,8 +2,8 @@
  * Projects list page object
  */
 
-import { Page, Locator, expect } from '@playwright/test';
-import { BasePage } from './base.page';
+import { Page, Locator, expect } from "@playwright/test";
+import { BasePage } from "./base.page";
 
 export class ProjectsPage extends BasePage {
   // Locators
@@ -26,28 +26,35 @@ export class ProjectsPage extends BasePage {
   constructor(page: Page) {
     super(page);
 
-    this.heading = page.getByRole('heading', { name: 'Projects' });
-    this.newProjectButton = page.getByRole('button', { name: 'New Project' });
-    this.refreshButton = page.getByRole('button', { name: 'Refresh' });
+    this.heading = page.getByRole("heading", { name: "Projects" });
+    this.newProjectButton = page.getByRole("button", { name: "New Project" });
+    this.refreshButton = page.getByRole("button", { name: "Refresh" });
     this.projectCards = page.locator('[class*="grid"] a[href^="/project/"]');
-    this.loadingSpinner = page.locator('.animate-spin');
-    this.emptyState = page.getByText('No projects yet');
-    this.errorMessage = page.locator('.text-destructive');
-    this.retryButton = page.getByRole('button', { name: 'Retry' });
+    this.loadingSpinner = page.locator(".animate-spin");
+    this.emptyState = page.getByText("No projects yet");
+    this.errorMessage = page.locator(".text-destructive");
+    this.retryButton = page.getByRole("button", { name: "Retry" });
 
     // New project form
-    this.newProjectForm = page.locator('[class*="Card"]').filter({ hasText: 'Create New Project' });
-    this.projectNameInput = page.getByPlaceholder('Project name');
-    this.createButton = page.getByRole('button', { name: 'Create', exact: true });
-    this.cancelButton = page.getByRole('button', { name: 'Cancel' });
-    this.createError = page.locator('.text-destructive').filter({ hasText: 'Failed' });
+    this.newProjectForm = page
+      .locator('[class*="Card"]')
+      .filter({ hasText: "Create New Project" });
+    this.projectNameInput = page.getByPlaceholder("Project name");
+    this.createButton = page.getByRole("button", {
+      name: "Create",
+      exact: true,
+    });
+    this.cancelButton = page.getByRole("button", { name: "Cancel" });
+    this.createError = page
+      .locator(".text-destructive")
+      .filter({ hasText: "Failed" });
   }
 
   /**
    * Navigate to projects page
    */
   async goto() {
-    await this.page.goto('/');
+    await this.page.goto("/");
     await this.waitForPageLoad();
   }
 
@@ -56,7 +63,7 @@ export class ProjectsPage extends BasePage {
    */
   async waitForProjectsToLoad() {
     await expect(this.heading).toBeVisible();
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState("networkidle");
   }
 
   /**
@@ -110,7 +117,7 @@ export class ProjectsPage extends BasePage {
    */
   async refresh() {
     await this.refreshButton.click();
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState("networkidle");
   }
 
   /**

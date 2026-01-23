@@ -11,14 +11,16 @@ from typing import Optional
 
 class ApprovalPolicy(str, Enum):
     """Approval policy types."""
+
     ALL_MUST_APPROVE = "all_must_approve"  # Both agents must approve
-    NO_BLOCKERS = "no_blockers"            # Approve if no blocking issues
-    WEIGHTED_SCORE = "weighted_score"      # Approve based on weighted scores
-    MAJORITY = "majority"                  # At least one must approve
+    NO_BLOCKERS = "no_blockers"  # Approve if no blocking issues
+    WEIGHTED_SCORE = "weighted_score"  # Approve based on weighted scores
+    MAJORITY = "majority"  # At least one must approve
 
 
 class ApprovalStatus(str, Enum):
     """Status of an approval decision."""
+
     APPROVED = "approved"
     REJECTED = "rejected"
     NEEDS_CHANGES = "needs_changes"
@@ -28,6 +30,7 @@ class ApprovalStatus(str, Enum):
 @dataclass
 class ApprovalConfig:
     """Configuration for approval evaluation."""
+
     policy: ApprovalPolicy = ApprovalPolicy.NO_BLOCKERS
     minimum_score: float = 6.0
     require_both_agents: bool = True
@@ -38,6 +41,7 @@ class ApprovalConfig:
 @dataclass
 class AgentFeedback:
     """Normalized feedback from an agent."""
+
     agent: str
     assessment: str  # approve, needs_changes, reject
     score: float
@@ -96,11 +100,13 @@ class AgentFeedback:
             for file_review in review.get("files_reviewed", []):
                 for issue in file_review.get("issues", []):
                     if issue.get("severity") == "error":
-                        blocking.append({
-                            "file": file_review.get("file"),
-                            "description": issue.get("description"),
-                            "type": issue.get("type"),
-                        })
+                        blocking.append(
+                            {
+                                "file": file_review.get("file"),
+                                "description": issue.get("description"),
+                                "type": issue.get("type"),
+                            }
+                        )
 
         # Check approved field for review phase
         assessment = "approve" if review.get("approved", False) else "needs_changes"
@@ -125,6 +131,7 @@ class AgentFeedback:
 @dataclass
 class ApprovalResult:
     """Result of an approval evaluation."""
+
     status: ApprovalStatus
     approved: bool
     cursor_approved: bool
@@ -230,9 +237,7 @@ class ApprovalEngine:
         all_blocking.extend(gemini_feedback.blocking_issues)
 
         # Calculate combined score
-        combined_score = self._calculate_combined_score(
-            cursor_feedback, gemini_feedback
-        )
+        combined_score = self._calculate_combined_score(cursor_feedback, gemini_feedback)
 
         # Evaluate based on policy
         if cfg.policy == ApprovalPolicy.ALL_MUST_APPROVE:
@@ -240,17 +245,11 @@ class ApprovalEngine:
                 cursor_approved, gemini_approved, cursor_feedback, gemini_feedback, cfg
             )
         elif cfg.policy == ApprovalPolicy.NO_BLOCKERS:
-            approved, reasoning = self._eval_no_blockers(
-                all_blocking, combined_score, cfg
-            )
+            approved, reasoning = self._eval_no_blockers(all_blocking, combined_score, cfg)
         elif cfg.policy == ApprovalPolicy.WEIGHTED_SCORE:
-            approved, reasoning = self._eval_weighted_score(
-                cursor_feedback, gemini_feedback, cfg
-            )
+            approved, reasoning = self._eval_weighted_score(cursor_feedback, gemini_feedback, cfg)
         elif cfg.policy == ApprovalPolicy.MAJORITY:
-            approved, reasoning = self._eval_majority(
-                cursor_approved, gemini_approved, cfg
-            )
+            approved, reasoning = self._eval_majority(cursor_approved, gemini_approved, cfg)
         else:
             approved = cursor_approved and gemini_approved
             reasoning = "Default policy: both must approve"
@@ -356,13 +355,13 @@ class ApprovalEngine:
         cursor_score = cursor_feedback.score if not cursor_feedback.error else 0
         gemini_score = gemini_feedback.score if not gemini_feedback.error else 0
 
-        weighted_score = (
-            cursor_score * weights["cursor"] +
-            gemini_score * weights["gemini"]
-        )
+        weighted_score = cursor_score * weights["cursor"] + gemini_score * weights["gemini"]
 
         if weighted_score >= config.minimum_score:
-            return True, f"Weighted score {weighted_score:.1f} meets threshold {config.minimum_score}"
+            return (
+                True,
+                f"Weighted score {weighted_score:.1f} meets threshold {config.minimum_score}",
+            )
 
         return False, f"Weighted score {weighted_score:.1f} below threshold {config.minimum_score}"
 

@@ -2,42 +2,42 @@
  * Projects page tests (migrated to use page objects)
  */
 
-import { test, expect } from '@playwright/test';
-import { ProjectsPage } from './page-objects';
-import { setupApiMocks, overrideApiMock, mockProjects } from './fixtures';
+import { test, expect } from "@playwright/test";
+import { ProjectsPage } from "./page-objects";
+import { setupApiMocks, overrideApiMock, mockProjects } from "./fixtures";
 
-test.describe('Projects Page', () => {
+test.describe("Projects Page", () => {
   test.beforeEach(async ({ page }) => {
     await setupApiMocks(page, {
       projects: mockProjects.single,
     });
   });
 
-  test('should display projects list', async ({ page }) => {
+  test("should display projects list", async ({ page }) => {
     const projectsPage = new ProjectsPage(page);
     await projectsPage.goto();
 
     await expect(projectsPage.heading).toBeVisible();
-    await expect(page.getByText('test-project')).toBeVisible();
+    await expect(page.getByText("test-project")).toBeVisible();
   });
 
-  test('should allow creating a new project', async ({ page }) => {
+  test("should allow creating a new project", async ({ page }) => {
     const projectsPage = new ProjectsPage(page);
     await projectsPage.goto();
 
     await projectsPage.clickNewProject();
-    await expect(page.getByText('Create New Project')).toBeVisible();
+    await expect(page.getByText("Create New Project")).toBeVisible();
 
-    await projectsPage.projectNameInput.fill('new-project');
+    await projectsPage.projectNameInput.fill("new-project");
 
     // Mock updated projects list after creation
-    await overrideApiMock(page, '/api/projects', [
+    await overrideApiMock(page, "/api/projects", [
       ...mockProjects.single,
       {
-        name: 'new-project',
-        path: '/tmp/new-project',
+        name: "new-project",
+        path: "/tmp/new-project",
         current_phase: 0,
-        workflow_status: 'not_started',
+        workflow_status: "not_started",
       },
     ]);
 

@@ -19,7 +19,8 @@ class MigrationAutoImprovement(BaseMigration):
 
     async def up(self, ctx: MigrationContext) -> None:
         """Apply the migration."""
-        await ctx.execute("""
+        await ctx.execute(
+            """
 -- ============================================
 -- Agent Evaluations (auto-improvement system)
 -- ============================================
@@ -134,7 +135,8 @@ DEFINE INDEX IF NOT EXISTS idx_opt_template ON TABLE optimization_history COLUMN
 DEFINE INDEX IF NOT EXISTS idx_opt_method ON TABLE optimization_history COLUMNS method;
 DEFINE INDEX IF NOT EXISTS idx_opt_success ON TABLE optimization_history COLUMNS success;
 DEFINE INDEX IF NOT EXISTS idx_opt_time ON TABLE optimization_history COLUMNS created_at;
-        """)
+        """
+        )
 
     async def down(self, ctx: MigrationContext) -> None:
         """Rollback by removing tables."""

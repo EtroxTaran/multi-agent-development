@@ -50,61 +50,37 @@ Backend Selection:
 from pathlib import Path
 from typing import Optional
 
-# Protocol definitions (for type hints)
-from .base import (
-    # Protocols
-    AuditStorageProtocol,
-    SessionStorageProtocol,
-    BudgetStorageProtocol,
-    CheckpointStorageProtocol,
-    WorkflowStorageProtocol,
-    # Data classes
-    AuditEntryData,
-    AuditStatisticsData,
-    SessionData,
-    BudgetRecordData,
-    BudgetSummaryData,
-    CheckpointData,
-    WorkflowStateData,
-    # Context
-    AuditRecordContext as AuditRecordContextProtocol,
-)
-
 # Async utilities
 from .async_utils import (
-    run_async,
-    sync_wrapper,
     AsyncContextAdapter,
     ensure_async,
     gather_with_fallback,
+    run_async,
+    sync_wrapper,
 )
 
 # Adapters and factory functions
-from .audit_adapter import (
-    AuditStorageAdapter,
-    AuditRecordContext,
-    get_audit_storage,
-)
+from .audit_adapter import AuditRecordContext, AuditStorageAdapter, get_audit_storage
 
-from .session_adapter import (
-    SessionStorageAdapter,
-    get_session_storage,
+# Protocol definitions (for type hints)
+from .base import (
+    AuditEntryData,
+    AuditStatisticsData,
+    AuditStorageProtocol,
+    BudgetRecordData,
+    BudgetStorageProtocol,
+    BudgetSummaryData,
+    CheckpointData,
+    CheckpointStorageProtocol,
+    SessionData,
+    SessionStorageProtocol,
+    WorkflowStateData,
+    WorkflowStorageProtocol,
 )
-
-from .budget_adapter import (
-    BudgetStorageAdapter,
-    get_budget_storage,
-)
-
-from .checkpoint_adapter import (
-    CheckpointStorageAdapter,
-    get_checkpoint_storage,
-)
-
-from .workflow_adapter import (
-    WorkflowStorageAdapter,
-    get_workflow_storage,
-)
+from .budget_adapter import BudgetStorageAdapter, get_budget_storage
+from .checkpoint_adapter import CheckpointStorageAdapter, get_checkpoint_storage
+from .session_adapter import SessionStorageAdapter, get_session_storage
+from .workflow_adapter import WorkflowStorageAdapter, get_workflow_storage
 
 
 def get_all_storage(
@@ -139,6 +115,7 @@ def is_surrealdb_active() -> bool:
     """
     try:
         from orchestrator.db import is_surrealdb_enabled
+
         return is_surrealdb_enabled()
     except ImportError:
         return False

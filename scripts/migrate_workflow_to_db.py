@@ -18,11 +18,9 @@ import argparse
 import asyncio
 import json
 import logging
-import os
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -35,12 +33,11 @@ except ImportError:
     print("Install with: pip install websockets")
     sys.exit(1)
 
-from orchestrator.db.config import require_db, get_db_config
-from orchestrator.db.connection import get_connection
-from orchestrator.db.schema import ensure_schema
-from orchestrator.db.repositories.phase_outputs import get_phase_output_repository
+from orchestrator.db.config import require_db
 from orchestrator.db.repositories.logs import get_logs_repository
+from orchestrator.db.repositories.phase_outputs import get_phase_output_repository
 from orchestrator.db.repositories.workflow import get_workflow_repository
+from orchestrator.db.schema import ensure_schema
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -235,9 +232,11 @@ async def migrate_project(project_dir: Path, project_name: str) -> dict[str, Any
     if results["errors"]:
         results["status"] = "partial"
 
-    logger.info(f"  Summary: {len(results['migrated_files'])} migrated, "
-                f"{len(results['skipped_files'])} skipped, "
-                f"{len(results['errors'])} errors")
+    logger.info(
+        f"  Summary: {len(results['migrated_files'])} migrated, "
+        f"{len(results['skipped_files'])} skipped, "
+        f"{len(results['errors'])} errors"
+    )
 
     return results
 
@@ -266,9 +265,7 @@ def get_all_projects(conductor_root: Path) -> list[tuple[Path, str]]:
 
 
 async def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate .workflow/ file data to SurrealDB"
-    )
+    parser = argparse.ArgumentParser(description="Migrate .workflow/ file data to SurrealDB")
     parser.add_argument(
         "project",
         nargs="?",
@@ -352,7 +349,9 @@ async def main():
     total_migrated = 0
     total_errors = 0
     for result in all_results:
-        status_icon = "✓" if result["status"] == "success" else "⚠" if result["status"] == "partial" else "○"
+        status_icon = (
+            "✓" if result["status"] == "success" else "⚠" if result["status"] == "partial" else "○"
+        )
         logger.info(f"{status_icon} {result['project']}: {result['status']}")
         if result.get("migrated_files"):
             total_migrated += len(result["migrated_files"])

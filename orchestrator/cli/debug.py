@@ -9,9 +9,8 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from orchestrator.storage import get_checkpoint_storage, CheckpointData
+from orchestrator.storage import get_checkpoint_storage
 from orchestrator.utils.setup_logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -20,8 +19,8 @@ logger = logging.getLogger(__name__)
 class TimeTravelDebugger(cmd.Cmd):
     """Interactive debugger for time travel."""
 
-    intro = 'Welcome to Time Travel Debugger. Type help or ? to list commands.\n'
-    prompt = '(debug) '
+    intro = "Welcome to Time Travel Debugger. Type help or ? to list commands.\n"
+    prompt = "(debug) "
 
     def __init__(self, project_dir: Path):
         super().__init__()
@@ -40,10 +39,10 @@ class TimeTravelDebugger(cmd.Cmd):
         """List available checkpoints."""
         self._refresh_checkpoints()
         print(f"\nFound {len(self.checkpoints)} checkpoints:\n")
-        
+
         print(f"{'ID':<10} {'Time':<20} {'Name':<30} {'Phase':<10} {'Notes'}")
         print("-" * 90)
-        
+
         for i, cp in enumerate(self.checkpoints):
             cp_id = cp.id[:8]
             time_str = datetime.fromisoformat(cp.created_at).strftime("%Y-%m-%d %H:%M")
@@ -61,11 +60,11 @@ class TimeTravelDebugger(cmd.Cmd):
 
         target_id = arg.strip()
         matches = [cp for cp in self.checkpoints if cp.id.startswith(target_id)]
-        
+
         if not matches:
             print(f"No checkpoint found starting with '{target_id}'")
             return
-        
+
         if len(matches) > 1:
             print(f"Ambiguous ID '{target_id}'. Matches:")
             for cp in matches:
@@ -74,9 +73,9 @@ class TimeTravelDebugger(cmd.Cmd):
 
         checkpoint = matches[0]
         print(f"Rolling back to checkpoint: {checkpoint.name} ({checkpoint.id[:8]})...")
-        
+
         confirm = input("This will overwrite current state. Continue? [y/N] ")
-        if confirm.lower() != 'y':
+        if confirm.lower() != "y":
             print("Aborted.")
             return
 
@@ -92,6 +91,7 @@ class TimeTravelDebugger(cmd.Cmd):
         try:
             # Run async resume in sync context
             from orchestrator.orchestrator import resume_workflow
+
             asyncio.run(resume_workflow(self.project_dir))
             print("\nWorkflow execution finished.")
         except Exception as e:
@@ -121,7 +121,7 @@ class TimeTravelDebugger(cmd.Cmd):
         """Exit the debugger."""
         print("Bye!")
         return True
-    
+
     def do_quit(self, arg):
         """Exit the debugger."""
         return self.do_exit(arg)
@@ -131,7 +131,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python -m orchestrator.cli.debug <project_name>")
         sys.exit(1)
-        
+
     project_name = sys.argv[1]
     # Assume nested project structure for now or resolve path
     project_dir = Path(f"projects/{project_name}")
@@ -144,7 +144,7 @@ def main():
             sys.exit(1)
 
     setup_logging(project_dir, debug=True)
-    
+
     try:
         debugger = TimeTravelDebugger(project_dir)
         debugger.cmdloop()
@@ -153,7 +153,9 @@ def main():
     except Exception as e:
         print(f"Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

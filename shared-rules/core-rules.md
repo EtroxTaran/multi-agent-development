@@ -35,6 +35,11 @@
 - Always read PRODUCT.md for requirements
 - Check .workflow/state.json for current state
 
+### Documentation Access
+- **Use the Context Map**: Start at `docs/readme.md` to find the correct file.
+- **No Monoliths**: Do not assume `CONDUCTOR-GUIDE.md` or similar huge files exist. Follow the links.
+
+
 ## Error Handling
 
 ### When Errors Occur

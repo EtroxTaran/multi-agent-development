@@ -34,7 +34,7 @@ Usage:
 
 import json
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -383,9 +383,7 @@ class ErrorContextManager:
 
         # Extract files if not provided
         if files_involved is None:
-            files_involved = extract_files_from_error(
-                error_message, stderr, self.project_dir
-            )
+            files_involved = extract_files_from_error(error_message, stderr, self.project_dir)
 
         # Generate suggestions
         suggestions = extract_suggestions(error_type, error_message, stderr)

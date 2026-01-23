@@ -223,11 +223,14 @@ class AuditRepository(BaseRepository[AuditEntry]):
         Returns:
             Updated entry
         """
-        return await self.update(entry_id, {
-            "status": "timeout",
-            "duration_seconds": timeout_seconds,
-            "exit_code": -1,
-        })
+        return await self.update(
+            entry_id,
+            {
+                "status": "timeout",
+                "duration_seconds": timeout_seconds,
+                "exit_code": -1,
+            },
+        )
 
     async def mark_error(self, entry_id: str, error_message: str) -> Optional[AuditEntry]:
         """Mark entry as errored.
@@ -249,10 +252,13 @@ class AuditRepository(BaseRepository[AuditEntry]):
             metadata = current.get("metadata", {})
             metadata["error_message"] = error_message
 
-            return await self.update(entry_id, {
-                "status": "error",
-                "metadata": metadata,
-            })
+            return await self.update(
+                entry_id,
+                {
+                    "status": "error",
+                    "metadata": metadata,
+                },
+            )
 
     async def find_by_task(
         self,
@@ -426,7 +432,9 @@ class AuditRepository(BaseRepository[AuditEntry]):
         params: dict[str, Any] = {}
 
         if since:
-            time_filter += " AND timestamp >= $since" if time_filter else "WHERE timestamp >= $since"
+            time_filter += (
+                " AND timestamp >= $since" if time_filter else "WHERE timestamp >= $since"
+            )
             params["since"] = since.isoformat()
         if until:
             time_filter += " AND timestamp < $until" if time_filter else "WHERE timestamp < $until"
@@ -502,10 +510,7 @@ class AuditRepository(BaseRepository[AuditEntry]):
                 """,
             )
 
-            return {
-                row.get("task_id", ""): row.get("total_cost", 0) or 0
-                for row in results
-            }
+            return {row.get("task_id", ""): row.get("total_cost", 0) or 0 for row in results}
 
     async def cleanup_old_entries(self, days: int = 30) -> int:
         """Remove entries older than specified days.

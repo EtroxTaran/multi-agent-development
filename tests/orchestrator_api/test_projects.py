@@ -1,8 +1,7 @@
 """Tests for project endpoints."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import patch
 
 
 class TestListProjects:
@@ -65,9 +64,7 @@ class TestGetProject:
 
     def test_get_project_not_found(self, test_client, mock_project_manager):
         """Get project should return 404 when not found."""
-        mock_project_manager.get_project_status.return_value = {
-            "error": "Project not found"
-        }
+        mock_project_manager.get_project_status.return_value = {"error": "Project not found"}
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
             response = test_client.get("/projects/nonexistent")
@@ -130,12 +127,9 @@ class TestDeleteProject:
         data = response.json()
         assert "deleted" in data["message"].lower()
 
-    def test_delete_project_with_source(
-        self, test_client, mock_project_manager, temp_project_dir
-    ):
+    def test_delete_project_with_source(self, test_client, mock_project_manager, temp_project_dir):
         """Delete project with remove_source should delete everything."""
         import tempfile
-        import shutil
 
         # Create a fresh temp dir to delete
         fresh_dir = Path(tempfile.mkdtemp()) / "to-delete"
@@ -146,9 +140,7 @@ class TestDeleteProject:
         mock_project_manager.get_project.return_value = fresh_dir
 
         with patch("main.get_project_manager", return_value=mock_project_manager):
-            response = test_client.delete(
-                "/projects/test-project?remove_source=true"
-            )
+            response = test_client.delete("/projects/test-project?remove_source=true")
 
         assert response.status_code == 200
         assert not fresh_dir.exists()

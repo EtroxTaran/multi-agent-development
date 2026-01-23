@@ -1,0 +1,58 @@
+{
+  "agent_id": "A13",
+  "agent_name": "Quality Gate",
+  "description": "Tool policy for lint/typecheck quality gate (read-only).",
+  "allowed": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(tsc*)",
+    "Bash(npx tsc*)",
+    "Bash(eslint*)",
+    "Bash(npx eslint*)",
+    "Bash(npm run lint*)",
+    "Bash(npm run typecheck*)",
+    "Bash(npm ls*)",
+    "mcp__Ref__ref_search_documentation",
+    "mcp__Ref__ref_read_url"
+  ],
+  "forbidden": [
+    "Write",
+    "Edit"
+  ],
+  "file_restrictions": {
+    "allowed_paths": ["**/*"],
+    "forbidden_paths": [],
+    "read_only": true
+  },
+  "budget_limits": {
+    "per_invocation_usd": 0.5,
+    "per_task_usd": 1.0,
+    "fallback_model": "codex-5.2"
+  },
+  "timeout_seconds": 600,
+  "max_retries": 2,
+  "security_restrictions": {
+    "forbidden_patterns": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(*--force*delete*)"
+    ],
+    "require_confirmation": [
+      "Bash(docker*)",
+      "Bash(kubectl*)",
+      "Bash(terraform*)"
+    ],
+    "secrets_check": true
+  },
+  "completion_signals": {
+    "claude": "<promise>DONE</promise>",
+    "cursor": "{\"status\": \"done\"}",
+    "gemini": "DONE|COMPLETE"
+  },
+  "tool_descriptions": {
+    "Bash(tsc*)": "Run TypeScript type checks.",
+    "Bash(eslint*)": "Run linting checks."
+  },
+  "rationale": "Quality gate runs checks without code changes."
+}

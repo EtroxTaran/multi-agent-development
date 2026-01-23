@@ -5,28 +5,28 @@ concurrent requests, and statistics tracking.
 """
 
 import asyncio
-import pytest
 import time
 from datetime import datetime, timedelta
-from unittest.mock import patch, AsyncMock, MagicMock
+
+import pytest
 
 from orchestrator.sdk.rate_limiter import (
-    RateLimitConfig,
-    RateLimitStats,
-    TokenBucket,
-    AsyncRateLimiter,
-    RateLimitContext,
-    get_rate_limiter,
-    get_all_rate_limiters,
     CLAUDE_RATE_LIMIT,
     GEMINI_RATE_LIMIT,
+    AsyncRateLimiter,
+    RateLimitConfig,
+    RateLimitContext,
+    RateLimitStats,
+    TokenBucket,
     _rate_limiters,
+    get_all_rate_limiters,
+    get_rate_limiter,
 )
-
 
 # =============================================================================
 # Rate Limit Config Tests
 # =============================================================================
+
 
 class TestRateLimitConfig:
     """Tests for RateLimitConfig dataclass."""
@@ -94,6 +94,7 @@ class TestRateLimitStats:
 # =============================================================================
 # Token Bucket Tests
 # =============================================================================
+
 
 class TestTokenBucket:
     """Tests for TokenBucket implementation."""
@@ -175,6 +176,7 @@ class TestTokenBucket:
 # Async Rate Limiter Tests
 # =============================================================================
 
+
 class TestAsyncRateLimiter:
     """Tests for AsyncRateLimiter class."""
 
@@ -238,6 +240,7 @@ class TestAsyncRateLimiter:
 # =============================================================================
 # Rate Limiting Behavior Tests
 # =============================================================================
+
 
 class TestRateLimitingBehavior:
     """Tests for rate limiting enforcement."""
@@ -326,6 +329,7 @@ class TestRateLimitingBehavior:
 # Backoff Calculation Tests
 # =============================================================================
 
+
 class TestBackoffCalculation:
     """Tests for backoff calculation."""
 
@@ -400,8 +404,10 @@ class TestBackoffCalculation:
     def test_backoff_resets_on_success(self):
         """Test that consecutive throttle count resets to 0 on success."""
         config = RateLimitConfig(
-            backoff_base=1.0, backoff_max=60.0, backoff_jitter=0,
-            requests_per_minute=1000  # High limit for this test
+            backoff_base=1.0,
+            backoff_max=60.0,
+            backoff_jitter=0,
+            requests_per_minute=1000,  # High limit for this test
         )
         limiter = AsyncRateLimiter(config=config, name="backoff-test")
 
@@ -422,6 +428,7 @@ class TestBackoffCalculation:
 # =============================================================================
 # Concurrent Request Tests
 # =============================================================================
+
 
 class TestConcurrentRequests:
     """Tests for concurrent request handling."""
@@ -473,6 +480,7 @@ class TestConcurrentRequests:
 # =============================================================================
 # Data Cleanup Tests
 # =============================================================================
+
 
 class TestDataCleanup:
     """Tests for old data cleanup."""
@@ -542,6 +550,7 @@ class TestDataCleanup:
 # Rate Limit Context Tests
 # =============================================================================
 
+
 class TestRateLimitContext:
     """Tests for RateLimitContext class."""
 
@@ -584,6 +593,7 @@ class TestRateLimitContext:
 # =============================================================================
 # Global Rate Limiter Tests
 # =============================================================================
+
 
 class TestGlobalRateLimiters:
     """Tests for global rate limiter management."""
@@ -649,6 +659,7 @@ class TestGlobalRateLimiters:
 # Predefined Config Tests
 # =============================================================================
 
+
 class TestPredefinedConfigs:
     """Tests for predefined rate limit configurations."""
 
@@ -670,6 +681,7 @@ class TestPredefinedConfigs:
 # =============================================================================
 # Wait for Capacity Tests
 # =============================================================================
+
 
 class TestWaitForCapacity:
     """Tests for wait_for_capacity method."""
@@ -703,6 +715,7 @@ class TestWaitForCapacity:
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestIntegration:
     """Integration tests for rate limiter."""

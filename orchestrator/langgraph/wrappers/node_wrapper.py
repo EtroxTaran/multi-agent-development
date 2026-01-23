@@ -21,16 +21,17 @@ import asyncio
 import functools
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Optional, TypeVar, Union
 
 from ..state import (
-    WorkflowState,
-    WorkflowDecision,
-    ErrorContext,
     AgentExecution,
-    create_error_context,
+    ErrorContext,
+    WorkflowDecision,
+    WorkflowState,
     create_agent_execution,
+    create_error_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,13 +210,15 @@ class NodeWrapper:
 
             # Return error state for routing to error_dispatch
             error_result = {
-                "errors": [{
-                    "type": error_context.get("error_type"),
-                    "message": error_context.get("error_message"),
-                    "source_node": self.node_name,
-                    "timestamp": datetime.now().isoformat(),
-                    "error_id": error_context.get("error_id"),
-                }],
+                "errors": [
+                    {
+                        "type": error_context.get("error_type"),
+                        "message": error_context.get("error_message"),
+                        "source_node": self.node_name,
+                        "timestamp": datetime.now().isoformat(),
+                        "error_id": error_context.get("error_id"),
+                    }
+                ],
                 "error_context": error_context,
                 "next_decision": WorkflowDecision.ESCALATE,
                 "updated_at": datetime.now().isoformat(),
@@ -293,7 +296,15 @@ class NodeWrapper:
         result_copy = dict(result)
 
         # Remove internal tracking fields from final output
-        for key in ["_prompt", "_output", "_exit_code", "_cost_usd", "_model", "_input_tokens", "_output_tokens"]:
+        for key in [
+            "_prompt",
+            "_output",
+            "_exit_code",
+            "_cost_usd",
+            "_model",
+            "_input_tokens",
+            "_output_tokens",
+        ]:
             result_copy.pop(key, None)
 
         # Add execution tracking
@@ -353,6 +364,7 @@ def wrapped_node(
     Returns:
         Wrapped node function
     """
+
     def decorator(f: T) -> T:
         wrapper = NodeWrapper(
             f,

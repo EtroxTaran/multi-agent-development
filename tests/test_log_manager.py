@@ -1,16 +1,15 @@
 """Tests for LogManager component."""
 
 import json
-import gzip
-import pytest
 import tempfile
-from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from orchestrator.utils.log_manager import (
+    CleanupResult,
     LogManager,
     LogRotationConfig,
-    CleanupResult,
     load_config,
     should_auto_cleanup,
 )

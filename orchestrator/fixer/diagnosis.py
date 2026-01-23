@@ -5,14 +5,13 @@ considering context like file content, logs, and error history.
 This enables more targeted and effective fixes.
 """
 
-import json
 import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .triage import ErrorCategory, FixerError
 
@@ -22,9 +21,9 @@ logger = logging.getLogger(__name__)
 class DiagnosisConfidence(str, Enum):
     """Confidence level in diagnosis."""
 
-    HIGH = "high"       # > 80% confidence
-    MEDIUM = "medium"   # 50-80% confidence
-    LOW = "low"         # < 50% confidence
+    HIGH = "high"  # > 80% confidence
+    MEDIUM = "medium"  # 50-80% confidence
+    LOW = "low"  # < 50% confidence
 
 
 class RootCause(str, Enum):
@@ -152,9 +151,7 @@ class DiagnosisResult:
             root_cause=RootCause(data["root_cause"]),
             confidence=DiagnosisConfidence(data["confidence"]),
             category=ErrorCategory(data["category"]),
-            affected_files=[
-                AffectedFile(**f) for f in data.get("affected_files", [])
-            ],
+            affected_files=[AffectedFile(**f) for f in data.get("affected_files", [])],
             explanation=data.get("explanation", ""),
             suggested_fixes=data.get("suggested_fixes", []),
             related_errors=data.get("related_errors", []),
@@ -168,15 +165,15 @@ FILE_LOCATION_PATTERNS = [
     # Python: File "path", line 123
     r'File ["\']([^"\']+)["\'], line (\d+)',
     # Python: path:line:col
-    r'([^\s:]+\.py):(\d+):(\d+)',
+    r"([^\s:]+\.py):(\d+):(\d+)",
     # JavaScript/TypeScript: at path:line:col
-    r'at ([^\s:]+\.[jt]sx?):(\d+):(\d+)',
+    r"at ([^\s:]+\.[jt]sx?):(\d+):(\d+)",
     # Generic: path:line
-    r'([^\s:]+):(\d+)',
+    r"([^\s:]+):(\d+)",
     # Go: path:line:col
-    r'([^\s:]+\.go):(\d+):(\d+)',
+    r"([^\s:]+\.go):(\d+):(\d+)",
     # Rust: --> path:line:col
-    r'--> ([^\s:]+\.rs):(\d+):(\d+)',
+    r"--> ([^\s:]+\.rs):(\d+):(\d+)",
 ]
 
 # Patterns for identifying root causes
@@ -276,9 +273,10 @@ class DiagnosisEngine:
             project_dir: Project directory for reading files
         """
         self.project_dir = Path(project_dir)
-        
+
         # Initialize LLM diagnoser for complex errors
         from .llm_diagnoser import LLMDiagnosisEngine
+
         self.llm_engine = LLMDiagnosisEngine(self.project_dir)
 
     async def diagnose(
@@ -315,10 +313,7 @@ class DiagnosisEngine:
         if confidence == DiagnosisConfidence.LOW or root_cause == RootCause.UNKNOWN:
             logger.info("Regex diagnosis low confidence/unknown. Attempting LLM diagnosis...")
             llm_result = await self.llm_engine.diagnose(
-                error=error,
-                category=category,
-                affected_files=affected_files,
-                context=context
+                error=error, category=category, affected_files=affected_files, context=context
             )
             if llm_result:
                 logger.info(f"LLM diagnosis successful: {llm_result.root_cause}")
@@ -363,7 +358,11 @@ class DiagnosisEngine:
             for pattern in patterns:
                 if re.search(pattern, text, re.IGNORECASE):
                     # Higher confidence for more specific patterns
-                    confidence = DiagnosisConfidence.HIGH if len(pattern) > 30 else DiagnosisConfidence.MEDIUM
+                    confidence = (
+                        DiagnosisConfidence.HIGH
+                        if len(pattern) > 30
+                        else DiagnosisConfidence.MEDIUM
+                    )
                     return root_cause, confidence
 
         # Fall back to category-based mapping
@@ -410,10 +409,17 @@ class DiagnosisEngine:
                 seen_paths.add(path)
 
                 # Skip system/library paths
-                if any(x in path for x in [
-                    "site-packages", "node_modules", "/usr/",
-                    "python3.", "venv/", ".venv/"
-                ]):
+                if any(
+                    x in path
+                    for x in [
+                        "site-packages",
+                        "node_modules",
+                        "/usr/",
+                        "python3.",
+                        "venv/",
+                        ".venv/",
+                    ]
+                ):
                     continue
 
                 line_num = int(groups[1]) if len(groups) > 1 else None
@@ -422,12 +428,14 @@ class DiagnosisEngine:
                 # Try to read snippet from file
                 snippet = self._read_snippet(path, line_num) if line_num else None
 
-                affected.append(AffectedFile(
-                    path=path,
-                    line_number=line_num,
-                    column=column,
-                    snippet=snippet,
-                ))
+                affected.append(
+                    AffectedFile(
+                        path=path,
+                        line_number=line_num,
+                        column=column,
+                        snippet=snippet,
+                    )
+                )
 
         return affected
 
@@ -466,7 +474,7 @@ class DiagnosisEngine:
 
             return "\n".join(snippet_lines)
 
-        except (IOError, UnicodeDecodeError):
+        except (OSError, UnicodeDecodeError):
             return None
 
     def _generate_explanation(
@@ -523,7 +531,9 @@ class DiagnosisEngine:
         if affected_files:
             file_info = affected_files[0]
             if file_info.line_number:
-                base += f" The error appears to be in {file_info.path} at line {file_info.line_number}."
+                base += (
+                    f" The error appears to be in {file_info.path} at line {file_info.line_number}."
+                )
             else:
                 base += f" The error appears to be related to {file_info.path}."
 

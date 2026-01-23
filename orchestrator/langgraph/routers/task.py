@@ -6,13 +6,7 @@ task_breakdown → select_task → implement_task → verify_task → (loop back
 
 from typing import Literal
 
-from ..state import (
-    WorkflowState,
-    WorkflowDecision,
-    TaskStatus,
-    get_task_by_id,
-    all_tasks_completed,
-)
+from ..state import TaskStatus, WorkflowDecision, WorkflowState, all_tasks_completed, get_task_by_id
 
 
 def task_breakdown_router(
@@ -53,7 +47,9 @@ def task_breakdown_router(
 
 def select_task_router(
     state: WorkflowState,
-) -> Literal["implement_task", "implement_tasks_parallel", "build_verification", "human_escalation"]:
+) -> Literal[
+    "implement_task", "implement_tasks_parallel", "build_verification", "human_escalation"
+]:
     """Route after task selection.
 
     Args:

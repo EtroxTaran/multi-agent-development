@@ -2,23 +2,23 @@
 
 import json
 import logging
-import subprocess
 import os
+import subprocess
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
-from dataclasses import dataclass, field
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Default timeouts by phase (in seconds)
 PHASE_TIMEOUTS = {
-    1: 900,   # Planning: 15 minutes
-    2: 600,   # Validation: 10 minutes
+    1: 900,  # Planning: 15 minutes
+    2: 600,  # Validation: 10 minutes
     3: 1800,  # Implementation: 30 minutes
-    4: 600,   # Verification: 10 minutes
-    5: 300,   # Completion: 5 minutes
+    4: 600,  # Verification: 10 minutes
+    5: 300,  # Completion: 5 minutes
 }
 
 
@@ -124,11 +124,13 @@ class BaseAgent(ABC):
         if self._audit_trail is None and self.enable_audit:
             try:
                 from ..storage import get_audit_storage
+
                 self._audit_trail = get_audit_storage(self.project_dir)
             except ImportError:
                 # Fallback to direct audit trail if storage module not available
                 try:
                     from ..audit import get_project_audit_trail
+
                     self._audit_trail = get_project_audit_trail(self.project_dir)
                 except ImportError:
                     logger.debug("Audit trail not available")
@@ -144,6 +146,7 @@ class BaseAgent(ABC):
         if self._evaluator is None and self.enable_evaluation:
             try:
                 from ..evaluation import AgentEvaluator
+
                 self._evaluator = AgentEvaluator(
                     project_dir=self.project_dir,
                     evaluator_model="haiku",
@@ -256,7 +259,9 @@ class BaseAgent(ABC):
                 error_length=len(result.error) if result.error else 0,
                 cost_usd=result.cost_usd,
                 model=result.model,
-                parsed_output_type=type(result.parsed_output).__name__ if result.parsed_output else None,
+                parsed_output_type=type(result.parsed_output).__name__
+                if result.parsed_output
+                else None,
             )
 
             return result
@@ -317,7 +322,9 @@ class BaseAgent(ABC):
             cost_usd = None
             model = None
             if parsed_output:
-                cost_usd = parsed_output.get("cost_usd") or parsed_output.get("usage", {}).get("cost_usd")
+                cost_usd = parsed_output.get("cost_usd") or parsed_output.get("usage", {}).get(
+                    "cost_usd"
+                )
                 model = parsed_output.get("model")
 
             if result.returncode != 0:
@@ -498,7 +505,9 @@ class BaseAgent(ABC):
             jsonschema.validate(instance=parsed_output, schema=schema)
             return (True, [])
         except jsonschema.ValidationError as e:
-            errors = [f"Validation error at {'.'.join(str(p) for p in e.absolute_path)}: {e.message}"]
+            errors = [
+                f"Validation error at {'.'.join(str(p) for p in e.absolute_path)}: {e.message}"
+            ]
             return (False, errors)
         except jsonschema.SchemaError as e:
             errors = [f"Invalid schema '{schema_name}': {e.message}"]

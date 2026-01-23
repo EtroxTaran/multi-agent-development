@@ -1,10 +1,10 @@
 """Unit tests for the review cycle module."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
-from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from orchestrator.dispatch import DispatchResult, Task
 from orchestrator.review.cycle import (
     ReviewCycle,
     ReviewCycleResult,
@@ -12,12 +12,7 @@ from orchestrator.review.cycle import (
     ReviewFeedback,
     ReviewIteration,
 )
-from orchestrator.review.resolver import (
-    ConflictResolver,
-    ResolutionResult,
-    ReviewResult,
-)
-from orchestrator.dispatch import DispatchResult, Task
+from orchestrator.review.resolver import ConflictResolver
 
 
 class TestReviewFeedback:
@@ -236,7 +231,11 @@ class TestConflictResolver:
         resolver = ConflictResolver()
 
         # Use blocking issues that won't be filtered as process gaps
-        cursor_review = {"approved": False, "score": 4.0, "blocking_issues": ["SQL injection vulnerability"]}
+        cursor_review = {
+            "approved": False,
+            "score": 4.0,
+            "blocking_issues": ["SQL injection vulnerability"],
+        }
         gemini_review = {"approved": False, "score": 5.0, "blocking_issues": ["Poor structure"]}
 
         resolution = resolver.resolve(cursor_review, gemini_review)

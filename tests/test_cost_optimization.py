@@ -5,26 +5,24 @@ cost estimation, and usage summaries.
 """
 
 import json
-import pytest
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import patch
+
+import pytest
 
 from orchestrator.utils.cost_optimization import (
-    TaskComplexity,
+    MODEL_REGISTRY,
+    ModelRouter,
     ModelSpec,
+    TaskComplexity,
+    TokenTracker,
     TokenUsage,
     UsageSummary,
-    TokenTracker,
-    ModelRouter,
-    MODEL_REGISTRY,
 )
-
 
 # =============================================================================
 # Task Complexity Tests
 # =============================================================================
+
 
 class TestTaskComplexity:
     """Tests for TaskComplexity enum."""
@@ -56,6 +54,7 @@ class TestTaskComplexity:
 # =============================================================================
 # Model Spec Tests
 # =============================================================================
+
 
 class TestModelSpec:
     """Tests for ModelSpec dataclass."""
@@ -106,6 +105,7 @@ class TestModelSpec:
 # =============================================================================
 # Token Usage Tests
 # =============================================================================
+
 
 class TestTokenUsage:
     """Tests for TokenUsage dataclass."""
@@ -201,6 +201,7 @@ class TestTokenUsage:
 # Usage Summary Tests
 # =============================================================================
 
+
 class TestUsageSummary:
     """Tests for UsageSummary dataclass."""
 
@@ -236,6 +237,7 @@ class TestUsageSummary:
 # =============================================================================
 # Token Tracker Tests
 # =============================================================================
+
 
 class TestTokenTracker:
     """Tests for TokenTracker class."""
@@ -295,7 +297,7 @@ class TestTokenTracker:
         within, remaining = tracker.check_budget(estimated_cost=100.0)
 
         assert within is True
-        assert remaining == float('inf')
+        assert remaining == float("inf")
 
     def test_check_budget_within_limit(self, tmp_path):
         """Test budget check when within limit."""
@@ -415,6 +417,7 @@ class TestTokenTracker:
 # =============================================================================
 # Model Router Tests
 # =============================================================================
+
 
 class TestModelRouter:
     """Tests for ModelRouter class."""
@@ -582,6 +585,7 @@ class TestModelRouter:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests for cost optimization."""
 
@@ -663,6 +667,7 @@ class TestIntegration:
 # =============================================================================
 # Edge Cases
 # =============================================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases."""

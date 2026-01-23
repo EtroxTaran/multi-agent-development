@@ -1,9 +1,24 @@
 {
   "$schema": "https://json.schemastore.org/mcp.json",
   "mcpServers": {
+    "mcp-ref": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/ref-mcp"
+      ],
+      "env": {
+        "REF_API_KEY": "${REF_API_KEY}"
+      },
+      "description": "Documentation search and reading via Ref MCP (55% fewer tokens than Context7)",
+      "optional": true
+    },
     "mcp-codebase": {
       "command": "python",
-      "args": ["-m", "mcp_servers.codebase"],
+      "args": [
+        "-m",
+        "mcp_servers.codebase"
+      ],
       "env": {
         "PROJECTS_ROOT": "projects/"
       },
@@ -11,7 +26,10 @@
     },
     "mcp-workflow": {
       "command": "python",
-      "args": ["-m", "mcp_servers.workflow"],
+      "args": [
+        "-m",
+        "mcp_servers.workflow"
+      ],
       "env": {
         "PROJECTS_ROOT": "projects/"
       },
@@ -19,7 +37,10 @@
     },
     "mcp-docs": {
       "command": "python",
-      "args": ["-m", "mcp_servers.docs"],
+      "args": [
+        "-m",
+        "mcp_servers.docs"
+      ],
       "env": {
         "PROJECTS_ROOT": "projects/",
         "META_ROOT": "."
@@ -28,7 +49,10 @@
     },
     "mcp-git": {
       "command": "python",
-      "args": ["-m", "mcp_servers.git"],
+      "args": [
+        "-m",
+        "mcp_servers.git"
+      ],
       "env": {
         "PROJECTS_ROOT": "projects/"
       },
@@ -36,12 +60,20 @@
     },
     "mcp-linear": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.linear.app/mcp"
+      ],
       "description": "Official Linear MCP for issue tracking (optional)",
       "optional": true
     }
   },
   "toolDescriptions": {
+    "mcp-ref": {
+      "ref_search_documentation": "Search documentation for libraries, frameworks, and APIs",
+      "ref_read_url": "Read content from a documentation URL as markdown"
+    },
     "mcp-codebase": {
       "search_code": "Search for code patterns using ripgrep with regex support",
       "get_symbols": "Extract functions, classes, and methods from source files",

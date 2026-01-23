@@ -13,11 +13,11 @@ from rich.console import Console
 
 from .interrupt_display import InterruptDisplay
 from .prompt_helpers import (
+    display_warning,
+    prompt_confirm,
     prompt_menu,
     prompt_multiline,
-    prompt_confirm,
     prompt_text_block,
-    display_warning,
 )
 
 
@@ -55,6 +55,7 @@ def _is_interactive() -> bool:
         return False
 
     return True
+
 
 logger = logging.getLogger(__name__)
 

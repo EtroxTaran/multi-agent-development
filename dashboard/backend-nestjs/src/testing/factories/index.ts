@@ -3,14 +3,14 @@ import {
   PhaseStatus,
   TaskStatus,
   AgentType,
-} from '../../common/enums';
+} from "../../common/enums";
 
 /**
  * Factory utilities for generating test data
  */
 
 let idCounter = 0;
-const generateId = (prefix = 'test') => `${prefix}-${++idCounter}`;
+const generateId = (prefix = "test") => `${prefix}-${++idCounter}`;
 
 export const resetIdCounter = () => {
   idCounter = 0;
@@ -22,19 +22,19 @@ export interface ProjectSummaryData {
   name: string;
   path: string;
   createdAt?: string;
-  currentPhase?: number;
-  hasDocuments?: boolean;
-  hasProductSpec?: boolean;
-  hasClaudeMd?: boolean;
-  hasGeminiMd?: boolean;
-  hasCursorRules?: boolean;
+  currentPhase: number;
+  hasDocuments: boolean;
+  hasProductSpec: boolean;
+  hasClaudeMd: boolean;
+  hasGeminiMd: boolean;
+  hasCursorRules: boolean;
 }
 
 export const createProjectSummary = (
   overrides: Partial<ProjectSummaryData> = {},
 ): ProjectSummaryData => ({
   name: overrides.name ?? `project-${generateId()}`,
-  path: overrides.path ?? `/projects/${overrides.name ?? 'test-project'}`,
+  path: overrides.path ?? `/projects/${overrides.name ?? "test-project"}`,
   createdAt: overrides.createdAt ?? new Date().toISOString(),
   currentPhase: overrides.currentPhase ?? 0,
   hasDocuments: overrides.hasDocuments ?? false,
@@ -57,23 +57,23 @@ export interface ProjectStatusData {
   path: string;
   config?: Record<string, unknown>;
   state?: Record<string, unknown>;
-  files?: Record<string, boolean>;
-  phases?: Record<string, Record<string, unknown>>;
+  files: Record<string, boolean>;
+  phases: Record<string, Record<string, unknown>>;
 }
 
 export const createProjectStatus = (
   overrides: Partial<ProjectStatusData> = {},
 ): ProjectStatusData => ({
-  name: overrides.name ?? 'test-project',
-  path: overrides.path ?? '/projects/test-project',
-  config: overrides.config ?? { name: 'test-project', version: '1.0.0' },
-  state: overrides.state ?? { phase: 1, status: 'in_progress' },
+  name: overrides.name ?? "test-project",
+  path: overrides.path ?? "/projects/test-project",
+  config: overrides.config ?? { name: "test-project", version: "1.0.0" },
+  state: overrides.state ?? { phase: 1, status: "in_progress" },
   files: overrides.files ?? {
-    'Docs/': true,
-    'Docs/PRODUCT.md': true,
-    'CLAUDE.md': false,
-    'GEMINI.md': false,
-    '.cursor/rules': false,
+    "Docs/": true,
+    "Docs/PRODUCT.md": true,
+    "CLAUDE.md": false,
+    "GEMINI.md": false,
+    ".cursor/rules": false,
   },
   phases: overrides.phases ?? {},
 });
@@ -93,9 +93,9 @@ export interface WorkflowStatusData {
 export const createWorkflowStatus = (
   overrides: Partial<WorkflowStatusData> = {},
 ): WorkflowStatusData => ({
-  mode: overrides.mode ?? 'langgraph',
+  mode: overrides.mode ?? "langgraph",
   status: overrides.status ?? WorkflowStatus.NOT_STARTED,
-  project: overrides.project ?? 'test-project',
+  project: overrides.project ?? "test-project",
   currentPhase: overrides.currentPhase,
   phaseStatus: overrides.phaseStatus ?? {},
   pendingInterrupt: overrides.pendingInterrupt,
@@ -104,56 +104,56 @@ export const createWorkflowStatus = (
 
 export const createWorkflowInProgress = (
   phase: number = 2,
-  project: string = 'test-project',
+  project: string = "test-project",
 ): WorkflowStatusData => ({
-  mode: 'langgraph',
+  mode: "langgraph",
   status: WorkflowStatus.IN_PROGRESS,
   project,
   currentPhase: phase,
   phaseStatus: Object.fromEntries(
     Array.from({ length: 5 }, (_, i) => [
       String(i + 1),
-      i + 1 < phase ? 'completed' : i + 1 === phase ? 'in_progress' : 'pending',
+      i + 1 < phase ? "completed" : i + 1 === phase ? "in_progress" : "pending",
     ]),
   ),
 });
 
 export const createWorkflowPaused = (
   phase: number = 3,
-  interruptType: string = 'escalation',
+  interruptType: string = "escalation",
 ): WorkflowStatusData => ({
-  mode: 'langgraph',
+  mode: "langgraph",
   status: WorkflowStatus.PAUSED,
-  project: 'test-project',
+  project: "test-project",
   currentPhase: phase,
   phaseStatus: Object.fromEntries(
     Array.from({ length: 5 }, (_, i) => [
       String(i + 1),
-      i + 1 < phase ? 'completed' : i + 1 === phase ? 'in_progress' : 'pending',
+      i + 1 < phase ? "completed" : i + 1 === phase ? "in_progress" : "pending",
     ]),
   ),
   pendingInterrupt: {
     type: interruptType,
-    message: 'Human input required',
-    options: ['approve', 'reject'],
+    message: "Human input required",
+    options: ["approve", "reject"],
   },
 });
 
 export const createWorkflowCompleted = (
-  project: string = 'test-project',
+  project: string = "test-project",
 ): WorkflowStatusData => ({
-  mode: 'langgraph',
+  mode: "langgraph",
   status: WorkflowStatus.COMPLETED,
   project,
   currentPhase: 5,
   phaseStatus: {
-    '1': 'completed',
-    '2': 'completed',
-    '3': 'completed',
-    '4': 'completed',
-    '5': 'completed',
+    "1": "completed",
+    "2": "completed",
+    "3": "completed",
+    "4": "completed",
+    "5": "completed",
   },
-  message: 'Workflow completed successfully',
+  message: "Workflow completed successfully",
 });
 
 export interface WorkflowHealthData {
@@ -172,10 +172,10 @@ export interface WorkflowHealthData {
 export const createWorkflowHealth = (
   overrides: Partial<WorkflowHealthData> = {},
 ): WorkflowHealthData => ({
-  status: overrides.status ?? 'healthy',
-  project: overrides.project ?? 'test-project',
+  status: overrides.status ?? "healthy",
+  project: overrides.project ?? "test-project",
   currentPhase: overrides.currentPhase ?? 1,
-  phaseStatus: overrides.phaseStatus ?? 'in_progress',
+  phaseStatus: overrides.phaseStatus ?? "in_progress",
   iterationCount: overrides.iterationCount ?? 0,
   lastUpdated: overrides.lastUpdated ?? new Date().toISOString(),
   agents: overrides.agents ?? { claude: true, cursor: true, gemini: true },
@@ -198,10 +198,10 @@ export const createWorkflowStartResponse = (
   overrides: Partial<WorkflowStartResponseData> = {},
 ): WorkflowStartResponseData => ({
   success,
-  mode: overrides.mode ?? 'langgraph',
+  mode: overrides.mode ?? "langgraph",
   paused: overrides.paused ?? false,
-  message: overrides.message ?? (success ? 'Workflow started' : undefined),
-  error: overrides.error ?? (success ? undefined : 'Failed to start workflow'),
+  message: overrides.message ?? (success ? "Workflow started" : undefined),
+  error: overrides.error ?? (success ? undefined : "Failed to start workflow"),
   results: overrides.results,
 });
 
@@ -212,11 +212,11 @@ export interface TaskData {
   title: string;
   description?: string;
   status: TaskStatus;
-  priority?: number;
-  dependencies?: string[];
-  filesToCreate?: string[];
-  filesToModify?: string[];
-  acceptanceCriteria?: string[];
+  priority: number;
+  dependencies: string[];
+  filesToCreate: string[];
+  filesToModify: string[];
+  acceptanceCriteria: string[];
   complexityScore?: number;
   createdAt?: string;
   startedAt?: string;
@@ -225,8 +225,8 @@ export interface TaskData {
 }
 
 export const createTask = (overrides: Partial<TaskData> = {}): TaskData => ({
-  id: overrides.id ?? generateId('T'),
-  title: overrides.title ?? 'Test Task',
+  id: overrides.id ?? generateId("T"),
+  title: overrides.title ?? "Test Task",
   description: overrides.description,
   status: overrides.status ?? TaskStatus.PENDING,
   priority: overrides.priority ?? 0,
@@ -252,8 +252,9 @@ export const createTaskList = (
     const status = statusDistribution
       ? (Object.entries(statusDistribution).find(
           ([_, targetCount], idx) =>
-            tasks.filter((t) => t.status === Object.keys(statusDistribution)[idx]).length <
-            targetCount,
+            tasks.filter(
+              (t) => t.status === Object.keys(statusDistribution)[idx],
+            ).length < targetCount,
         )?.[0] as TaskStatus) ?? TaskStatus.PENDING
       : statuses[i % statuses.length];
 
@@ -264,6 +265,9 @@ export const createTaskList = (
         status,
         priority: i + 1,
         dependencies: i > 0 ? [`T${i}`] : [],
+        filesToCreate: [],
+        filesToModify: [],
+        acceptanceCriteria: [],
       }),
     );
   }
@@ -297,10 +301,10 @@ export interface AgentStatusData {
   agent: AgentType;
   available: boolean;
   lastInvocation?: string;
-  totalInvocations?: number;
-  successRate?: number;
-  avgDurationSeconds?: number;
-  totalCostUsd?: number;
+  totalInvocations: number;
+  successRate: number;
+  avgDurationSeconds: number;
+  totalCostUsd: number;
 }
 
 export const createAgentStatus = (
@@ -314,6 +318,8 @@ export const createAgentStatus = (
   successRate: overrides.successRate ?? 1.0,
   avgDurationSeconds: overrides.avgDurationSeconds ?? 0,
   totalCostUsd: overrides.totalCostUsd ?? 0,
+  // DTO fields might be different (camelCase vs snake_case or missing)
+  // Checking AgentStatusDto usually expects totalInvocations etc.
 });
 
 export const createAllAgentStatuses = (
@@ -347,15 +353,15 @@ export interface AuditEntryData {
 export const createAuditEntry = (
   overrides: Partial<AuditEntryData> = {},
 ): AuditEntryData => ({
-  id: overrides.id ?? generateId('audit'),
-  agent: overrides.agent ?? 'claude',
-  taskId: overrides.taskId ?? 'T1',
+  id: overrides.id ?? generateId("audit"),
+  agent: overrides.agent ?? "claude",
+  taskId: overrides.taskId ?? "T1",
   sessionId: overrides.sessionId,
   promptHash: overrides.promptHash,
   promptLength: overrides.promptLength,
   commandArgs: overrides.commandArgs ?? [],
   exitCode: overrides.exitCode,
-  status: overrides.status ?? 'success',
+  status: overrides.status ?? "success",
   durationSeconds: overrides.durationSeconds,
   outputLength: overrides.outputLength,
   errorLength: overrides.errorLength,
@@ -450,7 +456,7 @@ export interface ChatMessageData {
 }
 
 export const createChatMessage = (
-  role: 'user' | 'assistant' | 'system',
+  role: "user" | "assistant" | "system",
   content: string,
   timestamp?: string,
 ): ChatMessageData => ({
@@ -512,21 +518,21 @@ export const createStateChangeEvent = (
   project: string,
   newState: Record<string, unknown>,
 ): WebSocketEventData =>
-  createWebSocketEvent('state_change', project, { state: newState });
+  createWebSocketEvent("state_change", project, { state: newState });
 
 export const createActionEvent = (
   project: string,
   action: string,
   details: Record<string, unknown> = {},
 ): WebSocketEventData =>
-  createWebSocketEvent('action', project, { action, ...details });
+  createWebSocketEvent("action", project, { action, ...details });
 
 export const createEscalationEvent = (
   project: string,
   message: string,
-  options: string[] = ['approve', 'reject'],
+  options: string[] = ["approve", "reject"],
 ): WebSocketEventData =>
-  createWebSocketEvent('escalation', project, { message, options });
+  createWebSocketEvent("escalation", project, { message, options });
 
 // ==================== Export All ====================
 

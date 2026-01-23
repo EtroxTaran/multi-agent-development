@@ -3,7 +3,6 @@
 This node applies the fix plan and creates rollback data.
 """
 
-import json
 import logging
 import shutil
 from datetime import datetime
@@ -31,11 +30,11 @@ async def fixer_apply_node(state: WorkflowState) -> dict[str, Any]:
         State updates with fix result
     """
     from ...fixer import (
+        CircuitBreaker,
         DiagnosisResult,
+        FixerError,
         FixPlan,
         get_strategy_for_error,
-        FixerError,
-        CircuitBreaker,
     )
 
     project_dir = Path(state["project_dir"])
@@ -84,16 +83,14 @@ async def fixer_apply_node(state: WorkflowState) -> dict[str, Any]:
     error_data = diagnosis_data.get("error", {})
     error = FixerError.from_dict(error_data)
 
-    from ...fixer import ErrorCategory, RootCause, DiagnosisConfidence, AffectedFile
+    from ...fixer import AffectedFile, DiagnosisConfidence, ErrorCategory, RootCause
 
     diagnosis = DiagnosisResult(
         error=error,
         root_cause=RootCause(diagnosis_data.get("root_cause", "unknown")),
         confidence=DiagnosisConfidence(diagnosis_data.get("confidence", "low")),
         category=ErrorCategory(diagnosis_data.get("category", "unknown")),
-        affected_files=[
-            AffectedFile(**af) for af in diagnosis_data.get("affected_files", [])
-        ],
+        affected_files=[AffectedFile(**af) for af in diagnosis_data.get("affected_files", [])],
         explanation=diagnosis_data.get("explanation", ""),
         suggested_fixes=diagnosis_data.get("suggested_fixes", []),
     )
@@ -113,7 +110,7 @@ async def fixer_apply_node(state: WorkflowState) -> dict[str, Any]:
         }
 
     # Create plan object
-    from ...fixer import FixPlan, FixAction
+    from ...fixer import FixAction, FixPlan
 
     plan = FixPlan(
         diagnosis=diagnosis,
@@ -173,11 +170,13 @@ async def fixer_apply_node(state: WorkflowState) -> dict[str, Any]:
         return {
             "current_fix_attempt": updated_fix,
             "fixer_circuit_breaker_open": circuit_breaker.is_open,
-            "errors": [{
-                "type": "fixer_apply_failed",
-                "message": f"Fix application failed: {result.error}",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "fixer_apply_failed",
+                    "message": f"Fix application failed: {result.error}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }

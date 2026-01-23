@@ -6,8 +6,7 @@ from typing import Optional
 
 from ..config.models import CURSOR_MODELS, DEFAULT_CURSOR_MODEL
 from .base import BaseAgent
-from .prompts import load_prompt, format_prompt
-
+from .prompts import format_prompt, load_prompt
 
 # Available Cursor models
 # Managed in orchestrator.config.models
@@ -103,6 +102,48 @@ class CursorAgent(BaseAgent):
 
         return command
 
+    def run(
+        self,
+        prompt: str,
+        output_file: Optional[Path] = None,
+        phase: Optional[int] = None,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        **kwargs,
+    ) -> "AgentResult":
+        """Execute the agent with auto-fallback for quota limits."""
+        # Initial run
+        result = super().run(prompt, output_file, phase, task_id, session_id, **kwargs)
+
+        # Check for quota/rate limit errors
+        # cursor-agent might output to stdout or stderr depending on implementation
+        error_indicators = ["quota", "rate limit", "429", "too many requests", "exhausted"]
+        output_check = (result.output or "") + (result.error or "")
+
+        is_quota_error = any(
+            indicator.lower() in output_check.lower() for indicator in error_indicators
+        )
+
+        if not result.success and is_quota_error:
+            # check if we are already in auto mode
+            current_model = kwargs.get("model", self.model)
+
+            if current_model != "auto":
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Cursor quota exhausted for model {current_model}. Switching to 'auto' model."
+                )
+
+                # Retry with auto model
+                # We need to update kwargs to override any previous model setting
+                kwargs["model"] = "auto"
+
+                return super().run(prompt, output_file, phase, task_id, session_id, **kwargs)
+
+        return result
+
     def run_validation(
         self,
         plan: dict,
@@ -184,7 +225,11 @@ Focus on:
             AgentResult with code review
         """
         files_list = "\n".join(f"- {f}" for f in files_changed)
-        test_results_str = json.dumps(test_results, indent=2) if isinstance(test_results, dict) else str(test_results)
+        test_results_str = (
+            json.dumps(test_results, indent=2)
+            if isinstance(test_results, dict)
+            else str(test_results)
+        )
 
         try:
             template = load_prompt("cursor", "code_review")

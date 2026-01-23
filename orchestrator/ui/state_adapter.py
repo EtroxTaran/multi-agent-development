@@ -1,8 +1,8 @@
 """State adapter for UI display components."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 
 @dataclass
@@ -38,7 +38,7 @@ class UIStateSnapshot:
     total_phases: int
     phase_progress: float
     phase_name: str
-    tasks: List[TaskUIInfo]
+    tasks: list[TaskUIInfo]
     tasks_completed: int
     tasks_total: int
     current_task_id: Optional[str]
@@ -46,5 +46,5 @@ class UIStateSnapshot:
     cost: float
     files_created: int
     files_modified: int
-    recent_events: List[EventLogEntry]
+    recent_events: list[EventLogEntry]
     status: str  # running, paused, completed, failed

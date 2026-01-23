@@ -10,16 +10,11 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import (
-    Tool,
-    TextContent,
-    Resource,
-    ResourceTemplate,
-)
+from mcp.types import Resource, TextContent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -201,10 +196,7 @@ def create_server() -> Server:
             ),
             Tool(
                 name="add_blocker",
-                description=(
-                    "Add a blocker to a phase. "
-                    "Blockers prevent phase completion."
-                ),
+                description=("Add a blocker to a phase. " "Blockers prevent phase completion."),
                 inputSchema={
                     "type": "object",
                     "properties": {

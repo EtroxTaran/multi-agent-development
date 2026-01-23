@@ -1,13 +1,12 @@
 """Unit tests for SessionManager."""
 
-import json
-import pytest
-from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from orchestrator.agents.session_manager import (
-    SessionManager,
     SessionInfo,
+    SessionManager,
     extract_session_from_cli_response,
 )
 

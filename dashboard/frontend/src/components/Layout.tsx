@@ -2,9 +2,9 @@
  * Main layout component
  */
 
-import { Link, useLocation } from '@tanstack/react-router';
-import { Home, Settings, FolderKanban } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Link, useLocation } from "@tanstack/react-router";
+import { Home, Settings, FolderKanban } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,8 +14,8 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Projects', icon: FolderKanban },
-    { path: '/settings', label: 'Settings', icon: Settings },
+    { path: "/", label: "Projects", icon: FolderKanban },
+    { path: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -38,8 +38,8 @@ export function Layout({ children }: LayoutProps) {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    'flex items-center space-x-1 transition-colors hover:text-foreground/80',
-                    isActive ? 'text-foreground' : 'text-foreground/60'
+                    "flex items-center space-x-1 transition-colors hover:text-foreground/80",
+                    isActive ? "text-foreground" : "text-foreground/60",
                   )}
                 >
                   <Icon className="h-4 w-4" />

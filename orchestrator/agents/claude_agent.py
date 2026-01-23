@@ -11,13 +11,12 @@ Reference: https://docs.anthropic.com/claude-code/cli
 """
 
 import json
-import os
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
-from ..config.models import DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS
-from .base import BaseAgent, AgentResult
-from .prompts import load_prompt, format_prompt
+from ..config.models import DEFAULT_CLAUDE_MODEL
+from .base import AgentResult, BaseAgent
+from .prompts import format_prompt, load_prompt
 
 if TYPE_CHECKING:
     from ..storage import SessionStorageAdapter
@@ -97,6 +96,7 @@ class ClaudeAgent(BaseAgent):
         self._session_manager: Optional["SessionStorageAdapter"] = None
         if enable_session_continuity:
             from ..storage import get_session_storage
+
             self._session_manager = get_session_storage(project_dir)
 
     def _find_schema_dir(self) -> Optional[Path]:
@@ -235,10 +235,12 @@ class ClaudeAgent(BaseAgent):
         if self.system_prompt_file:
             system_path = self.project_dir / self.system_prompt_file
             if system_path.exists():
-                command.extend([
-                    "--append-system-prompt-file",
-                    str(system_path),
-                ])
+                command.extend(
+                    [
+                        "--append-system-prompt-file",
+                        str(system_path),
+                    ]
+                )
 
         # Add allowed tools
         if self.allowed_tools:
@@ -304,9 +306,7 @@ class ClaudeAgent(BaseAgent):
 
             # Try to capture session ID from output
             if result.output:
-                self._session_manager.capture_session_id_from_output(
-                    task_id, result.output
-                )
+                self._session_manager.capture_session_id_from_output(task_id, result.output)
 
         return result
 

@@ -5,7 +5,6 @@ Uses LangGraph's interrupt() for human-in-the-loop.
 In autonomous mode, auto-approves and continues without human input.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -13,8 +12,8 @@ from typing import Any
 
 from langgraph.types import interrupt
 
-from ..state import WorkflowState
 from ...config import load_project_config
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +66,18 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
         from ...storage.async_utils import run_async
 
         repo = get_logs_repository(state["project_name"])
-        run_async(repo.create_log(log_type="approval_response", content={
-            "phase": current_phase,
-            "timestamp": datetime.now().isoformat(),
-            "action": "approve",
-            "feedback": "Auto-approved in autonomous mode",
-            "autonomous": True,
-        }))
+        run_async(
+            repo.create_log(
+                log_type="approval_response",
+                content={
+                    "phase": current_phase,
+                    "timestamp": datetime.now().isoformat(),
+                    "action": "approve",
+                    "feedback": "Auto-approved in autonomous mode",
+                    "autonomous": True,
+                },
+            )
+        )
 
         return {
             "updated_at": datetime.now().isoformat(),
@@ -88,23 +92,30 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
     from ...storage.async_utils import run_async
 
     repo = get_logs_repository(state["project_name"])
-    run_async(repo.create_log(log_type="approval_context", content={
-        "phase": current_phase,
-        "context": approval_context,
-    }))
+    run_async(
+        repo.create_log(
+            log_type="approval_context",
+            content={
+                "phase": current_phase,
+                "context": approval_context,
+            },
+        )
+    )
 
     logger.info(f"Waiting for human approval at phase {current_phase}")
 
     # Interrupt workflow for human input
     # The human will respond with: {"action": "approve" | "reject" | "request_changes", "feedback": "..."}
-    human_response = interrupt({
-        "type": "approval_required",
-        "phase": current_phase,
-        "project": state["project_name"],
-        "context": approval_context,
-        "options": ["approve", "reject", "request_changes"],
-        "message": f"Phase {current_phase} requires approval. Review the context and choose an action.",
-    })
+    human_response = interrupt(
+        {
+            "type": "approval_required",
+            "phase": current_phase,
+            "project": state["project_name"],
+            "context": approval_context,
+            "options": ["approve", "reject", "request_changes"],
+            "message": f"Phase {current_phase} requires approval. Review the context and choose an action.",
+        }
+    )
 
     # Process human response
     action = human_response.get("action", "reject")
@@ -113,12 +124,17 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
     logger.info(f"Received approval response: action={action}")
 
     # Save response to database
-    run_async(repo.create_log(log_type="approval_response", content={
-        "phase": current_phase,
-        "timestamp": datetime.now().isoformat(),
-        "action": action,
-        "feedback": feedback,
-    }))
+    run_async(
+        repo.create_log(
+            log_type="approval_response",
+            content={
+                "phase": current_phase,
+                "timestamp": datetime.now().isoformat(),
+                "action": action,
+                "feedback": feedback,
+            },
+        )
+    )
 
     if action == "approve":
         return {
@@ -128,24 +144,28 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
 
     elif action == "reject":
         return {
-            "errors": [{
-                "type": "approval_rejected",
-                "message": f"Phase {current_phase} rejected by human reviewer",
-                "feedback": feedback,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "approval_rejected",
+                    "message": f"Phase {current_phase} rejected by human reviewer",
+                    "feedback": feedback,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "abort",
             "updated_at": datetime.now().isoformat(),
         }
 
     elif action == "request_changes":
         return {
-            "errors": [{
-                "type": "changes_requested",
-                "message": f"Changes requested at phase {current_phase}",
-                "feedback": feedback,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "changes_requested",
+                    "message": f"Changes requested at phase {current_phase}",
+                    "feedback": feedback,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "retry",
             "updated_at": datetime.now().isoformat(),
         }
@@ -154,11 +174,13 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
         # Unknown action, treat as rejection
         logger.warning(f"Unknown approval action: {action}")
         return {
-            "errors": [{
-                "type": "unknown_approval_action",
-                "message": f"Unknown approval action: {action}",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "unknown_approval_action",
+                    "message": f"Unknown approval action: {action}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "abort",
             "updated_at": datetime.now().isoformat(),
         }

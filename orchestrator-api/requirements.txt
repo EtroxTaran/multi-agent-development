@@ -1,8 +1,0 @@
-# Orchestrator Microservice Dependencies
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-pydantic>=2.5.0
-nest_asyncio>=1.6.0
-
-# Orchestrator dependencies (shared with main orchestrator)
-# These are inherited from the parent package

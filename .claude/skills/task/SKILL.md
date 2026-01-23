@@ -1,3 +1,12 @@
+---
+name: task
+description: Implement a single task by ID using TDD.
+version: 1.1.0
+tags: [implementation, tdd, tasks]
+owner: orchestration
+status: active
+---
+
 # Task Skill
 
 Implement a single task by ID using TDD.
@@ -20,7 +29,7 @@ This skill implements one task from the plan. It:
 
 ## Prerequisites
 
-- Plan exists at `.workflow/plan.json`
+- Plan exists in `phase_outputs` (type=plan)
 - Task ID exists in the plan
 - Dependencies are completed
 
@@ -38,7 +47,7 @@ By working task-by-task:
 
 ### Step 1: Load Task
 
-Read `.workflow/plan.json` and find the task:
+Read the plan from `phase_outputs` and find the task:
 
 ```json
 {
@@ -195,26 +204,7 @@ Next: /task T2 or /status to see progress
 
 ### Step 8: Update State
 
-Update `.workflow/plan.json`:
-```json
-{
-  "tasks": [
-    {
-      "id": "T1",
-      "status": "completed",
-      "completed_at": "2026-01-22T12:30:00Z",
-      "files_created": [...],
-      "files_modified": [...],
-      "test_results": {
-        "passed": 4,
-        "failed": 0
-      }
-    }
-  ]
-}
-```
-
-Update `.workflow/state.json`:
+Update `workflow_state` in SurrealDB:
 ```json
 {
   "current_task_id": null,
@@ -275,13 +265,12 @@ If a dependency task failed:
 | `blocked` | Cannot proceed (dependency/error) |
 | `failed` | Failed after max retries |
 
-## Output Files
+## Outputs
 
 Task implementation updates:
 - Source files in `src/` or equivalent
 - Test files in `tests/` or equivalent
-- `.workflow/plan.json` (task status)
-- `.workflow/state.json` (overall progress)
+- `workflow_state` updates in SurrealDB (task status / overall progress)
 
 ## Transition
 
@@ -297,7 +286,7 @@ Next steps:
   /status  - View full progress
 
 Or for code review:
-  /verify  - Run Cursor + Gemini review
+  /verify-code  - Run Cursor + Gemini review
 ```
 
 ## Example Session
@@ -369,5 +358,5 @@ Sequential is safer. Parallel is faster but may have merge conflicts.
 
 - `/plan` - Create the task breakdown
 - `/status` - View progress
-- `/verify` - Run code review on completed tasks
+- `/verify-code` - Run code review on completed tasks
 - `/discover` - Go back to discovery if requirements unclear

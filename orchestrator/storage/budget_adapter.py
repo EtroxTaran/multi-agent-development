@@ -9,15 +9,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from .async_utils import run_async
-from .base import BudgetRecordData, BudgetStorageProtocol, BudgetSummaryData
-
 # Import budget constants from the canonical source to avoid duplication
 from orchestrator.agents.budget import (
+    DEFAULT_INVOCATION_BUDGET_USD,
     DEFAULT_PROJECT_BUDGET_USD,
     DEFAULT_TASK_BUDGET_USD,
-    DEFAULT_INVOCATION_BUDGET_USD,
 )
+
+from .async_utils import run_async
+from .base import BudgetStorageProtocol, BudgetSummaryData
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ class BudgetStorageAdapter(BudgetStorageProtocol):
         """Get or create database backend."""
         if self._db_backend is None:
             from orchestrator.db.repositories.budget import get_budget_repository
+
             self._db_backend = get_budget_repository(self.project_name)
         return self._db_backend
 
@@ -154,6 +155,7 @@ class BudgetStorageAdapter(BudgetStorageProtocol):
 
         if not can_afford and raise_on_exceeded:
             from orchestrator.agents.budget import BudgetExceeded
+
             raise BudgetExceeded(
                 f"Task {task_id} budget exceeded. "
                 f"Requested: ${amount_usd:.2f}, Remaining: ${remaining:.2f}"
@@ -263,7 +265,9 @@ class BudgetStorageAdapter(BudgetStorageProtocol):
         project_remaining = self.get_project_remaining()
 
         # Calculate usage percentage
-        task_usage_pct = (task_spent / self.task_budget_usd) * 100 if self.task_budget_usd > 0 else 0
+        task_usage_pct = (
+            (task_spent / self.task_budget_usd) * 100 if self.task_budget_usd > 0 else 0
+        )
 
         # Check if we can proceed
         can_proceed = amount_usd <= task_remaining and amount_usd <= project_remaining

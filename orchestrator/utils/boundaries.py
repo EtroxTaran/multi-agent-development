@@ -170,7 +170,7 @@ def _matches_pattern(path_str: str, pattern: str) -> bool:
                 if not path_str.startswith(prefix):
                     return False
                 # Remove prefix from path for suffix matching
-                remaining = path_str[len(prefix):].lstrip("/")
+                remaining = path_str[len(prefix) :].lstrip("/")
             else:
                 remaining = path_str
 

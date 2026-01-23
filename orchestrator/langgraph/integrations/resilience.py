@@ -7,11 +7,12 @@ for use in async LangGraph nodes.
 import asyncio
 import logging
 import random
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import wraps
-from typing import Callable, Optional, TypeVar, Any
+from typing import Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -19,6 +20,7 @@ T = TypeVar("T")
 
 class AsyncCircuitState(Enum):
     """Circuit breaker states."""
+
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
@@ -27,6 +29,7 @@ class AsyncCircuitState(Enum):
 @dataclass
 class AsyncCircuitBreakerConfig:
     """Configuration for async circuit breaker."""
+
     failure_threshold: int = 5
     success_threshold: int = 3
     timeout_seconds: float = 60.0
@@ -36,6 +39,7 @@ class AsyncCircuitBreakerConfig:
 @dataclass
 class AsyncCircuitStats:
     """Statistics for async circuit breaker."""
+
     total_calls: int = 0
     successful_calls: int = 0
     failed_calls: int = 0
@@ -53,6 +57,7 @@ class AsyncCircuitStats:
 
 class AsyncCircuitBreakerError(Exception):
     """Raised when async circuit breaker is open."""
+
     pass
 
 
@@ -127,8 +132,7 @@ class AsyncCircuitBreaker:
         self.stats.current_state = new_state.value
 
         logger.info(
-            f"Async circuit breaker '{self.name}': "
-            f"{old_state.value} -> {new_state.value}"
+            f"Async circuit breaker '{self.name}': " f"{old_state.value} -> {new_state.value}"
         )
 
         if new_state == AsyncCircuitState.CLOSED:
@@ -172,9 +176,7 @@ class AsyncCircuitBreaker:
         state = await self._check_and_update_state()
         if state == AsyncCircuitState.OPEN:
             self.stats.rejected_calls += 1
-            raise AsyncCircuitBreakerError(
-                f"Async circuit breaker '{self.name}' is OPEN"
-            )
+            raise AsyncCircuitBreakerError(f"Async circuit breaker '{self.name}' is OPEN")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
@@ -187,6 +189,7 @@ class AsyncCircuitBreaker:
 
     def __call__(self, func: Callable[..., T]) -> Callable[..., T]:
         """Decorator for async functions."""
+
         @wraps(func)
         async def wrapper(*args, **kwargs) -> T:
             try:
@@ -213,6 +216,7 @@ class AsyncCircuitBreaker:
 @dataclass
 class AsyncRetryConfig:
     """Configuration for async retry."""
+
     max_attempts: int = 3
     base_delay: float = 1.0
     max_delay: float = 60.0
@@ -248,7 +252,7 @@ def async_retry_with_backoff(
                         break
 
                     delay = min(
-                        config.base_delay * (config.exponential_base ** attempt),
+                        config.base_delay * (config.exponential_base**attempt),
                         config.max_delay,
                     )
 
@@ -264,6 +268,7 @@ def async_retry_with_backoff(
             raise last_exception
 
         return wrapper
+
     return decorator
 
 

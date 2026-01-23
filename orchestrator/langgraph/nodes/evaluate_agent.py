@@ -17,9 +17,9 @@ Now supports ALL 9 template types with template-specific evaluation criteria:
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from ..state import WorkflowState, AgentExecution
+from ..state import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +223,7 @@ async def evaluate_agent_node(state: WorkflowState) -> dict[str, Any]:
                     reason=f"Score {evaluation.overall_score:.2f} below threshold",
                     priority=int(10 - evaluation.overall_score),  # Lower score = higher priority
                 )
-                logger.debug(f"Notified scheduler of optimization need")
+                logger.debug("Notified scheduler of optimization need")
             except Exception as se:
                 logger.debug(f"Scheduler notification failed (non-fatal): {se}")
 
@@ -244,11 +244,13 @@ async def evaluate_agent_node(state: WorkflowState) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
         return {
-            "errors": [{
-                "type": "evaluation_error",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }]
+            "errors": [
+                {
+                    "type": "evaluation_error",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ]
         }
 
 
@@ -497,9 +499,7 @@ async def optimize_prompts_node(state: WorkflowState) -> dict[str, Any]:
                 # Start deployment pipeline for new version
                 if result.source_version:
                     try:
-                        deploy_result = await deployer.start_shadow_testing(
-                            result.source_version
-                        )
+                        deploy_result = await deployer.start_shadow_testing(result.source_version)
                         deployment_results.append(deploy_result.to_dict())
                         logger.info(
                             f"Started shadow testing for {result.source_version}: "
@@ -507,20 +507,24 @@ async def optimize_prompts_node(state: WorkflowState) -> dict[str, Any]:
                         )
                     except Exception as de:
                         logger.warning(f"Deployment start failed: {de}")
-                        deployment_results.append({
-                            "success": False,
-                            "version_id": result.source_version,
-                            "error": str(de),
-                        })
+                        deployment_results.append(
+                            {
+                                "success": False,
+                                "version_id": result.source_version,
+                                "error": str(de),
+                            }
+                        )
 
         except Exception as e:
             logger.error(f"Optimization failed for {item.get('agent')}: {e}")
-            optimization_results.append({
-                "agent": item.get("agent"),
-                "template": item.get("template_name"),
-                "success": False,
-                "error": str(e),
-            })
+            optimization_results.append(
+                {
+                    "agent": item.get("agent"),
+                    "template": item.get("template_name"),
+                    "success": False,
+                    "error": str(e),
+                }
+            )
 
     return {
         "optimization_queue": [],  # Clear processed items

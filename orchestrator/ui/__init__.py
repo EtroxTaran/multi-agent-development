@@ -4,21 +4,21 @@ import os
 import sys
 from typing import Optional
 
-from orchestrator.ui.state_adapter import TaskUIInfo, EventLogEntry, UIStateSnapshot
 from orchestrator.ui.callbacks import NullCallback, ProgressCallback, UICallbackHandler
-from orchestrator.ui.display import PlaintextDisplay, WorkflowDisplay, UIState
+from orchestrator.ui.display import PlaintextDisplay, UIState, WorkflowDisplay
 from orchestrator.ui.input_manager import UserInputManager
 from orchestrator.ui.interrupt_display import InterruptDisplay
 from orchestrator.ui.prompt_helpers import (
+    display_error,
+    display_info_box,
+    display_success,
+    display_warning,
+    prompt_confirm,
     prompt_menu,
     prompt_multiline,
-    prompt_confirm,
     prompt_text_block,
-    display_info_box,
-    display_warning,
-    display_error,
-    display_success,
 )
+from orchestrator.ui.state_adapter import EventLogEntry, TaskUIInfo, UIStateSnapshot
 
 
 def is_interactive() -> bool:

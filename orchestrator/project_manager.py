@@ -24,25 +24,19 @@ import json
 import logging
 import re
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .utils.boundaries import (
-    ensure_orchestrator_can_write,
-    OrchestratorBoundaryError,
-)
-from .utils.worktree import (
-    WorktreeManager,
-    WorktreeError,
-)
+from .utils.boundaries import ensure_orchestrator_can_write
+from .utils.worktree import WorktreeError, WorktreeManager
 
 logger = logging.getLogger(__name__)
 
 
 class InvalidProjectNameError(ValueError):
     """Raised when a project name fails validation."""
+
     pass
 
 
@@ -62,28 +56,22 @@ def validate_project_name(name: str) -> bool:
         raise InvalidProjectNameError("Project name cannot be empty")
 
     # Reject path traversal patterns
-    if '..' in name or name.startswith('/') or name.startswith('~'):
-        raise InvalidProjectNameError(
-            f"Invalid project name '{name}' - path traversal not allowed"
-        )
+    if ".." in name or name.startswith("/") or name.startswith("~"):
+        raise InvalidProjectNameError(f"Invalid project name '{name}' - path traversal not allowed")
 
     # Reject slashes
-    if '/' in name or '\\' in name:
-        raise InvalidProjectNameError(
-            f"Invalid project name '{name}' - slashes not allowed"
-        )
+    if "/" in name or "\\" in name:
+        raise InvalidProjectNameError(f"Invalid project name '{name}' - slashes not allowed")
 
     # Only allow alphanumeric, underscore, and hyphen
-    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+    if not re.match(r"^[a-zA-Z0-9_-]+$", name):
         raise InvalidProjectNameError(
             f"Project name must be alphanumeric (with _ or - allowed): '{name}'"
         )
 
     # Limit length
     if len(name) > 64:
-        raise InvalidProjectNameError(
-            f"Project name too long (max 64 chars): '{name}'"
-        )
+        raise InvalidProjectNameError(f"Project name too long (max 64 chars): '{name}'")
 
     return True
 
@@ -115,23 +103,25 @@ class ProjectManager:
 
         projects = []
         for project_dir in sorted(self.projects_dir.iterdir()):
-            if not project_dir.is_dir() or project_dir.name.startswith('.'):
+            if not project_dir.is_dir() or project_dir.name.startswith("."):
                 continue
 
             config = self._load_project_config(project_dir)
             state = self._load_project_state(project_dir)
 
-            projects.append({
-                "name": project_dir.name,
-                "path": str(project_dir),
-                "created_at": config.get("created_at") if config else None,
-                "current_phase": state.get("current_phase", 0) if state else 0,
-                "has_documents": (project_dir / "Documents").exists(),
-                "has_product_spec": (project_dir / "PRODUCT.md").exists(),
-                "has_claude_md": (project_dir / "CLAUDE.md").exists(),
-                "has_gemini_md": (project_dir / "GEMINI.md").exists(),
-                "has_cursor_rules": (project_dir / ".cursor" / "rules").exists(),
-            })
+            projects.append(
+                {
+                    "name": project_dir.name,
+                    "path": str(project_dir),
+                    "created_at": config.get("created_at") if config else None,
+                    "current_phase": state.get("current_phase", 0) if state else 0,
+                    "has_documents": (project_dir / "Documents").exists(),
+                    "has_product_spec": (project_dir / "PRODUCT.md").exists(),
+                    "has_claude_md": (project_dir / "CLAUDE.md").exists(),
+                    "has_gemini_md": (project_dir / "GEMINI.md").exists(),
+                    "has_cursor_rules": (project_dir / ".cursor" / "rules").exists(),
+                }
+            )
 
         return projects
 
@@ -204,18 +194,12 @@ class ProjectManager:
         try:
             validate_project_name(name)
         except InvalidProjectNameError as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
         project_dir = self.projects_dir / name
 
         if project_dir.exists():
-            return {
-                "success": False,
-                "error": f"Project '{name}' already exists"
-            }
+            return {"success": False, "error": f"Project '{name}' already exists"}
 
         try:
             # Create project structure
@@ -237,14 +221,11 @@ class ProjectManager:
             return {
                 "success": True,
                 "project_dir": str(project_dir),
-                "message": f"Project '{name}' initialized. Add your Documents/ and context files."
+                "message": f"Project '{name}' initialized. Add your Documents/ and context files.",
             }
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def spawn_worker_claude(
         self,
@@ -252,7 +233,7 @@ class ProjectManager:
         prompt: str,
         allowed_tools: Optional[list[str]] = None,
         max_turns: Optional[int] = None,
-        timeout: int = 600
+        timeout: int = 600,
     ) -> dict:
         """Spawn a worker Claude instance inside a project directory.
 
@@ -271,10 +252,7 @@ class ProjectManager:
         """
         project_dir = self.get_project(project_name)
         if not project_dir:
-            return {
-                "success": False,
-                "error": f"Project '{project_name}' not found"
-            }
+            return {"success": False, "error": f"Project '{project_name}' not found"}
 
         # Build command
         cmd = ["claude", "-p", prompt, "--output-format", "json"]
@@ -284,9 +262,14 @@ class ProjectManager:
         else:
             # Default tools for implementation
             default_tools = [
-                "Read", "Write", "Edit",
-                "Bash(npm*)", "Bash(pytest*)", "Bash(python*)",
-                "Bash(ls*)", "Bash(mkdir*)"
+                "Read",
+                "Write",
+                "Edit",
+                "Bash(npm*)",
+                "Bash(pytest*)",
+                "Bash(python*)",
+                "Bash(ls*)",
+                "Bash(mkdir*)",
             ]
             cmd.extend(["--allowedTools", ",".join(default_tools)])
 
@@ -311,7 +294,7 @@ class ProjectManager:
                 process.wait()
                 return {
                     "success": False,
-                    "error": f"Worker Claude timed out after {timeout} seconds"
+                    "error": f"Worker Claude timed out after {timeout} seconds",
                 }
 
             # Try to parse JSON output
@@ -323,19 +306,16 @@ class ProjectManager:
             return {
                 "success": process.returncode == 0,
                 "output": output_json,
-                "stderr": stderr if stderr else None
+                "stderr": stderr if stderr else None,
             }
 
         except FileNotFoundError:
             return {
                 "success": False,
-                "error": "Claude CLI not found. Install with: npm install -g @anthropic/claude-cli"
+                "error": "Claude CLI not found. Install with: npm install -g @anthropic/claude-cli",
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def get_project_status(self, name: str) -> dict:
         """Get detailed status for a project.
@@ -368,7 +348,7 @@ class ProjectManager:
             phase_dir = project_dir / ".workflow" / "phases" / phase
             phases_status[phase] = {
                 "exists": phase_dir.exists(),
-                "has_output": bool(list(phase_dir.glob("*"))) if phase_dir.exists() else False
+                "has_output": bool(list(phase_dir.glob("*"))) if phase_dir.exists() else False,
             }
 
         return {
@@ -377,7 +357,7 @@ class ProjectManager:
             "config": config,
             "state": state,
             "files": files_status,
-            "phases": phases_status
+            "phases": phases_status,
         }
 
     def _load_project_config(self, project_dir: Path) -> Optional[dict]:
@@ -396,7 +376,7 @@ class ProjectManager:
         try:
             with open(config_path) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return None
 
     def _load_project_state(self, project_dir: Path) -> Optional[dict]:
@@ -412,6 +392,7 @@ class ProjectManager:
         """
         try:
             from .storage.workflow_adapter import WorkflowStorageAdapter
+
             adapter = WorkflowStorageAdapter(project_dir)
             state = adapter.get_state()
             if state:
@@ -445,6 +426,7 @@ class ProjectManager:
 
         try:
             from .storage.workflow_adapter import WorkflowStorageAdapter
+
             adapter = WorkflowStorageAdapter(project_dir)
             result = adapter.update_state(**updates)
             return result is not None
@@ -496,7 +478,7 @@ class ProjectManager:
                 with open(target_path, "w") as f:
                     f.write(content)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def safe_write_project_config(
@@ -529,7 +511,7 @@ class ProjectManager:
             with open(target_path, "w") as f:
                 json.dump(config, f, indent=2)
             return True
-        except IOError:
+        except OSError:
             return False
 
     def spawn_parallel_workers(
@@ -582,11 +564,13 @@ class ProjectManager:
                     worktrees.append((worktree, task))
                 except WorktreeError as e:
                     logger.error(f"Failed to create worktree for task {i}: {e}")
-                    results.append({
-                        "task_id": task.get("id"),
-                        "success": False,
-                        "error": str(e),
-                    })
+                    results.append(
+                        {
+                            "task_id": task.get("id"),
+                            "success": False,
+                            "error": str(e),
+                        }
+                    )
 
             # Execute tasks in parallel
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -623,11 +607,13 @@ class ProjectManager:
 
                     except Exception as e:
                         logger.error(f"Worker failed: {e}")
-                        results.append({
-                            "task_id": task.get("id"),
-                            "success": False,
-                            "error": str(e),
-                        })
+                        results.append(
+                            {
+                                "task_id": task.get("id"),
+                                "success": False,
+                                "error": str(e),
+                            }
+                        )
 
         finally:
             # Always cleanup worktrees
@@ -658,9 +644,14 @@ class ProjectManager:
 
         # Default tools for implementation
         default_tools = [
-            "Read", "Write", "Edit",
-            "Bash(npm*)", "Bash(pytest*)", "Bash(python*)",
-            "Bash(ls*)", "Bash(mkdir*)"
+            "Read",
+            "Write",
+            "Edit",
+            "Bash(npm*)",
+            "Bash(pytest*)",
+            "Bash(python*)",
+            "Bash(ls*)",
+            "Bash(mkdir*)",
         ]
         cmd.extend(["--allowedTools", ",".join(default_tools)])
 

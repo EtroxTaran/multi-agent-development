@@ -4,10 +4,9 @@ Tests the full flow from evaluation to optimization to deployment.
 """
 
 import asyncio
-import pytest
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+
+import pytest
 
 
 class TestEvaluationFlow:
@@ -34,9 +33,7 @@ class TestEvaluationFlow:
 
         # Mock the evaluator at the source module where it's defined
         # (local imports inside functions require patching at source)
-        with patch(
-            "orchestrator.evaluation.AgentEvaluator"
-        ) as MockEvaluator:
+        with patch("orchestrator.evaluation.AgentEvaluator") as MockEvaluator:
             mock_result = MagicMock()
             mock_result.to_dict.return_value = {
                 "overall_score": 8.5,
@@ -72,9 +69,7 @@ class TestEvaluationFlow:
         }
 
         # Mock at source modules (local imports require patching at source)
-        with patch(
-            "orchestrator.evaluation.AgentEvaluator"
-        ) as MockEvaluator:
+        with patch("orchestrator.evaluation.AgentEvaluator") as MockEvaluator:
             mock_result = MagicMock()
             mock_result.to_dict.return_value = {"overall_score": 5.5}
             mock_result.overall_score = 5.5
@@ -86,9 +81,7 @@ class TestEvaluationFlow:
             MockEvaluator.return_value = mock_evaluator
 
             # Mock scheduler at source module
-            with patch(
-                "orchestrator.optimization.scheduler.OptimizationScheduler"
-            ):
+            with patch("orchestrator.optimization.scheduler.OptimizationScheduler"):
                 result = await evaluate_agent_node(state)
 
                 assert "optimization_queue" in result
@@ -117,9 +110,7 @@ class TestOptimizationFlow:
         }
 
         # Mock at source modules (local imports require patching at source)
-        with patch(
-            "orchestrator.optimization.PromptOptimizer"
-        ) as MockOptimizer:
+        with patch("orchestrator.optimization.PromptOptimizer") as MockOptimizer:
             mock_result = MagicMock()
             mock_result.success = True
             mock_result.method = "opro"
@@ -132,9 +123,7 @@ class TestOptimizationFlow:
             MockOptimizer.return_value = mock_optimizer
 
             # Mock deployer at source module
-            with patch(
-                "orchestrator.optimization.deployer.DeploymentController"
-            ) as MockDeployer:
+            with patch("orchestrator.optimization.deployer.DeploymentController") as MockDeployer:
                 mock_deploy_result = MagicMock()
                 mock_deploy_result.to_dict.return_value = {
                     "success": True,
@@ -142,9 +131,7 @@ class TestOptimizationFlow:
                 }
 
                 mock_deployer = MagicMock()
-                mock_deployer.start_shadow_testing = AsyncMock(
-                    return_value=mock_deploy_result
-                )
+                mock_deployer.start_shadow_testing = AsyncMock(return_value=mock_deploy_result)
                 MockDeployer.return_value = mock_deployer
 
                 result = await optimize_prompts_node(state)
@@ -169,9 +156,7 @@ class TestOptimizationFlow:
         }
 
         # Mock at source module (local imports require patching at source)
-        with patch(
-            "orchestrator.optimization.PromptOptimizer"
-        ) as MockOptimizer:
+        with patch("orchestrator.optimization.PromptOptimizer") as MockOptimizer:
             mock_result = MagicMock()
             mock_result.success = False
             mock_result.error = "Not enough samples"
@@ -446,7 +431,7 @@ class TestConfiguration:
 
     def test_config_caching(self, tmp_path):
         """Test that configuration is cached."""
-        from orchestrator.evaluation.config import get_config, clear_config_cache
+        from orchestrator.evaluation.config import clear_config_cache, get_config
 
         clear_config_cache()
 
@@ -467,8 +452,8 @@ class TestWorkflowIntegration:
     def test_evaluation_nodes_exported(self):
         """Test that evaluation nodes are properly exported."""
         from orchestrator.langgraph.nodes import (
-            evaluate_agent_node,
             analyze_output_node,
+            evaluate_agent_node,
             optimize_prompts_node,
         )
 
@@ -479,8 +464,8 @@ class TestWorkflowIntegration:
     def test_evaluation_routers_exported(self):
         """Test that evaluation routers are properly exported."""
         from orchestrator.langgraph.routers import (
-            evaluate_agent_router,
             analyze_output_router,
+            evaluate_agent_router,
             optimize_prompts_router,
         )
 

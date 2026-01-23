@@ -1,3 +1,12 @@
+---
+name: status
+description: Show current workflow progress at a glance.
+version: 1.1.0
+tags: [status, workflow, summary]
+owner: orchestration
+status: active
+---
+
 # Status Skill
 
 Show current workflow progress at a glance.
@@ -16,6 +25,10 @@ A simple status check showing:
 /status
 ```
 
+## Prerequisites
+
+- SurrealDB connection configured for the project namespace.
+
 ## Purpose
 
 **Quick progress check** - See where you are and what's next.
@@ -25,11 +38,11 @@ This is the go-to command for:
 - Checking progress mid-workflow
 - Deciding what to do next
 
-## State Files
+## State Sources
 
-Check these files:
-- `.workflow/state.json` - Overall workflow state
-- `.workflow/plan.json` - Task breakdown and status
+Check these sources:
+- `workflow_state` in SurrealDB - Overall workflow state
+- `phase_outputs` in SurrealDB - Task breakdown and validation/verification
 
 ## Status Display
 
@@ -123,16 +136,16 @@ Shows:
 
 ```python
 # Pseudocode
-if not exists(".workflow/state.json"):
+if not workflow_state_exists():
     show "No workflow started"
     return
 
-state = read(".workflow/state.json")
-plan = read(".workflow/plan.json") if exists else None
+state = workflow_state_repo.get(project)
+plan = phase_outputs_repo.get_by_type(phase=1, output_type="plan")
 
 current_phase = state.get("current_phase", 0)
 phase_status = state.get("phase_status", {})
-tasks = plan.get("tasks", []) if plan else []
+tasks = state.get("tasks", [])  # task statuses tracked in state
 errors = state.get("errors", [])
 ```
 
@@ -142,9 +155,9 @@ errors = state.get("errors", [])
 |-------|------|------------|
 | 0 | Discovery | `/discover` |
 | 1 | Planning | `/plan` |
-| 2 | Validation | `/validate` |
+| 2 | Validation | `/validate-plan` |
 | 3 | Implementation | `/task <id>` |
-| 4 | Verification | `/verify` |
+| 4 | Verification | `/verify-code` |
 | 5 | Completion | (done) |
 
 ## Task Status Summary
@@ -244,11 +257,19 @@ All 6 tasks implemented and verified.
 - Review scores: Cursor 8.5, Gemini 8.0
 
 ### Artifacts
-- .workflow/phases/completion/summary.json
-- .workflow/phases/completion/uat.md
+- phase_outputs: summary
+- logs: uat_document
 
 Ready to commit? The changes are in your working directory.
 ```
+
+## Outputs
+
+- Quick or detailed status report for the current project.
+
+## Error Handling
+
+- If SurrealDB is unreachable, show a degraded report and warn about missing data.
 
 ## Related Skills
 

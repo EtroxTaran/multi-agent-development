@@ -13,13 +13,7 @@ Audit entries are stored in append-only JSONL format with:
 - Parsed results
 """
 
-from .trail import (
-    AuditTrail,
-    AuditEntry,
-    AuditConfig,
-    create_audit_trail,
-    get_project_audit_trail,
-)
+from .trail import AuditConfig, AuditEntry, AuditTrail, create_audit_trail, get_project_audit_trail
 
 __all__ = [
     "AuditTrail",

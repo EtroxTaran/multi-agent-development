@@ -10,20 +10,12 @@ Tests cover:
 """
 
 import json
-import pytest
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, patch
 
-from orchestrator.langgraph.nodes.approval_gate import (
-    approval_gate_node,
-    _build_approval_context,
-)
-from orchestrator.langgraph.state import (
-    WorkflowState,
-    PhaseStatus,
-    create_initial_state,
-)
+import pytest
+
+from orchestrator.langgraph.nodes.approval_gate import _build_approval_context, approval_gate_node
+from orchestrator.langgraph.state import create_initial_state
 
 
 class TestApprovalGateSkipping:

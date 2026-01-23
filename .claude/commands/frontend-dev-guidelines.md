@@ -1,0 +1,1 @@
+../skills/frontend-dev-guidelines/SKILL.md

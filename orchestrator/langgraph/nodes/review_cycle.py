@@ -15,19 +15,19 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from langgraph.types import interrupt
 
-from orchestrator.dispatch import AgentDispatcher, Task
-from orchestrator.review import ReviewCycle, ReviewCycleResult
 from orchestrator.cleanup import CleanupManager
-from orchestrator.recovery import RecoveryHandler, ErrorContext, ErrorCategory
+from orchestrator.dispatch import AgentDispatcher, Task
+from orchestrator.recovery import ErrorCategory, ErrorContext, RecoveryHandler
+from orchestrator.review import ReviewCycle, ReviewCycleResult
 
 logger = logging.getLogger(__name__)
 
 
-async def review_cycle_node(state: Dict[str, Any]) -> Dict[str, Any]:
+async def review_cycle_node(state: dict[str, Any]) -> dict[str, Any]:
     """LangGraph node for running the review cycle.
 
     This node:
@@ -116,11 +116,11 @@ async def review_cycle_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _update_state_approved(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     task_id: str,
     result: ReviewCycleResult,
     cleanup_manager: CleanupManager,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update state after task approval.
 
     Args:
@@ -162,11 +162,11 @@ def _update_state_approved(
 
 
 def _update_state_failed(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     task_id: str,
     result: Optional[ReviewCycleResult],
     error_message: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update state after task failure.
 
     Args:
@@ -205,11 +205,11 @@ def _update_state_failed(
 
 
 async def _handle_escalation(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     task_id: str,
     result: ReviewCycleResult,
     recovery_handler: RecoveryHandler,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Handle escalation requiring human intervention.
 
     Uses LangGraph interrupt() to pause workflow for human input.
@@ -304,11 +304,11 @@ async def _handle_escalation(
 
 
 async def _handle_escalation_from_error(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     task_id: str,
     error: Exception,
     recovery_handler: RecoveryHandler,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Handle escalation from an exception.
 
     Args:
@@ -361,7 +361,7 @@ def _get_average_score(result: ReviewCycleResult) -> float:
 
 
 # Sync wrapper for LangGraph
-def review_cycle_node_sync(state: Dict[str, Any]) -> Dict[str, Any]:
+def review_cycle_node_sync(state: dict[str, Any]) -> dict[str, Any]:
     """Synchronous wrapper for review_cycle_node.
 
     Args:

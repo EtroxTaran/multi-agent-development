@@ -1,27 +1,27 @@
 """Tests for Fixer Strategies."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
+from orchestrator.fixer.diagnosis import AffectedFile, DiagnosisResult, RootCause
 from orchestrator.fixer.strategies import (
-    FixStrategy,
+    ConfigurationFixStrategy,
+    DependencyFixStrategy,
+    FixAction,
     FixPlan,
     FixResult,
-    FixAction,
     FixStatus,
-    RetryStrategy,
+    FixStrategy,
     ImportErrorFixStrategy,
+    RetryStrategy,
     SyntaxErrorFixStrategy,
     TestFailureFixStrategy,
-    ConfigurationFixStrategy,
     TimeoutFixStrategy,
-    DependencyFixStrategy,
     get_strategy_for_error,
     is_protected_file,
-    PROTECTED_FILES,
 )
-from orchestrator.fixer.diagnosis import DiagnosisResult, RootCause, AffectedFile
 from orchestrator.fixer.triage import ErrorCategory
 
 

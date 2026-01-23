@@ -17,11 +17,10 @@ Usage:
 import asyncio
 import logging
 import re
-import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class TestResult:
     coverage: float = 0.0
     execution_time_seconds: float = 0.0
     output: str = ""
-    failed_tests: List[Dict[str, str]] = field(default_factory=list)
+    failed_tests: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def all_pass(self) -> bool:
@@ -68,11 +67,11 @@ class TDDValidationResult:
     message: str
     test_result: Optional[TestResult] = None
     criteria_coverage: float = 0.0
-    uncovered_criteria: List[str] = field(default_factory=list)
-    issues: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    uncovered_criteria: list[str] = field(default_factory=list)
+    issues: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "valid": self.valid,
@@ -152,7 +151,7 @@ class TDDValidator:
 
     async def run_tests(
         self,
-        test_files: List[str],
+        test_files: list[str],
         with_coverage: bool = False,
         source_dir: str = "src",
     ) -> TestResult:
@@ -181,11 +180,11 @@ class TDDValidator:
 
         if ext == ".py":
             if with_coverage:
-                cmd = ["pytest"] + file_paths + [
-                    f"--cov={source_dir}",
-                    "--cov-report=term-missing",
-                    "-v"
-                ]
+                cmd = (
+                    ["pytest"]
+                    + file_paths
+                    + [f"--cov={source_dir}", "--cov-report=term-missing", "-v"]
+                )
             else:
                 cmd = ["pytest"] + file_paths + ["-v", "--tb=short"]
         elif ext in (".ts", ".js"):
@@ -270,11 +269,13 @@ class TDDValidator:
                 re.MULTILINE,
             )
             for file, test, reason in failed_matches:
-                result.failed_tests.append({
-                    "file": file,
-                    "name": test,
-                    "error": reason,
-                })
+                result.failed_tests.append(
+                    {
+                        "file": file,
+                        "name": test,
+                        "error": reason,
+                    }
+                )
 
         else:
             # Parse Jest output
@@ -310,8 +311,8 @@ class TDDValidator:
 
     def validate_test_phase(
         self,
-        test_files: List[str],
-        acceptance_criteria: List[str],
+        test_files: list[str],
+        acceptance_criteria: list[str],
     ) -> TDDValidationResult:
         """Validate the RED phase of TDD.
 
@@ -372,9 +373,7 @@ class TDDValidator:
         coverage, uncovered = self._check_criteria_coverage(test_files, acceptance_criteria)
 
         if coverage < 0.9:  # Require 90% criteria coverage
-            warnings.append(
-                f"Tests cover only {coverage * 100:.0f}% of acceptance criteria"
-            )
+            warnings.append(f"Tests cover only {coverage * 100:.0f}% of acceptance criteria")
 
         return TDDValidationResult(
             valid=len(issues) == 0,
@@ -389,9 +388,9 @@ class TDDValidator:
 
     def validate_implement_phase(
         self,
-        source_files: List[str],
-        test_files: List[str],
-        modified_test_files: Optional[List[str]] = None,
+        source_files: list[str],
+        test_files: list[str],
+        modified_test_files: Optional[list[str]] = None,
     ) -> TDDValidationResult:
         """Validate the GREEN phase of TDD.
 
@@ -420,9 +419,7 @@ class TDDValidator:
 
         # Run tests - they MUST pass
         loop = asyncio.get_event_loop()
-        test_result = loop.run_until_complete(
-            self.run_tests(test_files, with_coverage=True)
-        )
+        test_result = loop.run_until_complete(self.run_tests(test_files, with_coverage=True))
 
         if not test_result.all_pass:
             return TDDValidationResult(
@@ -456,8 +453,8 @@ class TDDValidator:
 
     def validate_refactor_phase(
         self,
-        test_files: List[str],
-        modified_source_files: List[str],
+        test_files: list[str],
+        modified_source_files: list[str],
     ) -> TDDValidationResult:
         """Validate the REFACTOR phase of TDD.
 
@@ -477,9 +474,7 @@ class TDDValidator:
 
         # Run tests - they MUST still pass
         loop = asyncio.get_event_loop()
-        test_result = loop.run_until_complete(
-            self.run_tests(test_files, with_coverage=True)
-        )
+        test_result = loop.run_until_complete(self.run_tests(test_files, with_coverage=True))
 
         if not test_result.all_pass:
             return TDDValidationResult(
@@ -504,9 +499,9 @@ class TDDValidator:
 
     def _check_criteria_coverage(
         self,
-        test_files: List[str],
-        acceptance_criteria: List[str],
-    ) -> Tuple[float, List[str]]:
+        test_files: list[str],
+        acceptance_criteria: list[str],
+    ) -> tuple[float, list[str]]:
         """Check how well tests cover acceptance criteria.
 
         Uses heuristic text matching to estimate coverage.
@@ -547,7 +542,7 @@ class TDDValidator:
         coverage = len(covered) / len(acceptance_criteria) if acceptance_criteria else 1.0
         return coverage, uncovered
 
-    def _extract_key_terms(self, text: str) -> List[str]:
+    def _extract_key_terms(self, text: str) -> list[str]:
         """Extract key terms from a criterion for matching.
 
         Args:
@@ -558,16 +553,84 @@ class TDDValidator:
         """
         # Remove common words and punctuation
         stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "must", "shall",
-            "can", "need", "to", "of", "in", "for", "on", "with", "at",
-            "by", "from", "as", "into", "through", "during", "before",
-            "after", "above", "below", "between", "under", "again",
-            "further", "then", "once", "here", "there", "when", "where",
-            "why", "how", "all", "each", "few", "more", "most", "other",
-            "some", "such", "no", "nor", "not", "only", "own", "same",
-            "so", "than", "too", "very", "just", "and", "but", "if", "or",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "here",
+            "there",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "each",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "nor",
+            "not",
+            "only",
+            "own",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "just",
+            "and",
+            "but",
+            "if",
+            "or",
         }
 
         # Extract words
@@ -581,8 +644,8 @@ class TDDValidator:
 
 def validate_test_phase(
     project_dir: Path,
-    test_files: List[str],
-    acceptance_criteria: List[str],
+    test_files: list[str],
+    acceptance_criteria: list[str],
 ) -> TDDValidationResult:
     """Convenience function to validate test phase.
 
@@ -600,9 +663,9 @@ def validate_test_phase(
 
 def validate_implement_phase(
     project_dir: Path,
-    source_files: List[str],
-    test_files: List[str],
-    modified_test_files: Optional[List[str]] = None,
+    source_files: list[str],
+    test_files: list[str],
+    modified_test_files: Optional[list[str]] = None,
 ) -> TDDValidationResult:
     """Convenience function to validate implementation phase.
 

@@ -12,7 +12,9 @@
     "Bash(kubectl*)",
     "Bash(terraform*)",
     "Bash(make*)",
-    "Bash(gh*)"
+    "Bash(gh*)",
+    "mcp__Ref__ref_search_documentation",
+    "mcp__Ref__ref_read_url"
   ],
   "forbidden": [
     "Bash(rm -rf /)",
@@ -37,7 +39,38 @@
       "tests/**/*",
       "lib/**/*",
       "app/**/*"
-    ]
+    ],
+    "read_only": false
   },
-  "notes": "A11 manages CI/CD and infrastructure. Cannot modify application code."
+  "budget_limits": {
+    "per_invocation_usd": 1.0,
+    "per_task_usd": 2.0,
+    "fallback_model": "codex-5.2"
+  },
+  "timeout_seconds": 1800,
+  "max_retries": 3,
+  "security_restrictions": {
+    "forbidden_patterns": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(*--force*delete*)"
+    ],
+    "require_confirmation": [
+      "Bash(docker*)",
+      "Bash(kubectl*)",
+      "Bash(terraform*)"
+    ],
+    "secrets_check": true
+  },
+  "completion_signals": {
+    "claude": "<promise>DONE</promise>",
+    "cursor": "{\"status\": \"done\"}",
+    "gemini": "DONE|COMPLETE"
+  },
+  "tool_descriptions": {
+    "Bash(docker*)": "Container build and run.",
+    "Bash(kubectl*)": "Kubernetes operations.",
+    "Bash(terraform*)": "Infrastructure changes."
+  },
+  "rationale": "DevOps manages CI/CD and infra only."
 }

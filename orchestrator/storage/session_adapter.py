@@ -57,6 +57,7 @@ class SessionStorageAdapter(SessionStorageProtocol):
         """Get or create database backend."""
         if self._db_backend is None:
             from orchestrator.db.repositories.sessions import get_session_repository
+
             self._db_backend = get_session_repository(self.project_name)
         return self._db_backend
 

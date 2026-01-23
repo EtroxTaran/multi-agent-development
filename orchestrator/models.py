@@ -5,7 +5,7 @@ These are pure data structures without persistence logic - persistence is
 handled by the storage adapters and DB repositories.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional

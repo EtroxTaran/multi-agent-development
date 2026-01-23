@@ -12,9 +12,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-from .diagnosis import RootCause, DiagnosisResult
+from .diagnosis import DiagnosisResult, RootCause
 from .triage import ErrorCategory
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,6 @@ BUILTIN_FIXES = [
         fix_data={"module": "{name}"},
         description="Add missing import statement",
     ),
-
     # JavaScript/Node fixes
     KnownFix(
         id="node_missing_module",
@@ -153,7 +152,6 @@ BUILTIN_FIXES = [
         fix_data={"command": "npm install {module}"},
         description="Install missing Node.js package",
     ),
-
     # Syntax fixes
     KnownFix(
         id="python_indentation",
@@ -167,7 +165,6 @@ BUILTIN_FIXES = [
         fix_data={},
         description="Fix Python indentation",
     ),
-
     # Test fixes
     KnownFix(
         id="pytest_assertion_error",
@@ -181,7 +178,6 @@ BUILTIN_FIXES = [
         fix_data={},
         description="Analyze test assertion failure",
     ),
-
     # Configuration fixes
     KnownFix(
         id="missing_env_var",
@@ -195,7 +191,6 @@ BUILTIN_FIXES = [
         fix_data={"default": ""},
         description="Add missing environment variable",
     ),
-
     # Timeout fixes
     KnownFix(
         id="operation_timeout",
@@ -209,7 +204,6 @@ BUILTIN_FIXES = [
         fix_data={"multiplier": 2},
         description="Increase operation timeout",
     ),
-
     # Security fixes
     KnownFix(
         id="sql_injection",
@@ -262,12 +256,12 @@ class KnownFixDatabase:
         # Load custom fixes
         if self.db_file.exists():
             try:
-                with open(self.db_file, "r") as f:
+                with open(self.db_file) as f:
                     data = json.load(f)
                     for fix_data in data.get("fixes", []):
                         fix = KnownFix.from_dict(fix_data)
                         self._fixes[fix.id] = fix
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Could not load known fixes database: {e}")
 
     def _save_database(self) -> None:
@@ -276,7 +270,8 @@ class KnownFixDatabase:
 
         # Only save custom fixes (not built-ins)
         custom_fixes = [
-            fix.to_dict() for fix in self._fixes.values()
+            fix.to_dict()
+            for fix in self._fixes.values()
             if fix.id not in {f.id for f in BUILTIN_FIXES}
         ]
 
@@ -288,7 +283,7 @@ class KnownFixDatabase:
         try:
             with open(self.db_file, "w") as f:
                 json.dump(data, f, indent=2)
-        except IOError as e:
+        except OSError as e:
             logger.warning(f"Could not save known fixes database: {e}")
 
     def find_matching_fix(
@@ -467,5 +462,7 @@ class KnownFixDatabase:
             "total_applications": total_successes + total_failures,
             "total_successes": total_successes,
             "total_failures": total_failures,
-            "overall_success_rate": total_successes / (total_successes + total_failures) if (total_successes + total_failures) > 0 else 0.0,
+            "overall_success_rate": total_successes / (total_successes + total_failures)
+            if (total_successes + total_failures) > 0
+            else 0.0,
         }

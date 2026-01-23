@@ -1,6 +1,23 @@
+---
+name: orchestrate
+description: Run the full multi-agent workflow with approvals, validation, and verification phases.
+version: 1.1.0
+tags: [workflow, orchestration, planning, validation, verification]
+owner: orchestration
+status: active
+---
+
 # Orchestrate Skill
 
 Multi-agent workflow orchestration using native Claude Code features.
+
+## Overview
+
+Runs the full 5-phase workflow with optional human approvals and multi-agent validation.
+
+## Prerequisites
+
+- SurrealDB configured (`SURREAL_URL`) for workflow state persistence.
 
 ## Usage
 
@@ -37,7 +54,7 @@ Claude Code (This Session = Orchestrator)
     |
     +-- Bash Tool --> gemini CLI (architecture review)
     |
-    +-- Read/Write --> .workflow/state.json (state persistence)
+    +-- SurrealDB --> State persistence (workflow_state, phase_outputs, logs)
 ```
 
 ## Workflow Phases
@@ -51,39 +68,12 @@ Claude Code (This Session = Orchestrator)
 | 4 | Verification | Cursor + Gemini | Bash (parallel, optional) |
 | 5 | Completion | Claude | Direct |
 
-## State Management
+## Storage Architecture
 
-State is persisted in `.workflow/state.json`:
-
-```json
-{
-  "project_name": "my-project",
-  "project_dir": "/path/to/project",
-  "current_phase": 2,
-  "execution_mode": "hitl",
-  "phase_status": {
-    "discussion": "completed",
-    "planning": "completed",
-    "validation": "in_progress",
-    "implementation": "pending",
-    "verification": "pending",
-    "completion": "pending"
-  },
-  "plan": { ... },
-  "tasks": [ ... ],
-  "current_task_id": null,
-  "validation_feedback": {
-    "cursor": { ... },
-    "gemini": { ... }
-  },
-  "verification_feedback": {
-    "cursor": { ... },
-    "gemini": { ... }
-  },
-  "errors": [],
-  "updated_at": "2026-01-22T12:00:00Z"
-}
-```
+Workflow state is persisted in SurrealDB only. Use the repositories and adapters in `orchestrator/db/` to read/write:
+- `workflow_state` for current phase and status
+- `phase_outputs` for plan, validation, implementation, and verification results
+- `logs` for escalations, approvals, and research artifacts
 
 ## Project Directory Resolution
 
@@ -184,7 +174,7 @@ After reading all documentation, build a mental model of:
 
 #### Step 4: Save Documentation Index
 
-Save an index of discovered documentation to `.workflow/docs-index.json`:
+Save an index of discovered documentation to `logs` (type=docs_index):
 
 ```json
 {
@@ -219,7 +209,7 @@ Update state with `docs_index` reference.
 **Interactive Mode (hitl)**:
 If Docs/ folder is missing or empty:
 1. Inform user: "No Docs/ folder found in project root."
-2. Use AskUserQuestion tool with options:
+2. Use AskQuestion tool with options:
    - **Create template**: Create a Docs/ folder with template files
    - **Specify location**: Point to where your documentation is
    - **Continue anyway**: Proceed without documentation (not recommended)
@@ -266,7 +256,7 @@ Task(
   **Required:**
   - Docs/PRODUCT.md (feature specification)
 
-  **Also read (check .workflow/docs-index.json for full list):**
+  **Also read (check docs_index log for full list):**
   - ALL `.md` files in Docs/ and subfolders (any structure)
   - CONTEXT.md (developer preferences from discussion, if exists)
 
@@ -301,7 +291,7 @@ Task(
 )
 ```
 
-Save result to `.workflow/phases/planning/plan.json`.
+Save result to `phase_outputs` (type=plan).
 
 **Interactive Mode**: Show plan summary to user and ask for approval before proceeding.
 
@@ -318,7 +308,7 @@ Run Cursor and Gemini in parallel via Bash (if available):
 **Cursor (Security Focus)**:
 ```bash
 cursor-agent --print --output-format json "
-Review .workflow/phases/planning/plan.json for:
+Review plan JSON from `phase_outputs` (type=plan) for:
 - Security vulnerabilities in proposed changes
 - Code quality concerns
 - Testing coverage adequacy
@@ -333,13 +323,13 @@ Return JSON:
   \"concerns\": [{\"area\": \"\", \"severity\": \"high|medium|low\", \"description\": \"\"}],
   \"blocking_issues\": []
 }
-" > .workflow/phases/validation/cursor-feedback.json
+" > cursor-feedback.json
 ```
 
 **Gemini (Architecture Focus)**:
 ```bash
 gemini --yolo "
-Review .workflow/phases/planning/plan.json for:
+Review plan JSON from `phase_outputs` (type=plan) for:
 - Architecture patterns and design
 - Scalability considerations
 - Technical debt risks
@@ -354,7 +344,7 @@ Return JSON:
   \"concerns\": [{\"area\": \"\", \"severity\": \"high|medium|low\", \"description\": \"\"}],
   \"blocking_issues\": []
 }
-" > .workflow/phases/validation/gemini-feedback.json
+" > gemini-feedback.json
 ```
 
 **Approval Criteria (Phase 2)**:
@@ -449,7 +439,7 @@ Return JSON:
   \"issues\": [{\"file\": \"\", \"line\": 0, \"severity\": \"\", \"description\": \"\"}],
   \"blocking_issues\": []
 }
-" > .workflow/phases/verification/cursor-review.json
+" > cursor-review.json
 ```
 
 **Gemini (Architecture Review)**:
@@ -470,7 +460,7 @@ Return JSON:
   \"issues\": [{\"file\": \"\", \"concern\": \"\", \"severity\": \"\"}],
   \"blocking_issues\": []
 }
-" > .workflow/phases/verification/gemini-review.json
+" > gemini-review.json
 ```
 
 **Approval Criteria (Phase 4)**:
@@ -491,7 +481,7 @@ Update state: `verification_feedback`, `phase_status.verification = "completed"`
 
 Generate summary documentation:
 
-1. Create `.workflow/phases/completion/summary.json`:
+1. Create summary entry in `phase_outputs` (type=summary):
    - Features implemented
    - Files changed
    - Tests added
@@ -542,7 +532,7 @@ Use automatic resolution:
 
 ## Resuming Workflows
 
-1. Read `.workflow/state.json`
+1. Read `workflow_state` from SurrealDB
 2. Check `current_phase` and `phase_status`
 3. Resume from last incomplete phase
 4. Preserve all previous feedback and decisions
@@ -553,7 +543,16 @@ Use automatic resolution:
 |-----------|------------------|--------------|---------|
 | Worker Claude spawn | ~13k tokens | ~4k tokens | 70% |
 | Context passing | Full duplication | Filtered | 60% |
-| State management | External DB | Native files | Simpler |
+| State management | Files + DB | SurrealDB | Consistent |
+
+## Outputs
+
+- SurrealDB records in `workflow_state`, `phase_outputs`, and `logs`.
+
+## Error Handling
+
+- If SurrealDB is unavailable, abort with `DatabaseRequiredError`.
+- On repeated phase failure (3 attempts), escalate to human decision.
 
 ## Related Skills
 

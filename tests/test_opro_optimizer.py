@@ -1,11 +1,12 @@
 """Tests for the OPRO optimizer."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-from orchestrator.optimization.opro import OPROOptimizer, OPROResult
+import pytest
+
 from orchestrator.optimization.bootstrap import BootstrapOptimizer, BootstrapResult
-from orchestrator.optimization.optimizer import PromptOptimizer, OptimizationResult
+from orchestrator.optimization.opro import OPROOptimizer, OPROResult
+from orchestrator.optimization.optimizer import OptimizationResult, PromptOptimizer
 
 
 class TestOPROOptimizer:
@@ -82,7 +83,7 @@ class TestOPROOptimizer:
 
         # Mock the LLM call - return a string longer than 100 chars
         long_prompt = "Improved prompt content that is sufficiently long to pass the validation check requiring at least 100 characters in the response."
-        with patch.object(optimizer, '_call_optimizer', return_value=long_prompt):
+        with patch.object(optimizer, "_call_optimizer", return_value=long_prompt):
             result = await optimizer.optimize(
                 template_name="test",
                 current_prompt="Original prompt",

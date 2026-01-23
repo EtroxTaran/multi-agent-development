@@ -2,16 +2,17 @@
 
 import re
 from dataclasses import dataclass
-from typing import List, Optional
 from enum import Enum
+from typing import Optional
 
 
 @dataclass
 class ValidationResult:
     """Result of a validation check."""
+
     valid: bool
-    errors: List[str]
-    warnings: List[str]
+    errors: list[str]
+    warnings: list[str]
 
     def __bool__(self) -> bool:
         return self.valid
@@ -38,8 +39,8 @@ class ProductSpecValidator:
         Returns:
             ValidationResult with errors and warnings
         """
-        errors: List[str] = []
-        warnings: List[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # Check for empty content
         if not content or not content.strip():
@@ -73,18 +74,15 @@ class ProductSpecValidator:
                 warnings.append(f"Missing recommended section: {section}")
 
         # Check for at least some structured content
-        if not re.search(r'^##?\s+\w', content, re.MULTILINE):
+        if not re.search(r"^##?\s+\w", content, re.MULTILINE):
             warnings.append("No markdown headings found - consider structuring with ## headers")
 
-        return ValidationResult(
-            valid=len(errors) == 0,
-            errors=errors,
-            warnings=warnings
-        )
+        return ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings)
 
 
 class AssessmentType(str, Enum):
     """Overall assessment types from agent feedback."""
+
     APPROVED = "approved"
     APPROVE = "approve"
     REVISION = "revision"
@@ -106,6 +104,7 @@ class AssessmentType(str, Enum):
 @dataclass
 class FeedbackItem:
     """A single feedback item from an agent."""
+
     category: str
     severity: str = "info"
     message: str = ""
@@ -118,7 +117,7 @@ class FeedbackItem:
             category=data.get("category", "general"),
             severity=data.get("severity", "info"),
             message=data.get("message", data.get("description", "")),
-            suggestion=data.get("suggestion", data.get("recommendation"))
+            suggestion=data.get("suggestion", data.get("recommendation")),
         )
 
 
@@ -129,13 +128,14 @@ class AgentFeedbackSchema:
     Provides structured validation for agent feedback, normalizing
     different field names and ensuring consistent output.
     """
+
     reviewer: str
     overall_assessment: AssessmentType
     score: float
     summary: Optional[str] = None
-    items: List[FeedbackItem] = None
-    blockers: List[str] = None
-    warnings: List[str] = None
+    items: list[FeedbackItem] = None
+    blockers: list[str] = None
+    warnings: list[str] = None
 
     def __post_init__(self):
         """Normalize values after initialization."""
@@ -167,14 +167,11 @@ class AgentFeedbackSchema:
         score = data.get("score") or data.get("rating") or data.get("confidence") or 0
 
         # Handle items/concerns/issues field variations
-        items_data = (
-            data.get("items") or
-            data.get("concerns") or
-            data.get("issues") or
-            []
-        )
+        items_data = data.get("items") or data.get("concerns") or data.get("issues") or []
         items = [
-            FeedbackItem.from_dict(item) if isinstance(item, dict) else FeedbackItem(category="general", message=str(item))
+            FeedbackItem.from_dict(item)
+            if isinstance(item, dict)
+            else FeedbackItem(category="general", message=str(item))
             for item in items_data
         ]
 
@@ -195,7 +192,7 @@ class AgentFeedbackSchema:
             summary=data.get("summary") or data.get("description"),
             items=items,
             blockers=blockers,
-            warnings=warnings
+            warnings=warnings,
         )
 
     def to_dict(self) -> dict:
@@ -210,12 +207,12 @@ class AgentFeedbackSchema:
                     "category": item.category,
                     "severity": item.severity,
                     "message": item.message,
-                    "suggestion": item.suggestion
+                    "suggestion": item.suggestion,
                 }
                 for item in self.items
             ],
             "blockers": self.blockers,
-            "warnings": self.warnings
+            "warnings": self.warnings,
         }
 
 
@@ -243,5 +240,5 @@ def validate_feedback(agent: str, raw_output: Optional[dict]) -> Optional[dict]:
         reviewer=agent,
         overall_assessment=AssessmentType.UNKNOWN,
         score=0,
-        summary="Failed to get feedback"
+        summary="Failed to get feedback",
     ).to_dict()

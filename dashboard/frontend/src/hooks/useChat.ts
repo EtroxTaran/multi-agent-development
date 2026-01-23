@@ -2,16 +2,16 @@
  * Chat hooks for Claude integration
  */
 
-import { useCallback, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { chatApi, createChatWebSocket } from '@/lib/api';
-import type { ChatMessage } from '@/types';
+import { useCallback, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { chatApi, createChatWebSocket } from "@/lib/api";
+import type { ChatMessage } from "@/types";
 
 // Query keys
 export const chatKeys = {
-  all: ['chat'] as const,
+  all: ["chat"] as const,
   feedback: (projectName: string, phase: number) =>
-    [...chatKeys.all, 'feedback', projectName, phase] as const,
+    [...chatKeys.all, "feedback", projectName, phase] as const,
 };
 
 /**
@@ -20,7 +20,7 @@ export const chatKeys = {
 export function useStreamingChat(projectName?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [currentResponse, setCurrentResponse] = useState('');
+  const [currentResponse, setCurrentResponse] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
 
   const sendMessage = useCallback(
@@ -28,12 +28,12 @@ export function useStreamingChat(projectName?: string) {
       // Add user message
       setMessages((prev) => [
         ...prev,
-        { role: 'user', content: message, timestamp: new Date().toISOString() },
+        { role: "user", content: message, timestamp: new Date().toISOString() },
       ]);
 
       // Start streaming
       setIsStreaming(true);
-      setCurrentResponse('');
+      setCurrentResponse("");
 
       const ws = createChatWebSocket(projectName);
 
@@ -45,32 +45,32 @@ export function useStreamingChat(projectName?: string) {
         try {
           const data = JSON.parse(event.data);
 
-          if (data.type === 'chat_chunk') {
+          if (data.type === "chat_chunk") {
             setCurrentResponse((prev) => prev + data.data.content);
-          } else if (data.type === 'chat_complete') {
+          } else if (data.type === "chat_complete") {
             setIsStreaming(false);
             setMessages((prev) => [
               ...prev,
               {
-                role: 'assistant',
+                role: "assistant",
                 content: currentResponse,
                 timestamp: new Date().toISOString(),
               },
             ]);
-            setCurrentResponse('');
-          } else if (data.type === 'chat_error') {
+            setCurrentResponse("");
+          } else if (data.type === "chat_error") {
             setIsStreaming(false);
             setMessages((prev) => [
               ...prev,
               {
-                role: 'assistant',
+                role: "assistant",
                 content: `Error: ${data.data.error}`,
                 timestamp: new Date().toISOString(),
               },
             ]);
           }
         } catch (e) {
-          console.error('Failed to parse chat message:', e);
+          console.error("Failed to parse chat message:", e);
         }
       };
 
@@ -85,7 +85,7 @@ export function useStreamingChat(projectName?: string) {
 
       wsRef.current = ws;
     },
-    [projectName, currentResponse]
+    [projectName, currentResponse],
   );
 
   const stopStreaming = useCallback(() => {
@@ -98,7 +98,7 @@ export function useStreamingChat(projectName?: string) {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setCurrentResponse('');
+    setCurrentResponse("");
   }, []);
 
   return {
@@ -116,8 +116,13 @@ export function useStreamingChat(projectName?: string) {
  */
 export function useSendMessage() {
   return useMutation({
-    mutationFn: ({ message, projectName }: { message: string; projectName?: string }) =>
-      chatApi.send(message, projectName),
+    mutationFn: ({
+      message,
+      projectName,
+    }: {
+      message: string;
+      projectName?: string;
+    }) => chatApi.send(message, projectName),
   });
 }
 
@@ -164,10 +169,18 @@ export function useRespondToEscalation(projectName: string) {
       questionId: string;
       answer: string;
       additionalContext?: string;
-    }) => chatApi.respondToEscalation(projectName, questionId, answer, additionalContext),
+    }) =>
+      chatApi.respondToEscalation(
+        projectName,
+        questionId,
+        answer,
+        additionalContext,
+      ),
     onSuccess: () => {
       // Invalidate workflow status
-      queryClient.invalidateQueries({ queryKey: ['workflow', 'status', projectName] });
+      queryClient.invalidateQueries({
+        queryKey: ["workflow", "status", projectName],
+      });
     },
   });
 }

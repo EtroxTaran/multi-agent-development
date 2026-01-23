@@ -6,11 +6,7 @@ from orchestrator.review.cycle import (
     ReviewDecision,
     ReviewIteration,
 )
-from orchestrator.review.resolver import (
-    ConflictResolver,
-    ResolutionResult,
-    ReviewResult,
-)
+from orchestrator.review.resolver import ConflictResolver, ResolutionResult, ReviewResult
 
 __all__ = [
     "ReviewCycle",

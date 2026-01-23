@@ -1,27 +1,21 @@
 """Task management API routes."""
 
 import json
+
+# Import orchestrator modules
+import sys
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
-from ..deps import get_project_dir, get_audit_adapter
-from ..models import (
-    AuditEntry,
-    ErrorResponse,
-    TaskInfo,
-    TaskListResponse,
-    TaskStatus,
-)
+from ..deps import get_audit_adapter, get_project_dir
+from ..models import AuditEntry, ErrorResponse, TaskInfo, TaskListResponse, TaskStatus
 
-# Import orchestrator modules
-import sys
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 from orchestrator.storage.audit_adapter import AuditStorageAdapter
-
 
 router = APIRouter(prefix="/projects/{project_name}/tasks", tags=["tasks"])
 
@@ -90,22 +84,24 @@ async def list_tasks(
         if status and task_status.value != status:
             continue
 
-        tasks.append(TaskInfo(
-            id=t.get("id", ""),
-            title=t.get("title", t.get("name", "")),
-            description=t.get("description"),
-            status=task_status,
-            priority=t.get("priority", 0),
-            dependencies=t.get("dependencies", t.get("depends_on", [])),
-            files_to_create=t.get("files_to_create", []),
-            files_to_modify=t.get("files_to_modify", []),
-            acceptance_criteria=t.get("acceptance_criteria", []),
-            complexity_score=t.get("complexity_score"),
-            created_at=t.get("created_at"),
-            started_at=t.get("started_at"),
-            completed_at=t.get("completed_at"),
-            error=t.get("error"),
-        ))
+        tasks.append(
+            TaskInfo(
+                id=t.get("id", ""),
+                title=t.get("title", t.get("name", "")),
+                description=t.get("description"),
+                status=task_status,
+                priority=t.get("priority", 0),
+                dependencies=t.get("dependencies", t.get("depends_on", [])),
+                files_to_create=t.get("files_to_create", []),
+                files_to_modify=t.get("files_to_modify", []),
+                acceptance_criteria=t.get("acceptance_criteria", []),
+                complexity_score=t.get("complexity_score"),
+                created_at=t.get("created_at"),
+                started_at=t.get("started_at"),
+                completed_at=t.get("completed_at"),
+                error=t.get("error"),
+            )
+        )
 
     # Calculate counts
     completed = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)

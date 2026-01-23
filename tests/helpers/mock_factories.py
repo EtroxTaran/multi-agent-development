@@ -4,7 +4,7 @@ This module centralizes mock creation to eliminate duplication across test files
 All mock repositories return AsyncMock for async methods.
 """
 
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 def create_mock_workflow_state():
@@ -108,7 +108,7 @@ def create_mock_workflow_repo():
     mock_repo.initialize_state = AsyncMock(return_value=mock_state)
     mock_repo.update_state = AsyncMock(return_value=mock_state)
     mock_repo.set_phase = AsyncMock(return_value=mock_state)
-    mock_repo.reset_state = AsyncMock(return_value=None) # reset_state returns None
+    mock_repo.reset_state = AsyncMock(return_value=None)  # reset_state returns None
     mock_repo.reset_to_phase = AsyncMock(return_value=mock_state)
 
     # Async summary methods

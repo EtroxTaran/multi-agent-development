@@ -12,16 +12,16 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
-from .models import PhaseStatus
-from .storage.workflow_adapter import WorkflowStorageAdapter, get_workflow_storage
-from .utils.logging import OrchestrationLogger, LogLevel
-from .utils.git_operations import GitOperationsManager
-from .utils.log_manager import LogManager, load_config as load_log_config, should_auto_cleanup
-from .utils.handoff import HandoffGenerator, generate_handoff
+from .db.config import DatabaseRequiredError
 from .project_manager import ProjectManager
-from .db.config import require_db, DatabaseRequiredError
+from .storage.workflow_adapter import get_workflow_storage
+from .utils.git_operations import GitOperationsManager
+from .utils.handoff import generate_handoff
+from .utils.log_manager import LogManager, should_auto_cleanup
+from .utils.log_manager import load_config as load_log_config
+from .utils.logging import LogLevel, OrchestrationLogger
 
 
 def is_langgraph_enabled() -> bool:
@@ -46,7 +46,7 @@ async def validate_db_connection(project_name: str) -> None:
         DatabaseRequiredError: If database is not available or query fails
     """
     try:
-        from .db import get_connection, ensure_schema
+        from .db import ensure_schema, get_connection
 
         # Test connection with a simple query
         async with get_connection(project_name) as conn:
@@ -135,7 +135,8 @@ class Orchestrator:
 
         # Initialize worktree manager and clean up any orphaned worktrees from previous runs
         # This is optional - worktrees require git, so we gracefully handle non-git directories
-        from .utils.worktree import WorktreeManager, WorktreeError
+        from .utils.worktree import WorktreeError, WorktreeManager
+
         self.worktree_manager: Optional[WorktreeManager] = None
         try:
             self.worktree_manager = WorktreeManager(self.project_dir)
@@ -156,9 +157,7 @@ class Orchestrator:
         # Check PRODUCT.md exists
         product_file = self.project_dir / "PRODUCT.md"
         if not product_file.exists():
-            errors.append(
-                "PRODUCT.md not found. Create it with your feature specification."
-            )
+            errors.append("PRODUCT.md not found. Create it with your feature specification.")
 
         # Check CLI tools
         from .agents import ClaudeAgent, CursorAgent, GeminiAgent
@@ -168,10 +167,14 @@ class Orchestrator:
         gemini = GeminiAgent(self.project_dir)
 
         if not claude.check_available():
-            errors.append("Claude CLI not found. Install with: npm install -g @anthropic/claude-cli")
+            errors.append(
+                "Claude CLI not found. Install with: npm install -g @anthropic/claude-cli"
+            )
 
         if not cursor.check_available():
-            errors.append("Cursor CLI not found. Install with: curl https://cursor.com/install -fsSL | bash")
+            errors.append(
+                "Cursor CLI not found. Install with: curl https://cursor.com/install -fsSL | bash"
+            )
 
         if not gemini.check_available():
             errors.append("Gemini CLI not found. Install with: npm install -g @google/gemini-cli")
@@ -295,33 +298,26 @@ class Orchestrator:
                 break
 
         if not target_commit:
-            return {
-                "success": False,
-                "error": f"No commit found before phase {phase_num}"
-            }
+            return {"success": False, "error": f"No commit found before phase {phase_num}"}
 
         try:
             if self.git.reset_hard(target_commit):
                 self.storage.reset_to_phase(phase_num)
 
-                self.logger.info(f"Rolled back to commit {target_commit[:8]} (before phase {phase_num})")
+                self.logger.info(
+                    f"Rolled back to commit {target_commit[:8]} (before phase {phase_num})"
+                )
 
                 return {
                     "success": True,
                     "rolled_back_to": target_commit,
                     "current_phase": phase_num - 1 if phase_num > 1 else 1,
-                    "message": f"Successfully rolled back to state before phase {phase_num}"
+                    "message": f"Successfully rolled back to state before phase {phase_num}",
                 }
             else:
-                return {
-                    "success": False,
-                    "error": "Git reset failed"
-                }
+                return {"success": False, "error": "Git reset failed"}
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Rollback failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Rollback failed: {str(e)}"}
 
     def health_check(self) -> dict:
         """Return current health status.
@@ -392,8 +388,8 @@ class Orchestrator:
         Returns:
             Dictionary with workflow results
         """
-        from .langgraph import WorkflowRunner, create_initial_state
-        from .ui import create_display, UICallbackHandler
+        from .langgraph import WorkflowRunner
+        from .ui import UICallbackHandler, create_display
 
         self.logger.banner("Multi-Agent Orchestration System (LangGraph Mode)")
 
@@ -422,7 +418,7 @@ class Orchestrator:
         self.logger.info(f"Project: {self.project_dir.name}")
 
         display = create_display(self.project_dir.name) if use_rich_display else None
-        
+
         # Combine callbacks if both display and external callback are provided
         callback = None
         if display:
@@ -430,9 +426,9 @@ class Orchestrator:
             # If we also have a progress_callback, we might need a CompositeCallback
             # For now, if progress_callback is provided, we prioritize it for the runner
             # or we could make a composite.
-            # To keep it simple: if progress_callback is passed, use it. 
+            # To keep it simple: if progress_callback is passed, use it.
             # Ideally we want both.
-        
+
         # Use provided callback or fall back to UI callback
         active_callback = progress_callback if progress_callback else callback
 
@@ -460,10 +456,12 @@ class Orchestrator:
                     with display.start():
                         display.log_event("Starting LangGraph workflow", "info")
                         # Pass active_callback (which might be the websocket one)
-                        # NOTE: If we use websocket callback, the local rich display might miss events 
+                        # NOTE: If we use websocket callback, the local rich display might miss events
                         # if we don't composite them.
                         # For this specific requirement (visualization), the websocket is priority.
-                        result = await runner.run(progress_callback=active_callback, config=run_config)
+                        result = await runner.run(
+                            progress_callback=active_callback, config=run_config
+                        )
 
                         success = self._check_workflow_success(result)
                         if success:
@@ -522,7 +520,11 @@ class Orchestrator:
         phase_status = result.get("phase_status", {})
         phase_5 = phase_status.get("5")
         if phase_5 and hasattr(phase_5, "status"):
-            return phase_5.status.value == "completed" if hasattr(phase_5.status, "value") else phase_5.status == "completed"
+            return (
+                phase_5.status.value == "completed"
+                if hasattr(phase_5.status, "value")
+                else phase_5.status == "completed"
+            )
         return False
 
     def _extract_interrupt_data(self, pending: dict) -> Optional[dict]:
@@ -561,23 +563,30 @@ class Orchestrator:
         }
 
         if interrupt_type == "escalation":
-            data.update({
-                "issue": interrupt_value.get("issue") or interrupt_value.get("error") or "An issue occurred",
-                "error_type": interrupt_value.get("error_type", "workflow_error"),
-                "suggested_actions": interrupt_value.get("suggested_actions", []),
-                "clarifications": interrupt_value.get("clarifications", []),
-                "context": interrupt_value.get("context", {}),
-                "retry_count": interrupt_value.get("retry_count", 0),
-                "max_retries": interrupt_value.get("max_retries", 3),
-            })
+            data.update(
+                {
+                    "issue": interrupt_value.get("issue")
+                    or interrupt_value.get("error")
+                    or "An issue occurred",
+                    "error_type": interrupt_value.get("error_type", "workflow_error"),
+                    "suggested_actions": interrupt_value.get("suggested_actions", []),
+                    "clarifications": interrupt_value.get("clarifications", []),
+                    "context": interrupt_value.get("context", {}),
+                    "retry_count": interrupt_value.get("retry_count", 0),
+                    "max_retries": interrupt_value.get("max_retries", 3),
+                }
+            )
         elif interrupt_type == "approval_required":
-            data.update({
-                "approval_type": interrupt_value.get("approval_type", "general"),
-                "summary": interrupt_value.get("summary") or interrupt_value.get("message", "Approval required"),
-                "details": interrupt_value.get("details", {}),
-                "scores": interrupt_value.get("scores", {}),
-                "files_changed": interrupt_value.get("files_changed", []),
-            })
+            data.update(
+                {
+                    "approval_type": interrupt_value.get("approval_type", "general"),
+                    "summary": interrupt_value.get("summary")
+                    or interrupt_value.get("message", "Approval required"),
+                    "details": interrupt_value.get("details", {}),
+                    "scores": interrupt_value.get("scores", {}),
+                    "files_changed": interrupt_value.get("files_changed", []),
+                }
+            )
 
         return data
 
@@ -600,7 +609,7 @@ class Orchestrator:
             Dictionary with workflow results
         """
         from .langgraph import WorkflowRunner
-        from .ui import create_display, UICallbackHandler, UserInputManager
+        from .ui import UICallbackHandler, UserInputManager, create_display
 
         self.logger.banner("Resuming LangGraph Workflow")
 
@@ -646,7 +655,9 @@ class Orchestrator:
                     if interrupt_data:
                         input_manager = UserInputManager()
                         human_response = input_manager.handle_interrupt(interrupt_data)
-                        self.logger.info(f"User response: {human_response.get('action', 'unknown')}")
+                        self.logger.info(
+                            f"User response: {human_response.get('action', 'unknown')}"
+                        )
 
                 elif pending:
                     self.logger.info(f"Workflow paused at: {pending['paused_at']}")
@@ -735,35 +746,108 @@ class Orchestrator:
             Dictionary with nodes and edges
         """
         from .langgraph import create_workflow_graph
-        
+
         # Create the graph (without checkpointer as we just want structure)
         graph = create_workflow_graph()
-        
+
         # Get the underlying graph definition
-        # LangGraph's get_graph() returns a DrawableGraph which we can inspect
         drawable = graph.get_graph()
-        
+
         nodes = []
-        for node_id, node in drawable.nodes.items():
-            nodes.append({
-                "id": node_id,
-                "type": "default" if node_id not in ["__start__", "__end__"] else "input",
-                "data": {"label": node_id}
-            })
-            
         edges = []
+
+        # Track which nodes have conditional outputs (routers)
+        router_sources = set()
         for edge in drawable.edges:
-            edges.append({
-                "source": edge.source,
-                "target": edge.target,
-                "type": "default",
-                "data": {"condition": edge.conditional} if hasattr(edge, "conditional") and edge.conditional else None
-            })
-            
-        return {
-            "nodes": nodes,
-            "edges": edges
-        }
+            if hasattr(edge, "conditional") and edge.conditional:
+                router_sources.add(edge.source)
+
+        # 1. Add standard nodes
+        for node_id, node in drawable.nodes.items():
+            if node_id in ["__start__", "__end__"]:
+                continue
+
+            nodes.append(
+                {"id": node_id, "type": "default", "data": {"label": node_id, "status": "idle"}}
+            )
+
+        # 2. Add synthetic router nodes
+        for source in router_sources:
+            router_id = f"{source}_router"
+            nodes.append(
+                {
+                    "id": router_id,
+                    "type": "router",  # Special type for diamond shape
+                    "data": {"label": "", "status": "idle"},
+                }
+            )
+            # Add edge from source to router
+            edges.append(
+                {
+                    "source": source,
+                    "target": router_id,
+                    "type": "default",
+                    "data": {"is_connector": True},
+                }
+            )
+
+        # 3. Add edges (handling routers)
+        for edge in drawable.edges:
+            source = edge.source
+            target = edge.target
+
+            # Skip start/end artifacts if not needed, but __start__ is useful
+            if source == "__start__":
+                edges.append({"source": source, "target": target, "type": "default", "data": None})
+                continue
+            if target == "__end__":
+                # Make sure we route through router if source is a router source
+                if source in router_sources:
+                    router_id = f"{source}_router"
+                    # Label for end transition
+                    label = "end"
+                    if hasattr(edge, "data") and edge.data:
+                        label = str(edge.data)
+                    elif hasattr(edge, "conditional") and edge.conditional:
+                        # Fallback if specific label logic is needed
+                        pass
+
+                    edges.append(
+                        {
+                            "source": router_id,
+                            "target": "end_node",  # Virtual end node for viz? Or just ignore
+                            "type": "default",
+                            "data": {"label": label, "condition": label},
+                        }
+                    )
+                continue
+
+            is_conditional = hasattr(edge, "conditional") and edge.conditional
+
+            if is_conditional:
+                # Route through the synthetic router
+                router_id = f"{source}_router"
+
+                # Determine label
+                # In LangGraph, edge.data often holds the condition key (e.g. "approved")
+                # If None, it often implies Key == TargetName
+                label = target
+                if hasattr(edge, "data") and edge.data is not None:
+                    label = str(edge.data)
+
+                edges.append(
+                    {
+                        "source": router_id,
+                        "target": target,
+                        "type": "default",
+                        "data": {"label": label, "condition": label},
+                    }
+                )
+            else:
+                # Standard sequential edge
+                edges.append({"source": source, "target": target, "type": "default", "data": None})
+
+        return {"nodes": nodes, "edges": edges}
 
     def _print_progress(self, phase_num: int, phase_name: str, status: str) -> None:
         """Print progress indicator.
@@ -782,7 +866,7 @@ class Orchestrator:
             elif i == phase_num:
                 progress_parts.append(f"[{i}*]")
             else:
-                progress_parts.append(f"[ ]")
+                progress_parts.append("[ ]")
 
         progress_bar = " ".join(progress_parts)
 
@@ -824,7 +908,8 @@ Examples:
 
     # Project management
     parser.add_argument(
-        "--project", "-p",
+        "--project",
+        "-p",
         type=str,
         help="Project name (in projects/ directory)",
     )
@@ -982,6 +1067,7 @@ Examples:
 
     if args.debug:
         from .cli.debug import TimeTravelDebugger
+
         debugger = TimeTravelDebugger(project_dir)
         debugger.cmdloop()
         return
@@ -1021,14 +1107,14 @@ Examples:
         print("\nProjects:")
         print("-" * 60)
         for p in projects:
-            phase_str = f"Phase {p['current_phase']}" if p['current_phase'] else "Not started"
-            docs_str = "Has docs" if p['has_documents'] else "No docs"
+            phase_str = f"Phase {p['current_phase']}" if p["current_phase"] else "Not started"
+            docs_str = "Has docs" if p["has_documents"] else "No docs"
             context_str = []
-            if p['has_claude_md']:
+            if p["has_claude_md"]:
                 context_str.append("CLAUDE")
-            if p['has_gemini_md']:
+            if p["has_gemini_md"]:
                 context_str.append("GEMINI")
-            if p['has_cursor_rules']:
+            if p["has_cursor_rules"]:
                 context_str.append("Cursor")
             context_display = ", ".join(context_str) if context_str else "No context files"
 
@@ -1039,9 +1125,9 @@ Examples:
 
     if args.init_project:
         result = project_manager.init_project(args.init_project)
-        if result['success']:
+        if result["success"]:
             print(f"\nProject initialized: {result['project_dir']}")
-            print(result['message'])
+            print(result["message"])
             print("\nNext steps:")
             print("  1. Add Documents/ folder with product vision and architecture docs")
             print("  2. Add context files (CLAUDE.md, GEMINI.md, .cursor/rules)")
@@ -1081,6 +1167,7 @@ Examples:
     # Dashboard command
     if args.dashboard:
         from .status import show_status
+
         show_status(
             project_dir,
             compact=args.compact,
@@ -1136,17 +1223,17 @@ Examples:
         print(f"  Total size: {stats['total_size_mb']} MB")
         print(f"  Archive count: {stats['archive_count']}")
 
-        if stats['needs_rotation']:
-            print(f"\n  Files needing rotation:")
-            for f in stats['needs_rotation']:
+        if stats["needs_rotation"]:
+            print("\n  Files needing rotation:")
+            for f in stats["needs_rotation"]:
                 print(f"    - {f}")
 
         print("\n  File details:")
-        for name, info in stats['files'].items():
-            if info.get('exists'):
-                size = info.get('size_mb', 0)
-                age = info.get('age_days', 0)
-                count = info.get('file_count')
+        for name, info in stats["files"].items():
+            if info.get("exists"):
+                size = info.get("size_mb", 0)
+                age = info.get("age_days", 0)
+                count = info.get("file_count")
                 if count is not None:
                     print(f"    {name}: {size} MB ({count} files)")
                 else:
@@ -1162,7 +1249,7 @@ Examples:
             print(json.dumps(brief.to_dict(), indent=2))
         else:
             print(brief.to_markdown())
-            print(f"\nHandoff files saved to:")
+            print("\nHandoff files saved to:")
             print(f"  - {workflow_dir / 'handoff_brief.json'}")
             print(f"  - {workflow_dir / 'handoff_brief.md'}")
 
@@ -1193,15 +1280,17 @@ Examples:
     if args.status:
         if use_langgraph:
             status = asyncio.run(orchestrator.status_langgraph())
-            print(f"\nWorkflow Status (LangGraph Mode):")
+            print("\nWorkflow Status (LangGraph Mode):")
             print(f"  Status: {status.get('status', 'unknown')}")
             print(f"  Project: {status.get('project', 'N/A')}")
             print(f"  Current Phase: {status.get('current_phase', 'N/A')}")
-            if status.get('pending_interrupt'):
-                print(f"  Warning: Paused for human intervention at: {status['pending_interrupt']['paused_at']}")
-            if 'phase_status' in status:
+            if status.get("pending_interrupt"):
+                print(
+                    f"  Warning: Paused for human intervention at: {status['pending_interrupt']['paused_at']}"
+                )
+            if "phase_status" in status:
                 print("\nPhase Statuses:")
-                for phase, state in status['phase_status'].items():
+                for phase, state in status["phase_status"].items():
                     emoji = "+" if state == "completed" else "x" if state == "failed" else "."
                     print(f"  [{emoji}] Phase {phase}: {state}")
         else:
@@ -1211,14 +1300,16 @@ Examples:
             print(f"  Current Phase: {status['current_phase']}")
             print(f"  Total Commits: {status['total_commits']}")
             print("\nPhase Statuses:")
-            for phase, state in status['phase_statuses'].items():
+            for phase, state in status["phase_statuses"].items():
                 emoji = "+" if state == "completed" else "x" if state == "failed" else "."
                 print(f"  [{emoji}] {phase}: {state}")
         return
 
     if args.health:
         health = orchestrator.health_check()
-        status_emoji = "+" if health['status'] == "healthy" else "?" if health['status'] == "degraded" else "x"
+        status_emoji = (
+            "+" if health["status"] == "healthy" else "?" if health["status"] == "degraded" else "x"
+        )
         print(f"\nHealth Check: [{status_emoji}] {health['status'].upper()}")
         print(f"\n  Project: {health['project']}")
         print(f"  Current Phase: {health['current_phase']}")
@@ -1226,7 +1317,7 @@ Examples:
         print(f"  Iteration Count: {health['iteration_count']}")
         print(f"  Last Updated: {health['last_updated']}")
         print("\nAgent Availability (CLI):")
-        for agent, available in health['agents'].items():
+        for agent, available in health["agents"].items():
             emoji = "+" if available else "x"
             print(f"  [{emoji}] {agent}: {'Available' if available else 'Unavailable'}")
         print(f"\nLangGraph Mode: {'Enabled' if health.get('langgraph_enabled') else 'Disabled'}")
@@ -1234,8 +1325,8 @@ Examples:
 
     if args.rollback:
         result = orchestrator.rollback_to_phase(args.rollback)
-        if result['success']:
-            print(f"\nRollback successful!")
+        if result["success"]:
+            print("\nRollback successful!")
             print(f"  Rolled back to commit: {result['rolled_back_to'][:8]}")
             print(f"  Current phase: {result['current_phase']}")
         else:
@@ -1269,7 +1360,7 @@ Examples:
 
     # Print mode information
     if result.get("mode") == "langgraph":
-        print(f"\n[LangGraph Mode]")
+        print("\n[LangGraph Mode]")
 
     # Exit with appropriate code
     sys.exit(0 if result.get("success", False) else 1)

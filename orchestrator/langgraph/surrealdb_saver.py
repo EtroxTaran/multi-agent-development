@@ -5,8 +5,8 @@ Provides persistence for LangGraph state using SurrealDB.
 
 import base64
 import logging
-import pickle
-from typing import Any, AsyncIterator, Optional, Sequence, Tuple
+from collections.abc import AsyncIterator, Sequence
+from typing import Any, Optional
 
 from langgraph.checkpoint.base import (
     BaseCheckpointSaver,
@@ -15,6 +15,7 @@ from langgraph.checkpoint.base import (
     CheckpointTuple,
     SerializerProtocol,
 )
+
 from orchestrator.db.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -47,37 +48,34 @@ class SurrealDBSaver(BaseCheckpointSaver):
             if checkpoint_id:
                 # Get specific checkpoint
                 query = """
-                SELECT * FROM graph_checkpoints 
-                WHERE thread_id = $thread_id 
+                SELECT * FROM graph_checkpoints
+                WHERE thread_id = $thread_id
                 AND checkpoint_ns = $checkpoint_ns
                 AND checkpoint_id = $checkpoint_id
                 LIMIT 1
                 """
                 params = {
-                    "thread_id": thread_id, 
+                    "thread_id": thread_id,
                     "checkpoint_ns": checkpoint_ns,
-                    "checkpoint_id": checkpoint_id
+                    "checkpoint_id": checkpoint_id,
                 }
             else:
                 # Get latest checkpoint
                 query = """
-                SELECT * FROM graph_checkpoints 
+                SELECT * FROM graph_checkpoints
                 WHERE thread_id = $thread_id
                 AND checkpoint_ns = $checkpoint_ns
                 ORDER BY created_at DESC
                 LIMIT 1
                 """
-                params = {
-                    "thread_id": thread_id,
-                    "checkpoint_ns": checkpoint_ns
-                }
+                params = {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns}
 
             result = await conn.query(query, params)
             if not result:
                 return None
 
             row = result[0]
-            
+
             # Deserialize checkpoint and metadata
             checkpoint = self.serde.loads(base64.b64decode(row["checkpoint"]))
             metadata = self.serde.loads(base64.b64decode(row["metadata"]))
@@ -85,27 +83,26 @@ class SurrealDBSaver(BaseCheckpointSaver):
 
             # Load pending writes
             writes_query = """
-            SELECT * FROM graph_writes 
-            WHERE thread_id = $thread_id 
+            SELECT * FROM graph_writes
+            WHERE thread_id = $thread_id
             AND checkpoint_ns = $checkpoint_ns
             AND checkpoint_id = $checkpoint_id
             ORDER BY created_at ASC, idx ASC
             """
-            writes_result = await conn.query(writes_query, {
-                "thread_id": thread_id, 
-                "checkpoint_ns": checkpoint_ns,
-                "checkpoint_id": row["checkpoint_id"]
-            })
-            
+            writes_result = await conn.query(
+                writes_query,
+                {
+                    "thread_id": thread_id,
+                    "checkpoint_ns": checkpoint_ns,
+                    "checkpoint_id": row["checkpoint_id"],
+                },
+            )
+
             pending_writes = [
-                (
-                    w["task_id"],
-                    w["channel"],
-                    self.serde.loads(base64.b64decode(w["value"]))
-                )
+                (w["task_id"], w["channel"], self.serde.loads(base64.b64decode(w["value"])))
                 for w in writes_result
             ]
-            
+
             return CheckpointTuple(
                 config=config,
                 checkpoint=checkpoint,
@@ -114,9 +111,11 @@ class SurrealDBSaver(BaseCheckpointSaver):
                     "configurable": {
                         "thread_id": thread_id,
                         "checkpoint_id": parent_id,
-                        "checkpoint_ns": checkpoint_ns
+                        "checkpoint_ns": checkpoint_ns,
                     }
-                } if parent_id else None,
+                }
+                if parent_id
+                else None,
                 pending_writes=pending_writes,
             )
 
@@ -131,30 +130,26 @@ class SurrealDBSaver(BaseCheckpointSaver):
         """List checkpoints."""
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
-        
+
         limit = limit or 10
-        
+
         query = """
-        SELECT * FROM graph_checkpoints 
+        SELECT * FROM graph_checkpoints
         WHERE thread_id = $thread_id
         AND checkpoint_ns = $checkpoint_ns
         """
-        params = {
-            "thread_id": thread_id, 
-            "checkpoint_ns": checkpoint_ns,
-            "limit": limit
-        }
-        
+        params = {"thread_id": thread_id, "checkpoint_ns": checkpoint_ns, "limit": limit}
+
         query += " ORDER BY created_at DESC LIMIT $limit"
-        
+
         async with get_connection(self.project_name) as conn:
             results = await conn.query(query, params)
-            
+
             for row in results:
                 checkpoint = self.serde.loads(base64.b64decode(row["checkpoint"]))
                 metadata = self.serde.loads(base64.b64decode(row["metadata"]))
                 parent_id = row.get("parent_checkpoint_id")
-                
+
                 yield CheckpointTuple(
                     config={
                         "configurable": {
@@ -169,9 +164,11 @@ class SurrealDBSaver(BaseCheckpointSaver):
                         "configurable": {
                             "thread_id": thread_id,
                             "checkpoint_id": parent_id,
-                            "checkpoint_ns": checkpoint_ns
+                            "checkpoint_ns": checkpoint_ns,
                         }
-                    } if parent_id else None,
+                    }
+                    if parent_id
+                    else None,
                 )
 
     async def aput(
@@ -192,15 +189,18 @@ class SurrealDBSaver(BaseCheckpointSaver):
         metadata_blob = base64.b64encode(self.serde.dumps(metadata)).decode("utf-8")
 
         async with get_connection(self.project_name) as conn:
-            await conn.create("graph_checkpoints", {
-                "thread_id": thread_id,
-                "checkpoint_ns": checkpoint_ns,
-                "checkpoint_id": checkpoint_id,
-                "parent_checkpoint_id": parent_id,
-                "checkpoint": checkpoint_blob,
-                "metadata": metadata_blob,
-                "created_at": "time::now()",
-            })
+            await conn.create(
+                "graph_checkpoints",
+                {
+                    "thread_id": thread_id,
+                    "checkpoint_ns": checkpoint_ns,
+                    "checkpoint_id": checkpoint_id,
+                    "parent_checkpoint_id": parent_id,
+                    "checkpoint": checkpoint_blob,
+                    "metadata": metadata_blob,
+                    "created_at": "time::now()",
+                },
+            )
 
         return {
             "configurable": {
@@ -213,7 +213,7 @@ class SurrealDBSaver(BaseCheckpointSaver):
     async def aput_writes(
         self,
         config: dict,
-        writes: Sequence[Tuple[str, Any]],
+        writes: Sequence[tuple[str, Any]],
         task_id: str,
     ) -> None:
         """Save intermediate writes."""
@@ -225,15 +225,18 @@ class SurrealDBSaver(BaseCheckpointSaver):
             for idx, (channel, value) in enumerate(writes):
                 # Serialize value
                 value_blob = base64.b64encode(self.serde.dumps(value)).decode("utf-8")
-                
-                await conn.create("graph_writes", {
-                    "thread_id": thread_id,
-                    "checkpoint_ns": checkpoint_ns,
-                    "checkpoint_id": checkpoint_id,
-                    "task_id": task_id,
-                    "idx": idx,
-                    "channel": channel,
-                    "type": "pickle",
-                    "value": value_blob,
-                    "created_at": "time::now()",
-                })
+
+                await conn.create(
+                    "graph_writes",
+                    {
+                        "thread_id": thread_id,
+                        "checkpoint_ns": checkpoint_ns,
+                        "checkpoint_id": checkpoint_id,
+                        "task_id": task_id,
+                        "idx": idx,
+                        "channel": channel,
+                        "type": "pickle",
+                        "value": value_blob,
+                        "created_at": "time::now()",
+                    },
+                )

@@ -5,13 +5,14 @@ import re
 import sys
 import threading
 from datetime import datetime
-from pathlib import Path
-from typing import Optional, Any
 from enum import Enum
+from pathlib import Path
+from typing import Optional
 
 
 class LogLevel(str, Enum):
     """Log levels."""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -23,13 +24,13 @@ class LogLevel(str, Enum):
 
 # ANSI color codes
 COLORS = {
-    LogLevel.DEBUG: "\033[90m",      # Gray
-    LogLevel.INFO: "\033[37m",       # White
-    LogLevel.WARNING: "\033[93m",    # Yellow
-    LogLevel.ERROR: "\033[91m",      # Red
-    LogLevel.SUCCESS: "\033[92m",    # Green
-    LogLevel.PHASE: "\033[96m",      # Cyan
-    LogLevel.AGENT: "\033[95m",      # Magenta
+    LogLevel.DEBUG: "\033[90m",  # Gray
+    LogLevel.INFO: "\033[37m",  # White
+    LogLevel.WARNING: "\033[93m",  # Yellow
+    LogLevel.ERROR: "\033[91m",  # Red
+    LogLevel.SUCCESS: "\033[92m",  # Green
+    LogLevel.PHASE: "\033[96m",  # Cyan
+    LogLevel.AGENT: "\033[95m",  # Magenta
 }
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -44,70 +45,59 @@ class SecretsRedactor:
 
     PATTERNS = [
         # OpenAI/Anthropic style API keys (must come first to catch before generic patterns)
-        (r'\bsk-[a-zA-Z0-9]{10,}',
-         '***API_KEY_REDACTED***'),
-
+        (r"\bsk-[a-zA-Z0-9]{10,}", "***API_KEY_REDACTED***"),
         # GitHub tokens (classic and fine-grained)
         # ghp_ = personal access tokens, ghu_ = user-to-server, gho_ = OAuth
         # ghs_ = server-to-server, ghr_ = refresh tokens
-        (r'\b(ghp_[a-zA-Z0-9]{36,})',
-         '***GITHUB_PAT_REDACTED***'),
-        (r'\b(ghu_[a-zA-Z0-9]{36,})',
-         '***GITHUB_USER_TOKEN_REDACTED***'),
-        (r'\b(gho_[a-zA-Z0-9]{36,})',
-         '***GITHUB_OAUTH_REDACTED***'),
-        (r'\b(ghs_[a-zA-Z0-9]{36,})',
-         '***GITHUB_SERVER_TOKEN_REDACTED***'),
-        (r'\b(ghr_[a-zA-Z0-9]{36,})',
-         '***GITHUB_REFRESH_TOKEN_REDACTED***'),
+        (r"\b(ghp_[a-zA-Z0-9]{36,})", "***GITHUB_PAT_REDACTED***"),
+        (r"\b(ghu_[a-zA-Z0-9]{36,})", "***GITHUB_USER_TOKEN_REDACTED***"),
+        (r"\b(gho_[a-zA-Z0-9]{36,})", "***GITHUB_OAUTH_REDACTED***"),
+        (r"\b(ghs_[a-zA-Z0-9]{36,})", "***GITHUB_SERVER_TOKEN_REDACTED***"),
+        (r"\b(ghr_[a-zA-Z0-9]{36,})", "***GITHUB_REFRESH_TOKEN_REDACTED***"),
         # GitHub App tokens
-        (r'\b(github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})',
-         '***GITHUB_PAT_REDACTED***'),
-
+        (r"\b(github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})", "***GITHUB_PAT_REDACTED***"),
         # AWS credentials (comprehensive patterns)
-        (r'(?i)(AWS_SECRET_ACCESS_KEY)["\s:=]+["\']?([a-zA-Z0-9/+]{40})["\']?',
-         r'\1=***REDACTED***'),
-        (r'(?i)(AWS_ACCESS_KEY_ID)["\s:=]+["\']?([A-Z0-9]{20})["\']?',
-         r'\1=***REDACTED***'),
-        (r'\b(AKIA[0-9A-Z]{16})',
-         '***AWS_KEY_REDACTED***'),
-
+        (
+            r'(?i)(AWS_SECRET_ACCESS_KEY)["\s:=]+["\']?([a-zA-Z0-9/+]{40})["\']?',
+            r"\1=***REDACTED***",
+        ),
+        (r'(?i)(AWS_ACCESS_KEY_ID)["\s:=]+["\']?([A-Z0-9]{20})["\']?', r"\1=***REDACTED***"),
+        (r"\b(AKIA[0-9A-Z]{16})", "***AWS_KEY_REDACTED***"),
         # Google Cloud / Firebase
-        (r'(?i)(GOOGLE_API_KEY|FIREBASE_API_KEY)["\s:=]+["\']?([a-zA-Z0-9_\-]{20,})["\']?',
-         r'\1=***REDACTED***'),
-        (r'\bAIza[0-9A-Za-z\-_]{35}',
-         '***GOOGLE_API_KEY_REDACTED***'),
-
+        (
+            r'(?i)(GOOGLE_API_KEY|FIREBASE_API_KEY)["\s:=]+["\']?([a-zA-Z0-9_\-]{20,})["\']?',
+            r"\1=***REDACTED***",
+        ),
+        (r"\bAIza[0-9A-Za-z\-_]{35}", "***GOOGLE_API_KEY_REDACTED***"),
         # API keys (various formats)
-        (r'(?i)(api[_-]?key|apikey)["\s:=]+["\']?([a-zA-Z0-9_\-]{20,})["\']?',
-         r'\1=***REDACTED***'),
+        (
+            r'(?i)(api[_-]?key|apikey)["\s:=]+["\']?([a-zA-Z0-9_\-]{20,})["\']?',
+            r"\1=***REDACTED***",
+        ),
         # Passwords
-        (r'(?i)(password|passwd|pwd)["\s:=]+["\']?([^\s"\']+)["\']?',
-         r'\1=***REDACTED***'),
+        (r'(?i)(password|passwd|pwd)["\s:=]+["\']?([^\s"\']+)["\']?', r"\1=***REDACTED***"),
         # Secrets and tokens
-        (r'(?i)(secret|token)["\s:=]+["\']?([a-zA-Z0-9_\-]{10,})["\']?',
-         r'\1=***REDACTED***'),
+        (r'(?i)(secret|token)["\s:=]+["\']?([a-zA-Z0-9_\-]{10,})["\']?', r"\1=***REDACTED***"),
         # Bearer tokens
-        (r'(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)',
-         r'\1***REDACTED***'),
+        (r"(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)", r"\1***REDACTED***"),
         # AWS-style credentials (legacy pattern, kept for compatibility)
-        (r'(?i)(aws[_-]?(?:access[_-]?key|secret)[_-]?(?:id)?)["\s:=]+["\']?([A-Z0-9]{16,})["\']?',
-         r'\1=***REDACTED***'),
-
+        (
+            r'(?i)(aws[_-]?(?:access[_-]?key|secret)[_-]?(?:id)?)["\s:=]+["\']?([A-Z0-9]{16,})["\']?',
+            r"\1=***REDACTED***",
+        ),
         # Slack tokens
-        (r'\b(xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24})',
-         '***SLACK_TOKEN_REDACTED***'),
-
+        (r"\b(xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24})", "***SLACK_TOKEN_REDACTED***"),
         # Generic private key patterns
-        (r'-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----',
-         '***PRIVATE_KEY_REDACTED***'),
+        (
+            r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----",
+            "***PRIVATE_KEY_REDACTED***",
+        ),
     ]
 
     def __init__(self):
         """Initialize with compiled patterns."""
         self._compiled_patterns = [
-            (re.compile(pattern), replacement)
-            for pattern, replacement in self.PATTERNS
+            (re.compile(pattern), replacement) for pattern, replacement in self.PATTERNS
         ]
 
     def redact(self, message: str) -> str:
@@ -184,9 +174,9 @@ class OrchestrationLogger:
             return
         self._closed = True
         try:
-            if hasattr(self, '_log_handle') and self._log_handle:
+            if hasattr(self, "_log_handle") and self._log_handle:
                 self._log_handle.close()
-            if hasattr(self, '_json_handle') and self._json_handle:
+            if hasattr(self, "_json_handle") and self._json_handle:
                 self._json_handle.close()
         except Exception:
             pass  # Ignore errors during cleanup
@@ -456,8 +446,10 @@ class OrchestrationLogger:
                 result[key] = self._redact_dict(value)
             elif isinstance(value, list):
                 result[key] = [
-                    self._redact_dict(item) if isinstance(item, dict)
-                    else self._redactor.redact(item) if isinstance(item, str)
+                    self._redact_dict(item)
+                    if isinstance(item, dict)
+                    else self._redactor.redact(item)
+                    if isinstance(item, str)
                     else item
                     for item in value
                 ]

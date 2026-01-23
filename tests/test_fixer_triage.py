@@ -1,6 +1,5 @@
 """Tests for fixer triage module."""
 
-import pytest
 
 from orchestrator.fixer.triage import (
     ErrorCategory,

@@ -7,10 +7,11 @@ and context managers for database operations.
 import asyncio
 import logging
 import ssl
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncGenerator, Callable, Optional, Union
+from typing import Any, Optional, Union
 
 import requests
 import websockets
@@ -33,6 +34,7 @@ class InsecureAsyncWsSurrealConnection(AsyncWsSurrealConnection):
         # overwrite params if passed in
         if url is not None:
             from surrealdb.connections.url import Url
+
             self.url = Url(url)
             self.raw_url = f"{self.url.raw_url}/rpc"
             self.host = self.url.hostname
@@ -57,11 +59,13 @@ class InsecureAsyncWsSurrealConnection(AsyncWsSurrealConnection):
 
 class ConnectionError(Exception):
     """Database connection error."""
+
     pass
 
 
 class QueryError(Exception):
     """Database query error."""
+
     pass
 
 
@@ -173,24 +177,22 @@ class Connection:
                 else:
                     # Local development: Use direct WebSocket signin
                     # SurrealDB v2 uses username/password format
-                    await self._client.signin({
-                        "username": self.config.user,
-                        "password": self.config.password,
-                    })
+                    await self._client.signin(
+                        {
+                            "username": self.config.user,
+                            "password": self.config.password,
+                        }
+                    )
                     logger.debug("Signed in via WebSocket")
 
                 # Step 3: Select namespace/database
                 await self._client.use(self.config.namespace, self.database)
 
                 self._connected = True
-                logger.debug(
-                    f"Connected to SurrealDB: {self.config.namespace}/{self.database}"
-                )
+                logger.debug(f"Connected to SurrealDB: {self.config.namespace}/{self.database}")
 
             except asyncio.TimeoutError:
-                raise ConnectionError(
-                    f"Connection timeout after {self.config.connect_timeout}s"
-                )
+                raise ConnectionError(f"Connection timeout after {self.config.connect_timeout}s")
             except ConnectionError:
                 raise
             except Exception as e:
@@ -244,7 +246,9 @@ class Connection:
                             # Direct record format (SurrealDB record with id field)
                             records.append(stmt_result)
                         else:
-                            logger.debug(f"Skipping unknown query result format: {list(stmt_result.keys())}")
+                            logger.debug(
+                                f"Skipping unknown query result format: {list(stmt_result.keys())}"
+                            )
                     elif isinstance(stmt_result, list):
                         records.extend(stmt_result)
                 return records

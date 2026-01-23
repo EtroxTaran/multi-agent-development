@@ -10,13 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from .g_eval import GEvalEvaluator, GEvalResult
-from .metrics import (
-    EvaluationMetric,
-    compute_weighted_score,
-    DEFAULT_THRESHOLDS,
-    ScoreThresholds,
-)
+from .g_eval import GEvalEvaluator
+from .metrics import DEFAULT_THRESHOLDS, EvaluationMetric, ScoreThresholds
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +179,7 @@ class AgentEvaluator:
         if self._storage is None and self.enable_storage:
             try:
                 from ..db.repositories import get_evaluation_repository
+
                 project_name = self.project_dir.name
                 self._storage = get_evaluation_repository(project_name)
             except ImportError:
@@ -261,7 +257,9 @@ class AgentEvaluator:
 
         # Generate evaluation ID
         timestamp = datetime.now()
-        evaluation_id = f"eval-{agent}-{timestamp.strftime('%Y%m%d%H%M%S')}-{g_eval_result.prompt_hash[:8]}"
+        evaluation_id = (
+            f"eval-{agent}-{timestamp.strftime('%Y%m%d%H%M%S')}-{g_eval_result.prompt_hash[:8]}"
+        )
 
         # Build result
         result = EvaluationResult(
@@ -313,13 +311,13 @@ class AgentEvaluator:
 
         # Priority order of metrics (most important first)
         priority_metrics = [
-            EvaluationMetric.TASK_COMPLETION,    # Most important
+            EvaluationMetric.TASK_COMPLETION,  # Most important
             EvaluationMetric.OUTPUT_QUALITY,
             EvaluationMetric.REASONING_QUALITY,
             EvaluationMetric.TOOL_UTILIZATION,
             EvaluationMetric.TOKEN_EFFICIENCY,
             EvaluationMetric.CONTEXT_RETENTION,
-            EvaluationMetric.SAFETY,             # Least weighted
+            EvaluationMetric.SAFETY,  # Least weighted
         ]
 
         selected = priority_metrics[:max_criteria]
@@ -540,4 +538,4 @@ class AgentEvaluator:
             return 0.0
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / len(values)
-        return variance ** 0.5
+        return variance**0.5

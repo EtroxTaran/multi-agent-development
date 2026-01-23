@@ -10,7 +10,9 @@
     "Glob",
     "Bash(pytest*)",
     "Bash(npm test*)",
-    "Bash(npx jest*)"
+    "Bash(npx jest*)",
+    "mcp__Ref__ref_search_documentation",
+    "mcp__Ref__ref_read_url"
   ],
   "forbidden": [
     "Bash(rm*)",
@@ -29,7 +31,37 @@
       "test/**/*",
       "*.md",
       ".workflow/**/*"
-    ]
+    ],
+    "read_only": false
   },
-  "notes": "A06 can modify source code but NOT test files. Must run tests to verify refactoring."
+  "budget_limits": {
+    "per_invocation_usd": 1.0,
+    "per_task_usd": 2.0,
+    "fallback_model": "gemini-2.0-flash"
+  },
+  "timeout_seconds": 1800,
+  "max_retries": 3,
+  "security_restrictions": {
+    "forbidden_patterns": [
+      "Bash(rm -rf*)",
+      "Bash(git push*)",
+      "Bash(*--force*delete*)"
+    ],
+    "require_confirmation": [
+      "Bash(docker*)",
+      "Bash(kubectl*)",
+      "Bash(terraform*)"
+    ],
+    "secrets_check": true
+  },
+  "completion_signals": {
+    "claude": "<promise>DONE</promise>",
+    "cursor": "{\"status\": \"done\"}",
+    "gemini": "DONE|COMPLETE"
+  },
+  "tool_descriptions": {
+    "Edit": "Refactor source code while preserving behavior.",
+    "Bash(npm test*)": "Run test suite after refactor."
+  },
+  "rationale": "Refactorer can modify source code but not tests."
 }

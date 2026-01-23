@@ -100,9 +100,7 @@ class MigrationRegistry:
         for m in migrations:
             for dep in m.dependencies:
                 if dep not in self._migrations:
-                    logger.warning(
-                        f"Migration {m.version} depends on unknown version {dep}"
-                    )
+                    logger.warning(f"Migration {m.version} depends on unknown version {dep}")
                     continue
                 in_degree[m.version] += 1
                 dependents[dep].append(m.version)
@@ -124,9 +122,7 @@ class MigrationRegistry:
         # Check for cycles
         if len(result) != len(migrations):
             remaining = set(in_degree.keys()) - {m.version for m in result}
-            raise MigrationError(
-                f"Circular dependency detected in migrations: {remaining}"
-            )
+            raise MigrationError(f"Circular dependency detected in migrations: {remaining}")
 
         return result
 

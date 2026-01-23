@@ -6,38 +6,29 @@ Provides the LangGraph node functions for implementing tasks.
 import asyncio
 import concurrent.futures
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ...state import (
-    WorkflowState,
-    Task,
-    TaskStatus,
-    TaskIndex,
-    get_task_by_id,
-)
-from ....storage import get_budget_storage
-from ....utils.worktree import WorktreeManager, WorktreeError
 from ....specialists.runner import SpecialistRunner
+from ....storage import get_budget_storage
+from ....utils.worktree import WorktreeError, WorktreeManager
 from ...integrations.board_sync import sync_board
+from ...state import Task, TaskIndex, TaskStatus, WorkflowState, get_task_by_id
 from .modes import (
-    TASK_TIMEOUT,
-    RALPH_TIMEOUT,
     FALLBACK_MODEL,
-    should_use_ralph_loop,
-    should_use_unified_loop,
+    implement_standard,
     implement_with_ralph_loop,
     implement_with_unified_loop,
-    implement_standard,
+    should_use_ralph_loop,
+    should_use_unified_loop,
 )
-from .prompts import build_task_prompt
 from .output import parse_task_output
+from .prompts import build_task_prompt
 from .storage import (
+    handle_task_error,
     save_clarification_request,
     save_task_result,
-    handle_task_error,
     update_task_trackers,
 )
 
@@ -72,7 +63,9 @@ def _check_budget_before_task(
         budget_manager = get_budget_storage(project_dir)
 
         # Quick check if budgets are disabled
-        if not hasattr(budget_manager, 'config') or not getattr(budget_manager.config, 'enabled', True):
+        if not hasattr(budget_manager, "config") or not getattr(
+            budget_manager.config, "enabled", True
+        ):
             return None
 
         # Enforce budget with structured result
@@ -82,14 +75,16 @@ def _check_budget_before_task(
             # Hard stop - budget completely exhausted
             logger.error(f"Budget exhausted, aborting: {result.message}")
             return {
-                "errors": [{
-                    "type": "budget_exceeded_error",
-                    "message": f"Budget exhausted: {result.message}",
-                    "exceeded_type": result.exceeded_type,
-                    "limit_usd": result.limit_usd,
-                    "current_usd": result.current_usd,
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "budget_exceeded_error",
+                        "message": f"Budget exhausted: {result.message}",
+                        "exceeded_type": result.exceeded_type,
+                        "limit_usd": result.limit_usd,
+                        "current_usd": result.current_usd,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "next_decision": "escalate",
                 "budget_status": result.to_dict(),
             }
@@ -122,16 +117,18 @@ def _check_budget_before_task(
                     f"({FALLBACK_MODEL}) doesn't fit. Escalating."
                 )
                 return {
-                    "errors": [{
-                        "type": "budget_limit_reached",
-                        "message": f"Budget limit reached: {result.message}. Even fallback model exceeds budget.",
-                        "exceeded_type": result.exceeded_type,
-                        "limit_usd": result.limit_usd,
-                        "current_usd": result.current_usd,
-                        "remaining_usd": result.remaining_usd,
-                        "fallback_attempted": True,
-                        "timestamp": datetime.now().isoformat(),
-                    }],
+                    "errors": [
+                        {
+                            "type": "budget_limit_reached",
+                            "message": f"Budget limit reached: {result.message}. Even fallback model exceeds budget.",
+                            "exceeded_type": result.exceeded_type,
+                            "limit_usd": result.limit_usd,
+                            "current_usd": result.current_usd,
+                            "remaining_usd": result.remaining_usd,
+                            "fallback_attempted": True,
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    ],
                     "next_decision": "escalate",
                     "budget_status": result.to_dict(),
                 }
@@ -173,22 +170,26 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
     task_id = state.get("current_task_id")
     if not task_id:
         return {
-            "errors": [{
-                "type": "implement_task_error",
-                "message": "No task selected for implementation",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "implement_task_error",
+                    "message": "No task selected for implementation",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
     task = get_task_by_id(state, task_id)
     if not task:
         return {
-            "errors": [{
-                "type": "implement_task_error",
-                "message": f"Task {task_id} not found",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "implement_task_error",
+                    "message": f"Task {task_id} not found",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -295,11 +296,13 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
     task_ids = state.get("current_task_ids", [])
     if not task_ids:
         return {
-            "errors": [{
-                "type": "implement_task_error",
-                "message": "No task batch selected for implementation",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "implement_task_error",
+                    "message": "No task batch selected for implementation",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -323,11 +326,13 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
         task = task_index.get_by_id(task_id)  # O(1) instead of O(n)
         if not task:
             return {
-                "errors": [{
-                    "type": "implement_task_error",
-                    "message": f"Task {task_id} not found",
-                    "timestamp": datetime.now().isoformat(),
-                }],
+                "errors": [
+                    {
+                        "type": "implement_task_error",
+                        "message": f"Task {task_id} not found",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ],
                 "next_decision": "escalate",
             }
         tasks.append(task)
@@ -357,12 +362,14 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
                     worktrees.append((worktree, task))
                 except WorktreeError as e:
                     logger.error(f"Failed to create worktree for task {task.get('id')}: {e}")
-                    errors.append({
-                        "type": "worktree_error",
-                        "task_id": task.get("id"),
-                        "message": str(e),
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    errors.append(
+                        {
+                            "type": "worktree_error",
+                            "task_id": task.get("id"),
+                            "message": str(e),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
                     should_escalate = True
 
             if should_escalate:
@@ -390,7 +397,7 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
                 completed = await asyncio.gather(*futures, return_exceptions=True)
 
             # Process results and merge sequentially
-            for (worktree, task), result in zip(worktrees, completed):
+            for (worktree, task), result in zip(worktrees, completed, strict=False):
                 task_id = task.get("id", "unknown")
 
                 if isinstance(result, Exception):
@@ -419,11 +426,13 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
         logger.error(f"Parallel implementation failed: {e}")
         return {
             "tasks": updated_tasks,
-            "errors": [{
-                "type": "worktree_error",
-                "message": str(e),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "worktree_error",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
             "updated_at": datetime.now().isoformat(),
         }
@@ -441,13 +450,15 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
                 task["status"] = TaskStatus.BLOCKED
                 task["error"] = f"Needs clarification: {output.get('question', 'Unknown')}"
                 save_clarification_request(project_dir, task_id, output, state["project_name"])
-                errors.append({
-                    "type": "task_clarification_needed",
-                    "task_id": task_id,
-                    "question": output.get("question"),
-                    "options": output.get("options", []),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                errors.append(
+                    {
+                        "type": "task_clarification_needed",
+                        "task_id": task_id,
+                        "question": output.get("question"),
+                        "options": output.get("options", []),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
                 should_escalate = True
                 continue
 
@@ -473,7 +484,9 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
     try:
         tasks = state.get("tasks", [])
         updated_task_ids = set(updated_tasks_map.keys())
-        updated_tasks_list = [t for t in tasks if t["id"] not in updated_task_ids] + list(updated_tasks_map.values())
+        updated_tasks_list = [t for t in tasks if t["id"] not in updated_task_ids] + list(
+            updated_tasks_map.values()
+        )
         sync_state = dict(state)
         sync_state["tasks"] = updated_tasks_list
         sync_board(sync_state)

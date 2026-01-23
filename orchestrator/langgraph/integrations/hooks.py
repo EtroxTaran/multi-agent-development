@@ -17,7 +17,7 @@ import stat
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +316,7 @@ def _build_hook_environment(context: dict) -> dict:
             env[env_key] = "true" if value else "false"
         elif isinstance(value, (list, dict)):
             import json
+
             env[env_key] = json.dumps(value)
         else:
             env[env_key] = str(value)
@@ -395,12 +396,15 @@ exit 0
 """,
     }
 
-    return templates.get(hook_name, f"""#!/bin/bash
+    return templates.get(
+        hook_name,
+        f"""#!/bin/bash
 # Custom hook: {hook_name}
 # Add your logic here
 
 exit 0
-""")
+""",
+    )
 
 
 def create_hook_manager(project_dir: Path, enabled: bool = True) -> HookManager:

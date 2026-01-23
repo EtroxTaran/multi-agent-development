@@ -1,32 +1,26 @@
 """Tests for the observability package."""
 
-import asyncio
 import hashlib
 import hmac
 import json
-import os
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from orchestrator.observability.config import (
     ObservabilityConfig,
     PrometheusConfig,
     TracingConfig,
     WebhooksConfig,
-    get_config,
     is_prometheus_enabled,
     is_tracing_enabled,
     is_webhooks_enabled,
 )
+from orchestrator.observability.manager import ObservabilityManager
 from orchestrator.observability.webhooks import (
-    WebhookPayload,
-    WebhookEventType,
-    WebhookDispatcher,
     WebhookDeliveryResult,
-)
-from orchestrator.observability.manager import (
-    ObservabilityManager,
-    get_observability_manager,
+    WebhookDispatcher,
+    WebhookEventType,
+    WebhookPayload,
 )
 
 
@@ -322,6 +316,7 @@ class TestConfigHelpers:
 
         # Force config reload
         import orchestrator.observability.config as config_module
+
         config_module._config = None
 
         assert is_prometheus_enabled() is False
@@ -331,6 +326,7 @@ class TestConfigHelpers:
         monkeypatch.delenv("OBSERVABILITY_OTLP_ENABLED", raising=False)
 
         import orchestrator.observability.config as config_module
+
         config_module._config = None
 
         assert is_tracing_enabled() is False
@@ -340,6 +336,7 @@ class TestConfigHelpers:
         monkeypatch.delenv("OBSERVABILITY_WEBHOOKS_ENABLED", raising=False)
 
         import orchestrator.observability.config as config_module
+
         config_module._config = None
 
         assert is_webhooks_enabled() is False

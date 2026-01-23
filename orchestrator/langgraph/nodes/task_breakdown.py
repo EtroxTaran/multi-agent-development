@@ -14,7 +14,6 @@ the "Complexity Triangle" principle where tasks must satisfy multiple
 constraints simultaneously.
 """
 
-import json
 import logging
 import re
 from collections import defaultdict
@@ -22,29 +21,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from ..state import (
-    WorkflowState,
-    Task,
-    Milestone,
-    TaskStatus,
-    PhaseStatus,
-    PhaseState,
-    create_task,
-)
-from ..integrations import (
-    create_linear_adapter,
-    save_issue_mapping,
-    create_markdown_tracker,
-)
-from ..integrations.board_sync import sync_board
 from ...utils.task_config import (
+    ComplexityScore,
     TaskSizeConfig,
     TaskValidationResult,
-    ComplexityScorer,
-    ComplexityScore,
-    ComplexityLevel,
     validate_task_complexity,
 )
+from ..integrations import create_linear_adapter, create_markdown_tracker, save_issue_mapping
+from ..integrations.board_sync import sync_board
+from ..state import Milestone, Task, TaskStatus, WorkflowState, create_task
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +71,13 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
 
     if not plan:
         return {
-            "errors": [{
-                "type": "task_breakdown_error",
-                "message": "No plan available for task breakdown",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "task_breakdown_error",
+                    "message": "No plan available for task breakdown",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -98,11 +85,13 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
     product_md = _load_product_md(project_dir)
     if not product_md:
         return {
-            "errors": [{
-                "type": "task_breakdown_error",
-                "message": "PRODUCT.md not found",
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "task_breakdown_error",
+                    "message": "PRODUCT.md not found",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -115,13 +104,15 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
     if not tasks:
         # Create a single task from the plan if no explicit tasks
         tasks = _create_single_task_from_plan(plan, acceptance_criteria)
-        milestones = [Milestone(
-            id="M1",
-            name="Implementation",
-            description="Full feature implementation",
-            task_ids=[t["id"] for t in tasks],
-            status=TaskStatus.PENDING,
-        )]
+        milestones = [
+            Milestone(
+                id="M1",
+                name="Implementation",
+                description="Full feature implementation",
+                task_ids=[t["id"] for t in tasks],
+                status=TaskStatus.PENDING,
+            )
+        ]
 
     # Validate and auto-split large tasks
     original_count = len(tasks)
@@ -146,12 +137,14 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
         cycle_details = "; ".join([" -> ".join(cycle) for cycle in cycles[:3]])  # Show first 3
         logger.error(f"Circular dependencies detected: {cycle_details}")
         return {
-            "errors": [{
-                "type": "circular_dependency_error",
-                "message": f"Circular dependencies detected in tasks: {cycle_details}",
-                "cycles": cycles,
-                "timestamp": datetime.now().isoformat(),
-            }],
+            "errors": [
+                {
+                    "type": "circular_dependency_error",
+                    "message": f"Circular dependencies detected in tasks: {cycle_details}",
+                    "cycles": cycles,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             "next_decision": "escalate",
         }
 
@@ -251,7 +244,9 @@ def _parse_acceptance_criteria(product_md: str) -> list[str]:
             criteria.extend(bullets)
 
     # Also look for definition of done
-    dod_pattern = r"(?:##?\s*)?(?:Definition\s*of\s*Done|DoD)[:\s]*\n((?:[\s\S]*?)(?=\n##|\n\*\*[A-Z]|\Z))"
+    dod_pattern = (
+        r"(?:##?\s*)?(?:Definition\s*of\s*Done|DoD)[:\s]*\n((?:[\s\S]*?)(?=\n##|\n\*\*[A-Z]|\Z))"
+    )
     dod_match = re.search(dod_pattern, product_md, re.IGNORECASE)
 
     if dod_match:
@@ -305,7 +300,12 @@ def _extract_tasks_from_plan(
 
             # Get file information
             files = task_data.get("files", [])
-            files_to_create = [f for f in files if "create" in description.lower() or not (Path(f).exists() if Path(f).is_absolute() else False)]
+            files_to_create = [
+                f
+                for f in files
+                if "create" in description.lower()
+                or not (Path(f).exists() if Path(f).is_absolute() else False)
+            ]
             files_to_modify = [f for f in files if f not in files_to_create]
 
             # Generate test files
@@ -439,7 +439,22 @@ def _match_criteria_to_task(description: str, all_criteria: list[str]) -> list[s
         # Check for word overlap
         overlap = desc_words & criterion_words
         # Remove common words
-        common_words = {"the", "a", "an", "is", "are", "be", "to", "and", "or", "of", "in", "on", "for", "with"}
+        common_words = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "be",
+            "to",
+            "and",
+            "or",
+            "of",
+            "in",
+            "on",
+            "for",
+            "with",
+        }
         meaningful_overlap = overlap - common_words
 
         if len(meaningful_overlap) >= 2:
@@ -464,7 +479,9 @@ def _generate_test_files(files: list[str], plan: dict) -> list[str]:
 
     # Get test files from plan's test_strategy
     test_strategy = plan.get("test_strategy", {})
-    existing_tests = test_strategy.get("unit_tests", []) + test_strategy.get("integration_tests", [])
+    existing_tests = test_strategy.get("unit_tests", []) + test_strategy.get(
+        "integration_tests", []
+    )
 
     for file_path in files:
         path = Path(file_path)
@@ -634,26 +651,50 @@ def _auto_split_large_task(
     if split_strategy == "files":
         # File-based split: group by directory, reduce file scope
         split_tasks = _split_by_files(
-            task, config, original_id, files_to_create, files_to_modify,
-            acceptance_criteria, priority, milestone_id
+            task,
+            config,
+            original_id,
+            files_to_create,
+            files_to_modify,
+            acceptance_criteria,
+            priority,
+            milestone_id,
         )
     elif split_strategy == "layers":
         # Architectural split: separate by layer to reduce cross-file deps
         split_tasks = _split_by_layers(
-            task, config, original_id, files_to_create, files_to_modify,
-            acceptance_criteria, priority, milestone_id
+            task,
+            config,
+            original_id,
+            files_to_create,
+            files_to_modify,
+            acceptance_criteria,
+            priority,
+            milestone_id,
         )
     elif split_strategy == "criteria":
         # Criteria split: separate acceptance criteria to reduce scope
         split_tasks = _split_by_criteria(
-            task, config, original_id, files_to_create, files_to_modify,
-            acceptance_criteria, priority, milestone_id
+            task,
+            config,
+            original_id,
+            files_to_create,
+            files_to_modify,
+            acceptance_criteria,
+            priority,
+            milestone_id,
         )
     else:
         # Default: balanced split by files
         split_tasks = _split_by_files(
-            task, config, original_id, files_to_create, files_to_modify,
-            acceptance_criteria, priority, milestone_id
+            task,
+            config,
+            original_id,
+            files_to_create,
+            files_to_modify,
+            acceptance_criteria,
+            priority,
+            milestone_id,
         )
 
     # Verify splits actually reduced complexity
@@ -748,8 +789,7 @@ def _split_by_files(
     criteria_per_task = _distribute_items(acceptance_criteria, max_batches)
 
     return _create_split_tasks(
-        task, original_id, create_batches, modify_batches,
-        criteria_per_task, priority, milestone_id
+        task, original_id, create_batches, modify_batches, criteria_per_task, priority, milestone_id
     )
 
 
@@ -815,8 +855,7 @@ def _split_by_layers(
     criteria_per_task = _distribute_items(acceptance_criteria, max_batches)
 
     return _create_split_tasks(
-        task, original_id, create_batches, modify_batches,
-        criteria_per_task, priority, milestone_id
+        task, original_id, create_batches, modify_batches, criteria_per_task, priority, milestone_id
     )
 
 
@@ -846,8 +885,7 @@ def _split_by_criteria(
     modify_batches = _distribute_items(files_to_modify, num_splits)
 
     return _create_split_tasks(
-        task, original_id, create_batches, modify_batches,
-        criteria_batches, priority, milestone_id
+        task, original_id, create_batches, modify_batches, criteria_batches, priority, milestone_id
     )
 
 
@@ -1058,9 +1096,7 @@ def validate_and_split_tasks(
             result_tasks.extend(split_tasks)
             task_counter += len(split_tasks)
 
-    logger.info(
-        f"Task validation complete: {len(tasks)} -> {len(result_tasks)} tasks"
-    )
+    logger.info(f"Task validation complete: {len(tasks)} -> {len(result_tasks)} tasks")
 
     return result_tasks
 

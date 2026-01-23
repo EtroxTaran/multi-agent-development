@@ -3,32 +3,29 @@
 import asyncio
 import json
 import subprocess
+
+# Import orchestrator modules
+import sys
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
 
 from ..config import get_settings
 from ..deps import get_project_dir, get_project_manager
 from ..models import (
-    ChatMessage,
     ChatRequest,
     ChatResponse,
     CommandRequest,
     CommandResponse,
-    EscalationQuestion,
-    EscalationResponse,
     ErrorResponse,
+    EscalationResponse,
 )
 from ..websocket import get_connection_manager
 
-# Import orchestrator modules
-import sys
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 from orchestrator.project_manager import ProjectManager
-
 
 router = APIRouter(tags=["chat"])
 
@@ -48,7 +45,9 @@ async def send_chat_message(
     if request.project_name:
         project_dir = project_manager.get_project(request.project_name)
         if not project_dir:
-            raise HTTPException(status_code=404, detail=f"Project '{request.project_name}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Project '{request.project_name}' not found"
+            )
         cwd = str(project_dir)
     else:
         cwd = str(get_settings().conductor_root)
@@ -91,7 +90,9 @@ async def execute_command(
     if request.project_name:
         project_dir = project_manager.get_project(request.project_name)
         if not project_dir:
-            raise HTTPException(status_code=404, detail=f"Project '{request.project_name}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Project '{request.project_name}' not found"
+            )
         cwd = str(project_dir)
     else:
         cwd = str(get_settings().conductor_root)
@@ -222,7 +223,9 @@ async def get_phase_feedback(
     elif phase == 4:
         phase_name = "verification"
     else:
-        raise HTTPException(status_code=400, detail="Only phases 2 (validation) and 4 (verification) have feedback")
+        raise HTTPException(
+            status_code=400, detail="Only phases 2 (validation) and 4 (verification) have feedback"
+        )
 
     phase_dir = project_dir / ".workflow" / "phases" / phase_name
     if not phase_dir.exists():
@@ -231,7 +234,9 @@ async def get_phase_feedback(
     feedback = {}
 
     # Load Cursor feedback
-    cursor_file = phase_dir / "cursor_feedback.json" if phase == 2 else phase_dir / "cursor_review.json"
+    cursor_file = (
+        phase_dir / "cursor_feedback.json" if phase == 2 else phase_dir / "cursor_review.json"
+    )
     if cursor_file.exists():
         try:
             feedback["cursor"] = json.loads(cursor_file.read_text())
@@ -239,7 +244,9 @@ async def get_phase_feedback(
             pass
 
     # Load Gemini feedback
-    gemini_file = phase_dir / "gemini_feedback.json" if phase == 2 else phase_dir / "gemini_review.json"
+    gemini_file = (
+        phase_dir / "gemini_feedback.json" if phase == 2 else phase_dir / "gemini_review.json"
+    )
     if gemini_file.exists():
         try:
             feedback["gemini"] = json.loads(gemini_file.read_text())
@@ -269,11 +276,15 @@ async def respond_to_escalation(
     escalation_dir.mkdir(parents=True, exist_ok=True)
 
     response_file = escalation_dir / f"{response.question_id}_response.json"
-    response_file.write_text(json.dumps({
-        "question_id": response.question_id,
-        "answer": response.answer,
-        "additional_context": response.additional_context,
-    }))
+    response_file.write_text(
+        json.dumps(
+            {
+                "question_id": response.question_id,
+                "answer": response.answer,
+                "additional_context": response.additional_context,
+            }
+        )
+    )
 
     # Broadcast response to workflow (if connected)
     manager = get_connection_manager()

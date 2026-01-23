@@ -36,42 +36,32 @@ class SurrealConfig:
         enable_live_queries: Whether to enable live query subscriptions
     """
 
-    url: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_URL", "ws://localhost:8001/rpc"
-    ))
-    namespace: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_NAMESPACE", "orchestrator"
-    ))
-    user: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_USER", "root"
-    ))
-    password: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_PASS", "root"  # Default for local development
-    ))
-    default_database: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_DATABASE", "default"
-    ))
-    pool_size: int = field(default_factory=lambda: int(os.getenv(
-        "SURREAL_POOL_SIZE", "5"
-    )))
-    connect_timeout: float = field(default_factory=lambda: float(os.getenv(
-        "SURREAL_CONNECT_TIMEOUT", "10.0"
-    )))
-    query_timeout: float = field(default_factory=lambda: float(os.getenv(
-        "SURREAL_QUERY_TIMEOUT", "30.0"
-    )))
-    retry_attempts: int = field(default_factory=lambda: int(os.getenv(
-        "SURREAL_RETRY_ATTEMPTS", "3"
-    )))
-    retry_delay: float = field(default_factory=lambda: float(os.getenv(
-        "SURREAL_RETRY_DELAY", "1.0"
-    )))
-    enable_live_queries: bool = field(default_factory=lambda: os.getenv(
-        "SURREAL_LIVE_QUERIES", "true"
-    ).lower() == "true")
-    skip_ssl_verify: bool = field(default_factory=lambda: os.getenv(
-        "SURREAL_SKIP_SSL_VERIFY", "false"
-    ).lower() == "true")
+    url: str = field(default_factory=lambda: os.getenv("SURREAL_URL", "ws://localhost:8001/rpc"))
+    namespace: str = field(default_factory=lambda: os.getenv("SURREAL_NAMESPACE", "orchestrator"))
+    user: str = field(default_factory=lambda: os.getenv("SURREAL_USER", "root"))
+    password: str = field(
+        default_factory=lambda: os.getenv("SURREAL_PASS", "root")  # Default for local development
+    )
+    default_database: str = field(default_factory=lambda: os.getenv("SURREAL_DATABASE", "default"))
+    pool_size: int = field(default_factory=lambda: int(os.getenv("SURREAL_POOL_SIZE", "5")))
+    connect_timeout: float = field(
+        default_factory=lambda: float(os.getenv("SURREAL_CONNECT_TIMEOUT", "10.0"))
+    )
+    query_timeout: float = field(
+        default_factory=lambda: float(os.getenv("SURREAL_QUERY_TIMEOUT", "30.0"))
+    )
+    retry_attempts: int = field(
+        default_factory=lambda: int(os.getenv("SURREAL_RETRY_ATTEMPTS", "3"))
+    )
+    retry_delay: float = field(
+        default_factory=lambda: float(os.getenv("SURREAL_RETRY_DELAY", "1.0"))
+    )
+    enable_live_queries: bool = field(
+        default_factory=lambda: os.getenv("SURREAL_LIVE_QUERIES", "true").lower() == "true"
+    )
+    skip_ssl_verify: bool = field(
+        default_factory=lambda: os.getenv("SURREAL_SKIP_SSL_VERIFY", "false").lower() == "true"
+    )
 
     @property
     def is_secure(self) -> bool:
@@ -224,6 +214,7 @@ def get_project_database(project_name: Optional[str] = None) -> str:
 
     # Sanitize the project name for database naming
     import re
+
     # Replace hyphens and spaces with underscores
     safe_name = project_name.replace("-", "_").replace(" ", "_")
     # Remove any characters that aren't alphanumeric or underscore

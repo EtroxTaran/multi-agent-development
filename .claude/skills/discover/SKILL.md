@@ -1,3 +1,12 @@
+---
+name: discover
+description: Read project docs, clarify requirements, and help create Docs/PRODUCT.md.
+version: 1.1.0
+tags: [discovery, docs, requirements]
+owner: orchestration
+status: active
+---
+
 # Discover Skill
 
 Read Docs/ folder, understand the project, and help create PRODUCT.md.
@@ -15,6 +24,10 @@ This skill guides the discovery phase where you:
 ```
 /discover
 ```
+
+## Prerequisites
+
+- Access to project documentation (`Docs/` or fallback locations).
 
 ## Purpose
 
@@ -195,7 +208,7 @@ Check these paths (in priority order):
 ## State Update
 
 After completing discovery:
-- Create/update `.workflow/state.json`
+- Create/update `workflow_state` in SurrealDB
 - Set `phase_status.discussion = "completed"`
 - Set `current_phase = 1` (ready for planning)
 
@@ -271,6 +284,14 @@ Claude: Created Docs/PRODUCT.md
 Discovery complete! You can now:
   /plan - Create task breakdown from this specification
 ```
+
+## Outputs
+
+- `Docs/PRODUCT.md` created or updated with validated structure.
+
+## Error Handling
+
+- If required documentation is missing, stop and request sources before drafting PRODUCT.md.
 
 ## Related Skills
 

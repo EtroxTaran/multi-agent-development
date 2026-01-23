@@ -26,13 +26,14 @@ _registry_lock = threading.Lock()
 # Optional import - graceful degradation if prometheus_client not installed
 try:
     from prometheus_client import (
-        Counter,
-        Histogram,
-        Gauge,
-        CollectorRegistry,
-        start_http_server,
         REGISTRY,
+        CollectorRegistry,
+        Counter,
+        Gauge,
+        Histogram,
+        start_http_server,
     )
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -145,8 +146,7 @@ class MetricsRegistry:
             )
             self._server_started = True
             logger.info(
-                f"Prometheus metrics server started on "
-                f"{self.config.host}:{self.config.port}"
+                f"Prometheus metrics server started on " f"{self.config.host}:{self.config.port}"
             )
             return True
         except Exception as e:

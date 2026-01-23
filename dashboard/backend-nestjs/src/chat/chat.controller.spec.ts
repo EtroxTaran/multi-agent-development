@@ -1,8 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ChatController } from './chat.controller';
-import { ChatService } from './chat.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ChatController } from "./chat.controller";
+import { ChatService } from "./chat.service";
 
-describe('ChatController', () => {
+describe("ChatController", () => {
   let controller: ChatController;
   let chatService: jest.Mocked<ChatService>;
 
@@ -23,66 +23,66 @@ describe('ChatController', () => {
     chatService = module.get(ChatService);
   });
 
-  describe('chat', () => {
-    it('should send chat message', async () => {
-      const response = { message: 'Response', streaming: false };
+  describe("chat", () => {
+    it("should send chat message", async () => {
+      const response = { message: "Response", streaming: false };
       chatService.chat.mockResolvedValueOnce(response);
 
-      const result = await controller.chat({ message: 'Hello' });
+      const result = await controller.chat({ message: "Hello" });
 
       expect(result).toEqual(response);
-      expect(chatService.chat).toHaveBeenCalledWith({ message: 'Hello' });
+      expect(chatService.chat).toHaveBeenCalledWith({ message: "Hello" });
     });
 
-    it('should send chat message with context', async () => {
-      const response = { message: 'Response', streaming: false };
+    it("should send chat message with context", async () => {
+      const response = { message: "Response", streaming: false };
       chatService.chat.mockResolvedValueOnce(response);
 
       await controller.chat({
-        message: 'Help',
-        projectName: 'test',
-        context: { data: 'value' },
+        message: "Help",
+        projectName: "test",
+        context: { data: "value" },
       });
 
       expect(chatService.chat).toHaveBeenCalledWith({
-        message: 'Help',
-        projectName: 'test',
-        context: { data: 'value' },
+        message: "Help",
+        projectName: "test",
+        context: { data: "value" },
       });
     });
   });
 
-  describe('executeCommand', () => {
-    it('should execute command', async () => {
-      const response = { success: true, output: 'Done' };
+  describe("executeCommand", () => {
+    it("should execute command", async () => {
+      const response = { success: true, output: "Done" };
       chatService.executeCommand.mockResolvedValueOnce(response);
 
       const result = await controller.executeCommand({
-        command: '/status',
+        command: "/status",
         args: [],
       });
 
       expect(result).toEqual(response);
       expect(chatService.executeCommand).toHaveBeenCalledWith({
-        command: '/status',
+        command: "/status",
         args: [],
       });
     });
 
-    it('should execute command with arguments', async () => {
+    it("should execute command with arguments", async () => {
       const response = { success: true };
       chatService.executeCommand.mockResolvedValueOnce(response);
 
       await controller.executeCommand({
-        command: '/orchestrate',
-        args: ['--project', 'test'],
-        projectName: 'test',
+        command: "/orchestrate",
+        args: ["--project", "test"],
+        projectName: "test",
       });
 
       expect(chatService.executeCommand).toHaveBeenCalledWith({
-        command: '/orchestrate',
-        args: ['--project', 'test'],
-        projectName: 'test',
+        command: "/orchestrate",
+        args: ["--project", "test"],
+        projectName: "test",
       });
     });
   });

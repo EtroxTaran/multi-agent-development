@@ -4,26 +4,23 @@ Covers cache operations, TTL expiration, eviction policies,
 statistics tracking, and conversation compression.
 """
 
-import json
-import pytest
-import tempfile
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from orchestrator.utils.caching import (
-    CacheStrategy,
     CacheEntry,
     CacheStats,
-    PromptCache,
+    CacheStrategy,
     ConversationCompressor,
+    PromptCache,
 )
-
 
 # =============================================================================
 # Cache Strategy Tests
 # =============================================================================
+
 
 class TestCacheStrategy:
     """Tests for CacheStrategy enum."""
@@ -38,6 +35,7 @@ class TestCacheStrategy:
 # =============================================================================
 # Cache Entry Tests
 # =============================================================================
+
 
 class TestCacheEntry:
     """Tests for CacheEntry dataclass."""
@@ -143,6 +141,7 @@ class TestCacheEntry:
 # Cache Stats Tests
 # =============================================================================
 
+
 class TestCacheStats:
     """Tests for CacheStats dataclass."""
 
@@ -188,6 +187,7 @@ class TestCacheStats:
 # =============================================================================
 # Prompt Cache Tests
 # =============================================================================
+
 
 class TestPromptCache:
     """Tests for PromptCache class."""
@@ -403,6 +403,7 @@ class TestPromptCache:
 # Prefix Cache Strategy Tests
 # =============================================================================
 
+
 class TestPrefixStrategy:
     """Tests for PREFIX cache strategy."""
 
@@ -452,6 +453,7 @@ class TestPrefixStrategy:
 # =============================================================================
 # Conversation Compressor Tests
 # =============================================================================
+
 
 class TestConversationCompressor:
     """Tests for ConversationCompressor class."""
@@ -599,6 +601,7 @@ class TestConversationCompressor:
 # Token Costs Tests
 # =============================================================================
 
+
 class TestTokenCosts:
     """Tests for token cost calculations in cache."""
 
@@ -652,6 +655,7 @@ class TestTokenCosts:
 # =============================================================================
 # Edge Cases
 # =============================================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases."""

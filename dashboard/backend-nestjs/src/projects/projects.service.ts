@@ -1,17 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { OrchestratorClientService } from '../orchestrator-client/orchestrator-client.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { OrchestratorClientService } from "../orchestrator-client/orchestrator-client.service";
 import {
   ProjectSummaryDto,
   ProjectStatusDto,
   InitProjectResponseDto,
   DeleteProjectResponseDto,
-} from './dto';
+} from "./dto";
 
 @Injectable()
 export class ProjectsService {
-  constructor(
-    private readonly orchestratorClient: OrchestratorClientService,
-  ) {}
+  constructor(private readonly orchestratorClient: OrchestratorClientService) {}
 
   async listProjects(): Promise<ProjectSummaryDto[]> {
     const projects = (await this.orchestratorClient.listProjects()) as any[];
@@ -25,7 +27,10 @@ export class ProjectsService {
       )) as any;
       return this.mapToProjectStatus(project);
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;
@@ -45,7 +50,7 @@ export class ProjectsService {
       };
     } catch (error: any) {
       throw new BadRequestException(
-        error.message || 'Failed to initialize project',
+        error.message || "Failed to initialize project",
       );
     }
   }
@@ -61,7 +66,10 @@ export class ProjectsService {
       )) as any;
       return { message: result.message };
     } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('not found')) {
+      if (
+        error.message?.includes("404") ||
+        error.message?.includes("not found")
+      ) {
         throw new NotFoundException(`Project '${projectName}' not found`);
       }
       throw error;

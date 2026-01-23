@@ -1,16 +1,14 @@
 """Integration tests for the orchestrator workflow."""
 
-import json
-import pytest
 import tempfile
 import threading
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from orchestrator import Orchestrator
-from orchestrator.models import PhaseStatus
-from orchestrator.storage.workflow_adapter import get_workflow_storage
 from orchestrator.agents.base import AgentResult
 
 
@@ -22,7 +20,8 @@ def temp_project():
 
         # Create PRODUCT.md with required sections
         product_md = project_dir / "PRODUCT.md"
-        product_md.write_text("""# User Authentication Feature
+        product_md.write_text(
+            """# User Authentication Feature
 
 ## Feature
 Add user authentication with JWT tokens to the application.
@@ -42,7 +41,8 @@ Add user authentication with JWT tokens to the application.
 - All authentication endpoints have tests
 - No security vulnerabilities in OWASP top 10
 - Response time < 200ms for auth operations
-""")
+"""
+        )
 
         yield project_dir
 
@@ -62,7 +62,14 @@ def mock_all_agents():
                 {
                     "phase": 1,
                     "name": "Setup",
-                    "tasks": [{"id": "T1", "description": "Setup auth module", "files": ["auth.py"], "dependencies": []}]
+                    "tasks": [
+                        {
+                            "id": "T1",
+                            "description": "Setup auth module",
+                            "files": ["auth.py"],
+                            "dependencies": [],
+                        }
+                    ],
                 }
             ],
             "test_strategy": {"unit_tests": ["test_auth.py"], "test_commands": ["pytest"]},
@@ -140,10 +147,9 @@ class TestWorkflowIntegration:
         """Test complete 5-phase workflow."""
         mock_claude, mock_cursor, mock_gemini = mock_all_agents
 
-        with patch("orchestrator.agents.ClaudeAgent", return_value=mock_claude), \
-             patch("orchestrator.agents.CursorAgent", return_value=mock_cursor), \
-             patch("orchestrator.agents.GeminiAgent", return_value=mock_gemini):
-
+        with patch("orchestrator.agents.ClaudeAgent", return_value=mock_claude), patch(
+            "orchestrator.agents.CursorAgent", return_value=mock_cursor
+        ), patch("orchestrator.agents.GeminiAgent", return_value=mock_gemini):
             orchestrator = Orchestrator(
                 temp_project,
                 auto_commit=False,
@@ -157,10 +163,9 @@ class TestWorkflowIntegration:
         """Test resuming workflow after phase failure."""
         mock_claude, mock_cursor, mock_gemini = mock_all_agents
 
-        with patch("orchestrator.agents.ClaudeAgent", return_value=mock_claude), \
-             patch("orchestrator.agents.CursorAgent", return_value=mock_cursor), \
-             patch("orchestrator.agents.GeminiAgent", return_value=mock_gemini):
-
+        with patch("orchestrator.agents.ClaudeAgent", return_value=mock_claude), patch(
+            "orchestrator.agents.CursorAgent", return_value=mock_cursor
+        ), patch("orchestrator.agents.GeminiAgent", return_value=mock_gemini):
             orchestrator = Orchestrator(
                 temp_project,
                 max_retries=2,
@@ -179,14 +184,12 @@ class TestWorkflowIntegration:
 
         # Make Gemini fail but Cursor succeed
         mock_gemini.run_validation.return_value = AgentResult(
-            success=False,
-            error="Gemini unavailable"
+            success=False, error="Gemini unavailable"
         )
 
-        with patch("orchestrator.agents.ClaudeAgent", return_value=mock_claude), \
-             patch("orchestrator.agents.CursorAgent", return_value=mock_cursor), \
-             patch("orchestrator.agents.GeminiAgent", return_value=mock_gemini):
-
+        with patch("orchestrator.agents.ClaudeAgent", return_value=mock_claude), patch(
+            "orchestrator.agents.CursorAgent", return_value=mock_cursor
+        ), patch("orchestrator.agents.GeminiAgent", return_value=mock_gemini):
             orchestrator = Orchestrator(
                 temp_project,
                 auto_commit=False,
@@ -210,6 +213,7 @@ class TestStatePersistence:
     def test_state_atomic_save(self, temp_project):
         """Test that state saves are atomic."""
         from orchestrator.utils.state import StateManager
+
         state_manager = StateManager(temp_project)
         state_manager.ensure_workflow_dir()
         state_manager.load()
@@ -324,6 +328,7 @@ class TestThreadSafety:
     def test_concurrent_state_updates(self, temp_project):
         """Test that concurrent state updates don't corrupt data."""
         from orchestrator.utils.state import StateManager
+
         state_manager = StateManager(temp_project)
         state_manager.ensure_workflow_dir()
         state_manager.load()
@@ -383,7 +388,7 @@ class TestLogging:
 
     def test_thread_safe_logging(self, temp_project):
         """Test that concurrent logging doesn't cause issues."""
-        from orchestrator.utils.logging import OrchestrationLogger, LogLevel
+        from orchestrator.utils.logging import LogLevel, OrchestrationLogger
 
         workflow_dir = temp_project / ".workflow"
         workflow_dir.mkdir(exist_ok=True)
@@ -426,7 +431,7 @@ class TestFeedbackValidation:
 
     def test_normalize_agent_feedback(self):
         """Test that agent feedback is normalized correctly."""
-        from orchestrator.utils.validation import validate_feedback, AssessmentType
+        from orchestrator.utils.validation import AssessmentType, validate_feedback
 
         # Test with various field name conventions
         raw_feedback = {
@@ -434,7 +439,7 @@ class TestFeedbackValidation:
             "rating": 8,  # Different field name
             "issues": [  # Different field name
                 {"category": "security", "message": "Consider input validation"}
-            ]
+            ],
         }
 
         normalized = validate_feedback("cursor", raw_feedback)

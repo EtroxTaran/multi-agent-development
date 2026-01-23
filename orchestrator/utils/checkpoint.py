@@ -11,7 +11,7 @@ import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class CheckpointManager:
 
         try:
             return json.loads(self.index_file.read_text())
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load checkpoint index: {e}")
             return {}
 
@@ -124,6 +124,7 @@ class CheckpointManager:
         """
         try:
             from .state_projector import StateProjector
+
             projector = StateProjector(self.project_dir)
             state = projector.get_state()
             if state is not None:
@@ -138,7 +139,7 @@ class CheckpointManager:
         if state_file.exists():
             try:
                 return json.loads(state_file.read_text())
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Failed to read state.json: {e}")
         return {}
 
@@ -220,9 +221,7 @@ class CheckpointManager:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         # Save checkpoint metadata
-        (checkpoint_dir / "checkpoint.json").write_text(
-            json.dumps(checkpoint.to_dict(), indent=2)
-        )
+        (checkpoint_dir / "checkpoint.json").write_text(json.dumps(checkpoint.to_dict(), indent=2))
 
         # Copy current state.json
         state_file = self.workflow_dir / "state.json"
@@ -259,7 +258,7 @@ class CheckpointManager:
                 try:
                     data = json.loads(checkpoint_file.read_text())
                     checkpoints.append(Checkpoint.from_dict(data))
-                except (json.JSONDecodeError, IOError, KeyError) as e:
+                except (OSError, json.JSONDecodeError, KeyError) as e:
                     logger.warning(f"Failed to load checkpoint {checkpoint_id}: {e}")
 
         # Sort by creation time
@@ -286,9 +285,7 @@ class CheckpointManager:
             if len(matches) == 1:
                 checkpoint_dir = self.checkpoints_dir / matches[0]
             elif len(matches) > 1:
-                logger.warning(
-                    f"Ambiguous checkpoint ID '{checkpoint_id}': {matches}"
-                )
+                logger.warning(f"Ambiguous checkpoint ID '{checkpoint_id}': {matches}")
                 return None
             else:
                 logger.warning(f"Checkpoint not found: {checkpoint_id}")
@@ -299,7 +296,7 @@ class CheckpointManager:
             try:
                 data = json.loads(checkpoint_file.read_text())
                 return Checkpoint.from_dict(data)
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.error(f"Failed to load checkpoint: {e}")
 
         return None

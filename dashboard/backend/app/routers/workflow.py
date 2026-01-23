@@ -1,17 +1,18 @@
 """Workflow management API routes."""
 
-import asyncio
+
+# Import orchestrator modules
+import sys
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
+from ..callbacks import WebSocketProgressCallback
 from ..config import get_settings
-from ..deps import get_project_dir, get_orchestrator, get_project_manager
+from ..deps import get_project_dir
 from ..models import (
     ErrorResponse,
     WorkflowHealthResponse,
-    WorkflowRollbackRequest,
     WorkflowRollbackResponse,
     WorkflowStartRequest,
     WorkflowStartResponse,
@@ -19,15 +20,10 @@ from ..models import (
     WorkflowStatusResponse,
 )
 from ..websocket import get_connection_manager
-from ..callbacks import WebSocketProgressCallback
 
-# Import orchestrator modules
-import sys
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
 from orchestrator.orchestrator import Orchestrator
-from orchestrator.project_manager import ProjectManager
-
 
 router = APIRouter(prefix="/projects/{project_name}", tags=["workflow"])
 
@@ -62,7 +58,9 @@ async def get_workflow_status(
         basic_status = orchestrator.status()
         return WorkflowStatusResponse(
             mode="langgraph",
-            status=WorkflowStatus.NOT_STARTED if not basic_status.get("current_phase") else WorkflowStatus.IN_PROGRESS,
+            status=WorkflowStatus.NOT_STARTED
+            if not basic_status.get("current_phase")
+            else WorkflowStatus.IN_PROGRESS,
             project=basic_status.get("project"),
             current_phase=basic_status.get("current_phase"),
             phase_status=basic_status.get("phase_statuses", {}),

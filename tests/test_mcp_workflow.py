@@ -12,32 +12,33 @@ Run with: pytest tests/test_mcp_workflow.py -v
 """
 
 import json
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 # Import server functions
 from mcp_servers.workflow.server import (
-    get_state,
-    update_phase,
-    get_plan,
-    save_plan,
-    create_checkpoint,
-    get_phase_feedback,
-    save_phase_feedback,
-    add_blocker,
-    resolve_blocker,
-    create_server,
+    _create_default_state,
     _get_workflow_dir,
     _load_state,
     _save_state,
-    _create_default_state,
+    add_blocker,
+    create_checkpoint,
+    create_server,
+    get_phase_feedback,
+    get_plan,
+    get_state,
+    resolve_blocker,
+    save_phase_feedback,
+    save_plan,
+    update_phase,
 )
-
 
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def temp_projects_dir(tmp_path):
@@ -79,13 +80,15 @@ def temp_projects_dir(tmp_path):
 def mock_projects_root(temp_projects_dir, monkeypatch):
     """Mock PROJECTS_ROOT to use temp directory."""
     import mcp_servers.workflow.server as server_module
-    monkeypatch.setattr(server_module, 'PROJECTS_ROOT', temp_projects_dir)
+
+    monkeypatch.setattr(server_module, "PROJECTS_ROOT", temp_projects_dir)
     return temp_projects_dir
 
 
 # =============================================================================
 # Test Helper Functions
 # =============================================================================
+
 
 class TestHelperFunctions:
     """Tests for helper functions."""
@@ -145,6 +148,7 @@ class TestHelperFunctions:
 # Test get_state
 # =============================================================================
 
+
 class TestGetState:
     """Tests for get_state function."""
 
@@ -170,6 +174,7 @@ class TestGetState:
 # =============================================================================
 # Test update_phase
 # =============================================================================
+
 
 class TestUpdatePhase:
     """Tests for update_phase function."""
@@ -254,6 +259,7 @@ class TestUpdatePhase:
 # Test Plan Management
 # =============================================================================
 
+
 class TestPlanManagement:
     """Tests for plan-related functions."""
 
@@ -303,6 +309,7 @@ class TestPlanManagement:
 # =============================================================================
 # Test Checkpoint Management
 # =============================================================================
+
 
 class TestCheckpointManagement:
     """Tests for checkpoint functions."""
@@ -365,6 +372,7 @@ class TestCheckpointManagement:
 # =============================================================================
 # Test Feedback Management
 # =============================================================================
+
 
 class TestFeedbackManagement:
     """Tests for feedback functions."""
@@ -467,6 +475,7 @@ class TestFeedbackManagement:
 # Test Blocker Management
 # =============================================================================
 
+
 class TestBlockerManagement:
     """Tests for blocker functions."""
 
@@ -564,6 +573,7 @@ class TestBlockerManagement:
 # Test Server Creation
 # =============================================================================
 
+
 class TestCreateServer:
     """Tests for server creation."""
 
@@ -578,6 +588,7 @@ class TestCreateServer:
 # =============================================================================
 # Test Edge Cases
 # =============================================================================
+
 
 class TestEdgeCases:
     """Test edge cases and error handling."""
