@@ -9,6 +9,11 @@ import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from orchestrator.config.models import (
+    CLAUDE_MODELS, CLAUDE_SONNET, CLAUDE_OPUS, CLAUDE_HAIKU, DEFAULT_CLAUDE_MODEL,
+    GEMINI_MODELS, GEMINI_FLASH, GEMINI_PRO, DEFAULT_GEMINI_MODEL,
+    CURSOR_MODELS, CURSOR_CODEX, CURSOR_COMPOSER, DEFAULT_CURSOR_MODEL
+)
 from orchestrator.agents.adapter import (
     AgentType,
     AgentCapabilities,
@@ -128,9 +133,9 @@ class TestClaudeAdapter:
         assert caps.supports_model_selection is True
         assert caps.supports_plan_mode is True
         assert caps.supports_budget_flag is True
-        assert "sonnet" in caps.available_models
-        assert "opus" in caps.available_models
-        assert "haiku" in caps.available_models
+        assert CLAUDE_SONNET in caps.available_models
+        assert CLAUDE_OPUS in caps.available_models
+        assert CLAUDE_HAIKU in caps.available_models
 
     def test_build_command_basic(self, tmp_path):
         """Test basic command building."""
@@ -145,9 +150,9 @@ class TestClaudeAdapter:
     def test_build_command_with_model(self, tmp_path):
         """Test command building with model selection."""
         adapter = ClaudeAdapter(tmp_path)
-        cmd = adapter.build_command("test prompt", model="opus")
+        cmd = adapter.build_command("test prompt", model=CLAUDE_OPUS)
         assert "--model" in cmd
-        assert "opus" in cmd
+        assert CLAUDE_OPUS in cmd
 
     def test_build_command_with_session(self, tmp_path):
         """Test command building with session."""
@@ -203,8 +208,8 @@ class TestCursorAdapter:
         assert caps.supports_json_output is True
         assert caps.supports_session is False
         assert caps.supports_model_selection is True
-        assert "codex-5.2" in caps.available_models
-        assert "composer" in caps.available_models
+        assert CURSOR_CODEX in caps.available_models
+        assert CURSOR_COMPOSER in caps.available_models
 
     def test_build_command_basic(self, tmp_path):
         """Test basic command building."""
@@ -251,8 +256,8 @@ class TestGeminiAdapter:
         assert caps.supports_json_output is False  # Gemini CLI doesn't support --output-format
         assert caps.supports_session is False
         assert caps.supports_model_selection is True
-        assert "gemini-2.0-flash" in caps.available_models
-        assert "gemini-2.0-pro" in caps.available_models
+        assert GEMINI_FLASH in caps.available_models
+        assert GEMINI_PRO in caps.available_models
 
     def test_build_command_basic(self, tmp_path):
         """Test basic command building."""
@@ -265,9 +270,9 @@ class TestGeminiAdapter:
     def test_build_command_with_model(self, tmp_path):
         """Test command building with model selection."""
         adapter = GeminiAdapter(tmp_path)
-        cmd = adapter.build_command("test prompt", model="gemini-2.0-pro")
+        cmd = adapter.build_command("test prompt", model=GEMINI_PRO)
         assert "--model" in cmd
-        assert "gemini-2.0-pro" in cmd
+        assert GEMINI_PRO in cmd
 
     def test_detect_completion(self, tmp_path):
         """Test completion detection."""
@@ -311,8 +316,8 @@ class TestCreateAdapter:
 
     def test_create_adapter_with_model(self, tmp_path):
         """Test creating adapter with model."""
-        adapter = create_adapter("cursor", tmp_path, model="composer")
-        assert adapter.model == "composer"
+        adapter = create_adapter("cursor", tmp_path, model=CURSOR_COMPOSER)
+        assert adapter.model == CURSOR_COMPOSER
 
     def test_create_adapter_with_timeout(self, tmp_path):
         """Test creating adapter with timeout."""
@@ -370,8 +375,8 @@ class TestGetAgentForTask:
 
     def test_task_specified_model(self):
         """Test task-specified model."""
-        agent_type, model = get_agent_for_task({"model": "opus"})
-        assert model == "opus"
+        agent_type, model = get_agent_for_task({"model": CLAUDE_OPUS})
+        assert model == CLAUDE_OPUS
 
     def test_env_override(self, monkeypatch):
         """Test environment variable override."""
@@ -383,11 +388,11 @@ class TestGetAgentForTask:
         """Test fallback when model is invalid for agent."""
         agent_type, model = get_agent_for_task({
             "agent_type": "cursor",
-            "model": "opus",  # Claude model, not valid for Cursor
+            "model": CLAUDE_OPUS,  # Claude model, not valid for Cursor
         })
         assert agent_type == AgentType.CURSOR
         # Should fall back to default cursor model
-        assert model == "codex-5.2"
+        assert model == DEFAULT_CURSOR_MODEL
 
 
 class TestAdapterRunIteration:

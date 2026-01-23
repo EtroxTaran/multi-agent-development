@@ -9,3 +9,5 @@ export * from './progress';
 export * from './scroll-area';
 export * from './separator';
 export * from './tabs';
+export * from './dialog';
+

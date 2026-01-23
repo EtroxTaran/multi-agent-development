@@ -196,6 +196,14 @@ def auto_patch_db_repos():
             "orchestrator.db.repositories.tasks.get_task_repository",
             return_value=create_mock_task_repo(),
         ),
+        patch(
+            "orchestrator.storage.surreal_store.get_workflow_repository",
+            return_value=create_mock_workflow_repo(),
+        ),
+        patch(
+            "orchestrator.storage.surreal_store.SurrealWorkflowRepository._get_db_backend",
+            return_value=create_mock_workflow_repo(),
+        ),
     ):
         yield
 

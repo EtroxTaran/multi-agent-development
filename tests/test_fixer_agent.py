@@ -125,10 +125,11 @@ class TestFixerAgentTriageError:
         assert result.decision == TriageDecision.ESCALATE
 
 
+@pytest.mark.asyncio
 class TestFixerAgentDiagnose:
     """Tests for error diagnosis."""
 
-    def test_diagnose_syntax_error(self, tmp_path):
+    async def test_diagnose_syntax_error(self, tmp_path):
         """Diagnose identifies syntax error root cause."""
         agent = FixerAgent(tmp_path)
         error = FixerError(
@@ -137,7 +138,7 @@ class TestFixerAgentDiagnose:
             error_type="SyntaxError",
             source="python",
         )
-        result = agent.diagnose(error, ErrorCategory.SYNTAX_ERROR)
+        result = await agent.diagnose(error, ErrorCategory.SYNTAX_ERROR)
         assert result.root_cause == RootCause.SYNTAX_ERROR
 
 

@@ -188,7 +188,7 @@ class FixerAgent(BaseAgent):
             fix_history=fix_history,
         )
 
-    def diagnose(
+    async def diagnose(
         self,
         error: FixerError | dict,
         category=None,
@@ -212,7 +212,7 @@ class FixerAgent(BaseAgent):
             triage_result = self.triage_error(error, workflow_state)
             category = triage_result.category
 
-        return self.diagnosis_engine.diagnose(error, category, workflow_state)
+        return await self.diagnosis_engine.diagnose(error, category, workflow_state)
 
     def create_plan(
         self,
@@ -346,7 +346,7 @@ class FixerAgent(BaseAgent):
             return attempt
 
         # Step 2: Diagnose
-        diagnosis = self.diagnose(error, triage_result.category, workflow_state)
+        diagnosis = await self.diagnose(error, triage_result.category, workflow_state)
         attempt.diagnosis = diagnosis
 
         # Step 3: Create plan

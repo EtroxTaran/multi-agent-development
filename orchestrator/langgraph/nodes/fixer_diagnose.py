@@ -62,7 +62,7 @@ async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
 
     # Run diagnosis
     diagnosis_engine = DiagnosisEngine(project_dir)
-    diagnosis = diagnosis_engine.diagnose(error, category, state)
+    diagnosis = await diagnosis_engine.diagnose(error, category, state)
 
     logger.info(
         f"Diagnosis: root_cause={diagnosis.root_cause.value}, "
@@ -115,19 +115,27 @@ async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
     )
 
     # Determine next step
-    requires_validation = (
-        plan.requires_validation or
-        plan.requires_security_notification or
-        plan.confidence < 0.5
+    requires_research = diagnosis.root_cause in (
+        RootCause.API_MISUSE,
+        RootCause.MISSING_DOCUMENTATION,
+        RootCause.DEPRECATED_FEATURE
     )
 
-    next_decision = "validate" if requires_validation else "apply"
+    if requires_research:
+        next_decision = "research"
+    else:
+        requires_validation = (
+            plan.requires_validation or
+            plan.requires_security_notification or
+            plan.confidence < 0.5
+        )
+        next_decision = "validate" if requires_validation else "apply"
 
     return {
         "current_fix_attempt": {
             **current_fix,
             "diagnosis": diagnosis.to_dict(),
-            "plan": plan.to_dict(),
+            "plan": plan.to_dict() if plan else None,
             "known_fix_id": known_fix.id if known_fix else None,
         },
         "next_decision": next_decision,

@@ -195,6 +195,24 @@ TASK GRANULARITY REMINDER:
 - Tasks should be completable in <10 minutes
 - Prefer many small tasks over few large tasks"""
 
+    # Check for structured correction prompt (richer than just blockers)
+    correction_prompt = state.get("correction_prompt")
+    if correction_prompt:
+        prompt += f"\n\n{correction_prompt}"
+        logger.info("Planning with structured correction context from failed validation")
+    else:
+        # Fallback to basic blockers (legacy support)
+        phase_2_status = phase_status.get("2", PhaseState())
+        if phase_2_status.blockers:
+            blockers_list = "\n".join(f"- {b}" for b in phase_2_status.blockers)
+            prompt += f"""
+
+CRITICAL FEEDBACK - PREVIOUS PLAN REJECTED:
+Your previous plan was rejected by the review board. You MUST address these specific issues in your new plan:
+{blockers_list}
+
+Please revise the plan to resolve these blocking issues."""
+
     action_logger.log_agent_invoke("A01-planner", "Generating implementation plan", phase=1)
 
     try:

@@ -20,6 +20,48 @@ from ...agents.prompts import load_prompt, format_prompt
 
 logger = logging.getLogger(__name__)
 
+
+def _build_validation_correction_prompt(
+    cursor_feedback: AgentFeedback,
+    gemini_feedback: AgentFeedback,
+    blocking_issues: list[str],
+) -> str:
+    """Build structured correction prompt for plan revision.
+
+    Args:
+        cursor_feedback: Feedback from Cursor review
+        gemini_feedback: Feedback from Gemini review
+        blocking_issues: List of blocking issues
+
+    Returns:
+        Formatted correction prompt string
+    """
+    sections = ["## Plan Revision Required\n"]
+    sections.append("Your previous plan was rejected. Address these specific issues:\n")
+
+    if blocking_issues:
+        sections.append("\n### Blocking Issues (MUST FIX)\n")
+        for i, issue in enumerate(blocking_issues, 1):
+            sections.append(f"{i}. {issue}\n")
+
+    if cursor_feedback and cursor_feedback.concerns:
+        sections.append("\n### Code Quality Concerns (Cursor)\n")
+        for concern in cursor_feedback.concerns[:5]:
+            desc = concern.get("description", str(concern)) if isinstance(concern, dict) else str(concern)
+            sev = concern.get("severity", "medium") if isinstance(concern, dict) else "medium"
+            sections.append(f"- [{sev}] {desc}\n")
+
+    if gemini_feedback and gemini_feedback.concerns:
+        sections.append("\n### Architecture Concerns (Gemini)\n")
+        for concern in gemini_feedback.concerns[:5]:
+            desc = concern.get("description", str(concern)) if isinstance(concern, dict) else str(concern)
+            sections.append(f"- {desc}\n")
+
+    sections.append("\n### Instructions\n")
+    sections.append("Revise your plan to address ALL blocking issues before resubmitting.\n")
+    return "".join(sections)
+
+
 CURSOR_VALIDATION_PROMPT = """You are a senior code reviewer validating an implementation plan.
 
 PLAN TO REVIEW:
@@ -512,10 +554,16 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
                 phase=2
             )
 
+            # Build structured correction prompt for retry
+            correction_prompt = _build_validation_correction_prompt(
+                cursor_feedback, gemini_feedback, blocking_issues
+            )
+
             return {
                 "phase_status": phase_status,
                 "current_phase": 1,  # Go back to planning
                 "next_decision": "retry",
+                "correction_prompt": correction_prompt,
                 "updated_at": datetime.now().isoformat(),
             }
         else:

@@ -35,7 +35,7 @@ def fixer_triage_router(
 
 def fixer_diagnose_router(
     state: WorkflowState,
-) -> Literal["fixer_validate", "fixer_apply", "human_escalation"]:
+) -> Literal["fixer_validate", "fixer_apply", "fixer_research", "human_escalation"]:
     """Route from fixer_diagnose based on diagnosis result.
 
     Args:
@@ -50,6 +50,27 @@ def fixer_diagnose_router(
         return "fixer_validate"
     elif decision == "apply":
         return "fixer_apply"
+    elif decision == "research":
+        return "fixer_research"
+    else:  # escalate
+        return "human_escalation"
+
+
+def fixer_research_router(
+    state: WorkflowState,
+) -> Literal["fixer_validate", "human_escalation"]:
+    """Route from fixer_research based on research result.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name
+    """
+    decision = state.get("next_decision")
+
+    if decision == "validate":
+        return "fixer_validate"
     else:  # escalate
         return "human_escalation"
 

@@ -39,24 +39,15 @@ class StateProjector:
     def __init__(
         self,
         project_dir: str | Path,
-        checkpoint_dir: Optional[str | Path] = None,
     ):
         """Initialize the state projector.
 
         Args:
             project_dir: Project directory path
-            checkpoint_dir: Optional checkpoint directory (defaults to .workflow/checkpoints)
         """
         self.project_dir = Path(project_dir)
         self.workflow_dir = self.project_dir / ".workflow"
         self.state_file = self.workflow_dir / "state.json"
-
-        if checkpoint_dir:
-            self.checkpoint_dir = Path(checkpoint_dir)
-        else:
-            self.checkpoint_dir = self.workflow_dir / "checkpoints"
-
-        self.db_path = self.checkpoint_dir / "checkpoints.db"
 
     async def project_state(
         self,
@@ -64,7 +55,7 @@ class StateProjector:
     ) -> Optional[dict[str, Any]]:
         """Project state from checkpoint to state.json.
 
-        Reads the latest checkpoint state from SQLite, converts it to
+        Reads the latest checkpoint state from SurrealDB, converts it to
         the legacy state.json format, and writes atomically.
 
         Args:
@@ -73,10 +64,6 @@ class StateProjector:
         Returns:
             The projected state dict, or None if no checkpoint exists
         """
-        if not self.db_path.exists():
-            logger.debug(f"No checkpoint database at {self.db_path}")
-            return self._load_fallback_state()
-
         try:
             # Load checkpoint state
             lg_state = await self._load_checkpoint_state(thread_id)
@@ -128,7 +115,7 @@ class StateProjector:
         self,
         thread_id: Optional[str] = None,
     ) -> Optional[dict[str, Any]]:
-        """Load state from SQLite checkpoint.
+        """Load state from SurrealDB checkpoint.
 
         Args:
             thread_id: Thread ID to load (defaults to project-based)
@@ -136,10 +123,11 @@ class StateProjector:
         Returns:
             LangGraph state dict or None
         """
-        try:
-            from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-        except ImportError:
-            logger.warning("AsyncSqliteSaver not available - cannot load checkpoint")
+        from ..langgraph.surrealdb_saver import SurrealDBSaver
+        from ..db.config import is_surrealdb_enabled
+
+        if not is_surrealdb_enabled():
+            logger.debug("SurrealDB not enabled - cannot load checkpoint")
             return None
 
         if thread_id is None:
@@ -153,17 +141,24 @@ class StateProjector:
 
         try:
             # Create a temporary checkpointer to read state
-            checkpointer = AsyncSqliteSaver.from_conn_string(str(self.db_path))
+            checkpointer = SurrealDBSaver(self.project_dir.name)
 
             # Get the latest checkpoint
-            checkpoint = await checkpointer.aget(config)
+            checkpoint_tuple = await checkpointer.aget_tuple(config)
 
-            if checkpoint is None:
+            if checkpoint_tuple is None:
                 return None
 
-            # Extract the channel values (state)
-            channel_values = checkpoint.get("channel_values", {})
-            return channel_values
+            # Extract the checkpoint state
+            checkpoint = checkpoint_tuple.checkpoint
+            
+            # LangGraph v0.2.x uses 'channel_values' in the checkpoint dict
+            # or it might be the checkpoint object itself if it has channel_values attribute
+            if hasattr(checkpoint, "channel_values"):
+                return checkpoint.channel_values
+            elif isinstance(checkpoint, dict):
+                return checkpoint.get("channel_values", {})
+            return {}
 
         except Exception as e:
             logger.warning(f"Failed to load checkpoint state: {e}")

@@ -21,6 +21,57 @@ from ...agents.prompts import load_prompt, format_prompt
 logger = logging.getLogger(__name__)
 
 
+def _build_verification_correction_prompt(
+    cursor_feedback: AgentFeedback,
+    gemini_feedback: AgentFeedback,
+    blocking_issues: list[str],
+) -> str:
+    """Build structured correction prompt for code fixes.
+
+    Args:
+        cursor_feedback: Feedback from Cursor review
+        gemini_feedback: Feedback from Gemini review
+        blocking_issues: List of blocking issues
+
+    Returns:
+        Formatted correction prompt string
+    """
+    sections = ["## Code Fixes Required\n"]
+    sections.append("Your implementation was rejected. Fix these specific issues:\n")
+
+    if blocking_issues:
+        sections.append("\n### Blocking Issues (MUST FIX)\n")
+        for i, issue in enumerate(blocking_issues, 1):
+            sections.append(f"{i}. {issue}\n")
+
+    # Extract specific file/line issues from cursor
+    if cursor_feedback and cursor_feedback.raw_output:
+        findings = cursor_feedback.raw_output.get("findings", [])
+        if findings:
+            sections.append("\n### Security/Code Issues\n")
+            for finding in findings[:10]:
+                f = finding.get("file", "?")
+                ln = finding.get("line", "?")
+                desc = finding.get("description", "")
+                sev = finding.get("severity", "INFO")
+                sections.append(f"- `{f}:{ln}` [{sev}]: {desc}\n")
+
+    # Architecture issues from gemini
+    if gemini_feedback and gemini_feedback.raw_output:
+        comments = gemini_feedback.raw_output.get("comments", [])
+        if comments:
+            sections.append("\n### Architecture Issues\n")
+            for c in comments[:5]:
+                desc = c.get("description", str(c)) if isinstance(c, dict) else str(c)
+                sections.append(f"- {desc}\n")
+
+    sections.append("\n### Instructions\n")
+    sections.append("1. Fix ALL blocking issues listed above\n")
+    sections.append("2. Run tests to verify fixes\n")
+    sections.append("3. Ensure no new issues are introduced\n")
+    return "".join(sections)
+
+
 async def cursor_review_node(state: WorkflowState) -> dict[str, Any]:
     """Cursor reviews the implementation for code quality (A07-security-reviewer).
 
@@ -444,10 +495,16 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
             phase_4.blockers = result.blocking_issues
             phase_status["4"] = phase_4
 
+            # Build structured correction prompt for retry
+            correction_prompt = _build_verification_correction_prompt(
+                cursor_feedback, gemini_feedback, result.blocking_issues
+            )
+
             return {
                 "phase_status": phase_status,
                 "current_phase": 3,  # Go back to implementation/fix
                 "next_decision": "retry",
+                "correction_prompt": correction_prompt,
                 "updated_at": datetime.now().isoformat(),
             }
         else:

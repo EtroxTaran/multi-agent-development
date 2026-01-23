@@ -48,7 +48,12 @@ class EvaluationRepository(BaseRepository[dict]):
         Returns:
             List of evaluations
         """
-        score_filter = f"AND overall_score >= {min_score}" if min_score else ""
+        params = {"agent": agent, "limit": limit}
+        if min_score is not None:
+            score_filter = "AND overall_score >= $min_score"
+            params["min_score"] = min_score
+        else:
+            score_filter = ""
 
         async with get_connection(self.project_name) as conn:
             results = await conn.query(
@@ -58,7 +63,7 @@ class EvaluationRepository(BaseRepository[dict]):
                 ORDER BY created_at DESC
                 LIMIT $limit
                 """,
-                {"agent": agent, "limit": limit},
+                params,
             )
             return results
 

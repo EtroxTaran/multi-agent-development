@@ -88,11 +88,17 @@ The orchestration system uses **LangGraph** for graph-based workflow management 
 
 ### Workflow Graph
 
+The architecture uses modular subgraphs for complex logic encapsulation:
+
 ```
 ┌──────────────────┐
 │  prerequisites   │ ← Validate project setup
 └────────┬─────────┘
          ▼
+┌──────────────────┐
+│product_validation│ ← Validate PRODUCT.md
+└────────┬─────────┘
+         │
 ┌──────────────────┐
 │    planning      │ ← Claude creates plan (Phase 1)
 └────────┬─────────┘
@@ -106,15 +112,37 @@ The orchestration system uses **LangGraph** for graph-based workflow management 
     └────┬────┘ (fan-in)
          ▼
 ┌──────────────────┐
-│validation_fan_in │ ← Merge feedback, route decision
+│validation_fan_in │
 └────────┬─────────┘
-         │ conditional: continue → implementation
-         │             retry → planning
-         │             escalate → human_escalation
          ▼
 ┌──────────────────┐
-│ implementation   │ ← Worker Claude writes code (Phase 3)
-└────────┬─────────┘   SEQUENTIAL - single writer
+│  approval_gate   │
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│ pre_implementation│
+└────────┬─────────┘
+         ▼
+┌──────────────────────────────────────────────┐
+│               TASK SUBGRAPH                  │
+│                                              │
+│  task_breakdown → select_task → write_tests  │
+│        ↑              │             │        │
+│        │              ▼             ▼        │
+│  verify_task  ←  implement_task             │
+│        │              │                      │
+│        └──────────────┘                      │
+│                                              │
+└────────────────┬─────────────────────────────┘
+                 │ (success)
+                 ▼
+┌──────────────────┐
+│build_verification│
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│   review_gate    │
+└────────┬─────────┘
          │
     ┌────┴────┐ (PARALLEL fan-out)
     ▼         ▼
@@ -125,13 +153,20 @@ The orchestration system uses **LangGraph** for graph-based workflow management 
     └────┬────┘ (fan-in)
          ▼
 ┌──────────────────┐
-│verification_fan_in│ ← Merge reviews, route decision
+│verification_fan_in│
 └────────┬─────────┘
          ▼
 ┌──────────────────┐
-│   completion     │ ← Generate summary (Phase 5)
+│  security_scan   │
+└────────┬─────────┘
+         ▼
+┌──────────────────┐
+│   completion     │
 └──────────────────┘
 ```
+
+The system also includes a **Fixer Subgraph** for self-healing error recovery, invoked via `error_dispatch` from any node.
+
 
 ### Key Safety Guarantees
 
@@ -319,6 +354,33 @@ When agents disagree, the system uses weighted expertise:
 | Scalability | 0.2 | 0.8 |
 | Performance | 0.4 | 0.6 |
 | Maintainability | 0.6 | 0.4 |
+
+---
+
+## Self-Healing & Time Travel
+
+Conductor includes advanced "Cognitive Orchestration" capabilities for resilience and debugging.
+
+### Self-Healing (The Fixer)
+When errors occur, the system doesn't just blindly retry. It enters a "Fixer" loop:
+1. **Triage:** Is it a syntax error, test failure, or something deeper?
+2. **Diagnosis:** 
+   - **Regex:** Fast path for common issues (missing imports, typos).
+   - **Deep Semantic (LLM):** If complex, Claude analyzes the stack trace and logic to find the root cause.
+3. **Dynamic Adaptation:** If the diagnosis reveals a knowledge gap (e.g., "API Misuse"), the system dynamically inserts a **Research Phase** to read documentation and generate a correct usage guide before retrying.
+4. **Fix Application:** Generates and applies a specific patch.
+
+### Time Travel Debugging
+Interactive debugging for the entire workflow state.
+
+```bash
+python -m orchestrator --project my-app --debug
+```
+
+**Debugger Commands:**
+- `list` - Show all checkpoints (Start, Pre-Implementation, Error states).
+- `checkout <id>` - Rollback the entire project state (files + memory) to that point.
+- `replay` - Resume execution from the restored state.
 
 ---
 
@@ -763,8 +825,11 @@ python -m orchestrator --start --no-commit
 # Set max retries
 python -m orchestrator --start --max-retries 5
 
-# Debug output
-python -m orchestrator --start --debug
+# Time Travel Debugger
+python -m orchestrator --project my-app --debug
+
+# Debug output (verbose logs)
+python -m orchestrator --start --debug-logs
 ```
 
 ### Agent Scripts

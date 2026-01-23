@@ -344,13 +344,12 @@ class AgentEvaluator:
         }
 
     async def _store_evaluation(self, result: EvaluationResult) -> None:
-        """Store evaluation in database.
-
-        Args:
-            result: Evaluation result to store
-        """
-        if self.storage:
-            await self.storage.save(result)
+        """Store evaluation in database."""
+        if self.storage is not None:
+            try:
+                await self.storage.save(result)
+            except Exception as e:
+                logger.warning(f"Failed to store evaluation: {e}")
 
     async def evaluate_implementation(
         self,

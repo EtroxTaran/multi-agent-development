@@ -33,6 +33,7 @@ class DummyWorktreeManager:
 async def test_implement_tasks_parallel_node_success(temp_project_dir):
     """Parallel implementation completes and clears batch state."""
     from orchestrator.langgraph.nodes import implement_task as implement_module
+    from orchestrator.langgraph.nodes.task import nodes as task_nodes
 
     state = {
         "project_dir": str(temp_project_dir),
@@ -53,8 +54,9 @@ async def test_implement_tasks_parallel_node_success(temp_project_dir):
         {"success": True, "output": '{"task_id":"T2","status":"completed"}', "error": None},
     ]
 
-    with patch.object(implement_module, "WorktreeManager", DummyWorktreeManager), \
-        patch.object(implement_module, "_run_task_in_worktree", side_effect=outputs):
+    with patch.object(task_nodes, "WorktreeManager", DummyWorktreeManager), \
+        patch.object(task_nodes, "_run_task_in_worktree", side_effect=outputs), \
+        patch.object(task_nodes, "_check_budget_before_task", return_value=None):
         result = await implement_module.implement_tasks_parallel_node(state)
 
     assert result["next_decision"] == "continue"

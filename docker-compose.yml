@@ -11,11 +11,40 @@ services:
     volumes:
       - surrealdb-data:/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+    # Health check disabled - SurrealDB image doesn't include curl/nc
+    # Verify connectivity via: curl http://localhost:8001/health
+
+  orchestrator-api:
+    build:
+      context: .
+      dockerfile: orchestrator-api/Dockerfile
+    container_name: conductor-orchestrator-api
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./projects:/app/projects
+      - ./orchestrator:/app/orchestrator:ro
+    environment:
+      - ORCHESTRATOR_API_PORT=8090
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+    depends_on:
+      - surrealdb
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./dashboard/backend-nestjs
+      dockerfile: Dockerfile
+    container_name: conductor-backend
+    ports:
+      - "8081:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - ORCHESTRATOR_API_URL=http://orchestrator-api:8090
+    depends_on:
+      - orchestrator-api
+    restart: unless-stopped
 
 volumes:
   surrealdb-data:

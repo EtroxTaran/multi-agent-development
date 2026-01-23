@@ -16,14 +16,9 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command, RetryPolicy
 
-# Try to import AsyncSqliteSaver for persistent checkpoints
-try:
-    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-    ASYNC_SQLITE_AVAILABLE = True
-except ImportError:
-    ASYNC_SQLITE_AVAILABLE = False
-
+from .surrealdb_saver import SurrealDBSaver
 from .state import WorkflowState, create_initial_state
+from .subgraphs import create_fixer_subgraph, create_task_subgraph
 from .nodes import (
     prerequisites_node,
     planning_node,
@@ -44,32 +39,17 @@ from .nodes import (
     coverage_check_node,
     security_scan_node,
     approval_gate_node,
-    # Task loop nodes
-    task_breakdown_node,
-    select_next_task_node,
-    implement_task_node,
-    implement_tasks_parallel_node,
-    verify_task_node,
-    verify_tasks_parallel_node,
-    write_tests_node,
-    fix_bug_node,
     # Discussion and Research nodes (GSD pattern)
     discuss_phase_node,
     research_phase_node,
     # Handoff node (GSD pattern)
     generate_handoff_node,
-    # Fixer nodes (self-healing)
-    fixer_triage_node,
-    fixer_diagnose_node,
     fixer_validate_node,
     fixer_apply_node,
     fixer_verify_node,
+    fixer_research_node,
     # Error dispatch node
     error_dispatch_node,
-    # Auto-improvement nodes (evaluation and optimization)
-    evaluate_agent_node,
-    analyze_output_node,
-    optimize_prompts_node,
 )
 from .routers import (
     prerequisites_router,
@@ -86,34 +66,34 @@ from .routers import (
     coverage_check_router,
     security_scan_router,
     approval_gate_router,
-    # Task loop routers
-    task_breakdown_router,
-    select_task_router,
-    implement_task_router,
-    implement_tasks_parallel_router,
-    verify_task_router,
-    verify_tasks_parallel_router,
-    write_tests_router,
-    fix_bug_router,
     # Discussion and Research routers (GSD pattern)
     discuss_router,
     research_router,
-    # Fixer routers (self-healing)
-    fixer_triage_router,
-    fixer_diagnose_router,
     fixer_validate_router,
     fixer_apply_router,
     fixer_verify_router,
+    fixer_research_router,
     should_use_fixer_router,
     # Error dispatch router
     error_dispatch_router,
-    # Auto-improvement routers (evaluation and optimization)
-    evaluate_agent_router,
-    analyze_output_router,
-    optimize_prompts_router,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def subgraph_router(state: WorkflowState) -> str:
+    """Route based on subgraph exit state.
+    
+    Args:
+        state: Workflow state
+        
+    Returns:
+        Next node name
+    """
+    decision = state.get("next_decision")
+    if decision == "escalate":
+        return "human_escalation"
+    return "continue"
 
 
 def create_workflow_graph(
@@ -128,117 +108,12 @@ def create_workflow_graph(
     - Human escalation and approval gates
     - Configurable feature flags for optional nodes
     - Discussion and Research phases for informed planning (GSD pattern)
-
-    Enhanced workflow path with task loop:
-    ```
-    prerequisites → DISCUSS → RESEARCH → product_validation → planning →
-    [cursor_validate || gemini_validate] → validation_fan_in →
-    approval_gate → pre_implementation → task_breakdown →
-    ┌─────────────────────────────────────────┐
-    │            TASK LOOP                    │
-    │  select_task → implement_task →         │
-    │       ↑         verify_task ────────────┼──┐
-    │       └─────────────────────────────────┘  │
-    │              (loop back)                   │
-    └────────────────────────────────────────────┘
-                        │ (all tasks complete)
-                        ↓
-    build_verification →
-    [cursor_review || gemini_review] → verification_fan_in →
-    coverage_check → security_scan → completion
-    ```
+    - Modular subgraphs for Task Loop and Fixer logic
 
     Retry Policy (when enabled):
     - Agent nodes (cursor_*, gemini_*) have RetryPolicy for transient failures
     - Uses exponential backoff: initial_interval=1s, backoff_multiplier=2
     - Max retries: 3 attempts before failing
-
-    Graph structure:
-    ```
-                     ┌─────────────────┐
-                     │  prerequisites  │
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │product_validation│  ← NEW: Validates PRODUCT.md
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │    planning     │
-                     └────────┬────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              │                               │
-     ┌────────▼────────┐             ┌────────▼────────┐
-     │ cursor_validate │             │ gemini_validate │
-     └────────┬────────┘             └────────┬────────┘
-              │                               │
-              └───────────────┬───────────────┘
-                              │
-                     ┌────────▼────────┐
-                     │validation_fan_in│
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │  approval_gate  │  ← NEW: Human approval (optional)
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │pre_implementation│  ← Environment checks
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │  task_breakdown │  ← NEW: Break into tasks
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │   select_task   │  ← TASK LOOP START
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │  implement_task │  ← Single task impl
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │   verify_task   │
-                     └────────┬────────┘
-                              │
-                     (loop back to select_task)
-                              │
-                     (when all tasks done)
-                              │
-                     ┌────────▼────────┐
-                     │build_verification│  ← Build check
-                     └────────┬────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              │                               │
-     ┌────────▼────────┐             ┌────────▼────────┐
-     │  cursor_review  │             │  gemini_review  │
-     └────────┬────────┘             └────────┬────────┘
-              │                               │
-              └───────────────┬───────────────┘
-                              │
-                     ┌────────▼────────┐
-                     │verification_fan_in│
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │  coverage_check │  ← NEW: Coverage enforcement
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │  security_scan  │  ← NEW: Security scanning
-                     └────────┬────────┘
-                              │
-                     ┌────────▼────────┐
-                     │   completion    │
-                     └────────┬────────┘
-                              │
-                            [END]
-    ```
-
-    Human escalation can be reached from multiple nodes when issues occur.
 
     Args:
         checkpointer: Optional checkpointer for persistence
@@ -284,15 +159,9 @@ def create_workflow_graph(
     graph.add_node("approval_gate", approval_gate_node)
     graph.add_node("pre_implementation", pre_implementation_node)
 
-    # Task loop nodes (incremental execution)
-    graph.add_node("task_breakdown", task_breakdown_node)
-    graph.add_node("select_task", select_next_task_node)
-    graph.add_node("write_tests", write_tests_node)
-    graph.add_node("implement_task", implement_task_node, retry=implementation_retry_policy)
-    graph.add_node("implement_tasks_parallel", implement_tasks_parallel_node, retry=implementation_retry_policy)
-    graph.add_node("fix_bug", fix_bug_node)
-    graph.add_node("verify_task", verify_task_node)
-    graph.add_node("verify_tasks_parallel", verify_tasks_parallel_node)
+    # Subgraphs
+    graph.add_node("task_subgraph", create_task_subgraph(retry_enabled))
+    graph.add_node("fixer_subgraph", create_fixer_subgraph())
 
     # Legacy implementation node (kept for compatibility)
     graph.add_node("implementation", implementation_node, retry=implementation_retry_policy)
@@ -311,20 +180,13 @@ def create_workflow_graph(
     # Error dispatch node (routes to fixer or human escalation)
     graph.add_node("error_dispatch", error_dispatch_node)
 
-    # Fixer nodes (self-healing)
-    graph.add_node("fixer_triage", fixer_triage_node)
-    graph.add_node("fixer_diagnose", fixer_diagnose_node)
     graph.add_node("fixer_validate", fixer_validate_node)
     graph.add_node("fixer_apply", fixer_apply_node)
     graph.add_node("fixer_verify", fixer_verify_node)
+    graph.add_node("fixer_research", fixer_research_node)
 
     # Handoff node (GSD pattern) - generates session brief before END
     graph.add_node("generate_handoff", generate_handoff_node)
-
-    # Auto-improvement nodes (evaluation and optimization)
-    graph.add_node("evaluate_agent", evaluate_agent_node)
-    graph.add_node("analyze_output", analyze_output_node)
-    graph.add_node("optimize_prompts", optimize_prompts_node)
 
     if retry_enabled:
         logger.info("Retry policies enabled for agent nodes")
@@ -410,136 +272,28 @@ def create_workflow_graph(
         },
     )
 
-    # Pre-implementation → task_breakdown (with conditional routing)
+    # Pre-implementation → task_subgraph (with conditional routing)
+    # Replaces routing to task_breakdown
     graph.add_conditional_edges(
         "pre_implementation",
         pre_implementation_router,
         {
-            "implementation": "task_breakdown",  # Changed: go to task_breakdown
+            "implementation": "task_subgraph",  # Use subgraph
             "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
 
-    # ========== TASK LOOP ==========
-
-    # Task breakdown → select_task
+    # ========== TASK SUBGRAPH ROUTING ==========
+    
     graph.add_conditional_edges(
-        "task_breakdown",
-        task_breakdown_router,
+        "task_subgraph",
+        subgraph_router,
         {
-            "select_task": "select_task",
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-            "__end__": END,
-        },
+            "continue": "build_verification",  # Success path
+            "human_escalation": "error_dispatch",
+        }
     )
-
-    # Select task → write_tests or build_verification (all done)
-    graph.add_conditional_edges(
-        "select_task",
-        select_task_router,
-        {
-            "implement_task": "write_tests", # Go to write_tests first
-            "implement_tasks_parallel": "implement_tasks_parallel",
-            "build_verification": "build_verification",  # All tasks done
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # Write tests → implement_task
-    graph.add_conditional_edges(
-        "write_tests",
-        write_tests_router,
-        {
-            "implement_task": "implement_task",
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # Implement task → verify_task
-    graph.add_conditional_edges(
-        "implement_task",
-        implement_task_router,
-        {
-            "verify_task": "verify_task",
-            "implement_task": "implement_task",  # Retry
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # Parallel implementation → parallel verification
-    graph.add_conditional_edges(
-        "implement_tasks_parallel",
-        implement_tasks_parallel_router,
-        {
-            "verify_tasks_parallel": "verify_tasks_parallel",
-            "implement_tasks_parallel": "implement_tasks_parallel",
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # Verify task → evaluate_agent (for auto-improvement) or fix_bug
-    # Changed: route through evaluate_agent before continuing to select_task
-    graph.add_conditional_edges(
-        "verify_task",
-        verify_task_router,
-        {
-            "select_task": "evaluate_agent",  # Changed: evaluate before next task
-            "implement_task": "fix_bug",  # Retry via Bug Fixer
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # ========== AUTO-IMPROVEMENT FLOW ==========
-    # Evaluation nodes run after task verification to assess and improve agent quality
-
-    # Evaluate agent → continue to select_task or analyze_output (if score low)
-    graph.add_conditional_edges(
-        "evaluate_agent",
-        evaluate_agent_router,
-        {
-            "analyze_output": "analyze_output",
-            "continue_workflow": "select_task",  # Continue task loop
-        },
-    )
-
-    # Analyze output → optimize prompts or continue
-    graph.add_conditional_edges(
-        "analyze_output",
-        analyze_output_router,
-        {
-            "optimize_prompts": "optimize_prompts",
-            "continue_workflow": "select_task",
-        },
-    )
-
-    # Optimize prompts → always continue to select_task
-    graph.add_edge("optimize_prompts", "select_task")
-
-    # ========== END AUTO-IMPROVEMENT FLOW ==========
-
-    # Verify tasks parallel → LOOP BACK to select_task or retry
-    graph.add_conditional_edges(
-        "verify_tasks_parallel",
-        verify_tasks_parallel_router,
-        {
-            "select_task": "select_task",  # LOOP BACK - get next batch
-            "implement_tasks_parallel": "implement_tasks_parallel",  # Retry batch
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # Fix bug → verify_task
-    graph.add_conditional_edges(
-        "fix_bug",
-        fix_bug_router,
-        {
-            "verify_task": "verify_task",
-            "human_escalation": "error_dispatch",  # Route through error_dispatch
-        },
-    )
-
-    # ========== END TASK LOOP ==========
 
     # Legacy: Implementation → build_verification (for backward compatibility)
     graph.add_edge("implementation", "build_verification")
@@ -612,70 +366,21 @@ def create_workflow_graph(
         "error_dispatch",
         error_dispatch_router,
         {
-            "fixer_triage": "fixer_triage",
+            "fixer_triage": "fixer_subgraph", # Use subgraph
             "human_escalation": "human_escalation",
         },
     )
 
-    # ========== FIXER FLOW ==========
-    # Fixer intercepts errors before human escalation
-    # Flow: fixer_triage → fixer_diagnose → [fixer_validate] → fixer_apply → fixer_verify
-
-    # Fixer triage → diagnose or escalate
+    # ========== FIXER SUBGRAPH ROUTING ==========
+    
     graph.add_conditional_edges(
-        "fixer_triage",
-        fixer_triage_router,
+        "fixer_subgraph",
+        subgraph_router,
         {
-            "fixer_diagnose": "fixer_diagnose",
+            "continue": "task_subgraph", # Default retry logic
             "human_escalation": "human_escalation",
-            "skip_fixer": "human_escalation",  # Skip goes to human
-        },
+        }
     )
-
-    # Fixer diagnose → validate, apply, or escalate
-    graph.add_conditional_edges(
-        "fixer_diagnose",
-        fixer_diagnose_router,
-        {
-            "fixer_validate": "fixer_validate",
-            "fixer_apply": "fixer_apply",
-            "human_escalation": "human_escalation",
-        },
-    )
-
-    # Fixer validate → apply or escalate
-    graph.add_conditional_edges(
-        "fixer_validate",
-        fixer_validate_router,
-        {
-            "fixer_apply": "fixer_apply",
-            "human_escalation": "human_escalation",
-        },
-    )
-
-    # Fixer apply → verify or escalate
-    graph.add_conditional_edges(
-        "fixer_apply",
-        fixer_apply_router,
-        {
-            "fixer_verify": "fixer_verify",
-            "human_escalation": "human_escalation",
-        },
-    )
-
-    # Fixer verify → resume workflow (via evaluate_agent) or escalate
-    # Note: resume_workflow routes through evaluate_agent to assess fix quality
-    graph.add_conditional_edges(
-        "fixer_verify",
-        fixer_verify_router,
-        {
-            # Resume goes through evaluation before continuing
-            "resume_workflow": "evaluate_agent",
-            "human_escalation": "human_escalation",
-        },
-    )
-
-    # ========== END FIXER FLOW ==========
 
     # Compile the graph
     compiled = graph.compile(checkpointer=checkpointer)
@@ -695,7 +400,7 @@ class WorkflowRunner:
 
     Checkpointing Options:
     - MemorySaver: Fast but loses state on restart (LANGGRAPH_CHECKPOINTER=memory)
-    - AsyncSqliteSaver: Persistent checkpoints in SQLite (default)
+    - SurrealDBSaver: Persistent checkpoints in SurrealDB (default)
 
     Set LANGGRAPH_CHECKPOINTER=memory for in-memory (testing) mode.
     """
@@ -710,27 +415,19 @@ class WorkflowRunner:
 
         Args:
             project_dir: Project directory path
-            checkpoint_dir: Optional checkpoint directory (defaults to .workflow/checkpoints)
-            use_persistent_checkpointer: Use AsyncSqliteSaver for persistent checkpoints
+            checkpoint_dir: Optional checkpoint directory (deprecated)
+            use_persistent_checkpointer: Use persistence (defaults to True unless configured otherwise)
         """
         self.project_dir = Path(project_dir)
         self.project_name = self.project_dir.name
 
-        # Setup checkpoint directory
-        if checkpoint_dir:
-            self.checkpoint_dir = Path(checkpoint_dir)
-        else:
-            self.checkpoint_dir = self.project_dir / ".workflow" / "checkpoints"
-        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
         # Check environment for checkpointer preference
-        # Default to SQLite for persistence
-        self.checkpointer_type = os.environ.get("LANGGRAPH_CHECKPOINTER", "sqlite")
+        # Default to surrealdb for persistence
+        self.checkpointer_type = os.environ.get("LANGGRAPH_CHECKPOINTER", "surrealdb")
 
         # Graph will be created in __aenter__
         self.graph = None
         self.checkpointer = None
-        self._checkpointer_context = None
 
         # Thread/run configuration
         self.thread_id = f"workflow-{self.project_name}"
@@ -742,28 +439,18 @@ class WorkflowRunner:
             logger.warning(
                 "Using MemorySaver - state will be lost on restart. "
                 "This should only be used for testing. "
-                "Set LANGGRAPH_CHECKPOINTER=sqlite for persistence."
+                "Set LANGGRAPH_CHECKPOINTER=surrealdb for persistence."
             )
         else:
-            # SQLite persistence with async support
-            if not ASYNC_SQLITE_AVAILABLE:
-                raise RuntimeError(
-                    "AsyncSqliteSaver required but not available. "
-                    "Install with: pip install aiosqlite langgraph-checkpoint-sqlite"
-                )
-            db_path = self.checkpoint_dir / "checkpoints.db"
-            self._checkpointer_context = AsyncSqliteSaver.from_conn_string(str(db_path))
-            self.checkpointer = await self._checkpointer_context.__aenter__()
-            logger.info(f"Using AsyncSqliteSaver: {db_path}")
+            # SurrealDB persistence
+            self.checkpointer = SurrealDBSaver(self.project_name)
+            logger.info(f"Using SurrealDBSaver for project: {self.project_name}")
 
         self.graph = create_workflow_graph(checkpointer=self.checkpointer)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Exit async context, closing checkpointer if needed."""
-        if self._checkpointer_context is not None:
-            await self._checkpointer_context.__aexit__(exc_type, exc_val, exc_tb)
-            self._checkpointer_context = None
+        """Exit async context."""
         self.checkpointer = None
         self.graph = None
         return False
@@ -1156,8 +843,8 @@ def get_workflow_runner(
 
     Args:
         project_dir: Project directory path
-        checkpoint_dir: Optional checkpoint directory
-        use_persistent_checkpointer: Use persistent SQLite checkpoints
+        checkpoint_dir: Optional checkpoint directory (deprecated)
+        use_persistent_checkpointer: Use persistent SurrealDB checkpoints
 
     Returns:
         WorkflowRunner instance

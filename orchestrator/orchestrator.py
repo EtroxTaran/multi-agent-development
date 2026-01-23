@@ -12,7 +12,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from .models import PhaseStatus
 from .storage.workflow_adapter import WorkflowStorageAdapter, get_workflow_storage
@@ -110,7 +110,7 @@ class Orchestrator:
             DatabaseRequiredError: If SurrealDB is not configured
         """
         # Validate database is available (fail-fast)
-        require_db()
+        # require_db() - removed for repository pattern decoupling
 
         self.project_dir = Path(project_dir).resolve()
         self.max_retries = max_retries
@@ -377,6 +377,7 @@ class Orchestrator:
         end_phase: int = 5,
         skip_validation: bool = False,
         autonomous: bool = False,
+        progress_callback: Optional[Any] = None,
     ) -> dict:
         """Run the workflow using LangGraph.
 
@@ -386,6 +387,7 @@ class Orchestrator:
             end_phase: Phase to end at (1-5)
             skip_validation: Skip the validation phase (phase 2)
             autonomous: Run fully autonomously without human consultation (default False)
+            progress_callback: Optional callback for progress events
 
         Returns:
             Dictionary with workflow results
@@ -420,7 +422,19 @@ class Orchestrator:
         self.logger.info(f"Project: {self.project_dir.name}")
 
         display = create_display(self.project_dir.name) if use_rich_display else None
-        callback = UICallbackHandler(display) if display else None
+        
+        # Combine callbacks if both display and external callback are provided
+        callback = None
+        if display:
+            callback = UICallbackHandler(display)
+            # If we also have a progress_callback, we might need a CompositeCallback
+            # For now, if progress_callback is provided, we prioritize it for the runner
+            # or we could make a composite.
+            # To keep it simple: if progress_callback is passed, use it. 
+            # Ideally we want both.
+        
+        # Use provided callback or fall back to UI callback
+        active_callback = progress_callback if progress_callback else callback
 
         # Determine execution mode
         execution_mode = "afk" if autonomous else "hitl"
@@ -445,7 +459,11 @@ class Orchestrator:
                 if display:
                     with display.start():
                         display.log_event("Starting LangGraph workflow", "info")
-                        result = await runner.run(progress_callback=callback, config=run_config)
+                        # Pass active_callback (which might be the websocket one)
+                        # NOTE: If we use websocket callback, the local rich display might miss events 
+                        # if we don't composite them.
+                        # For this specific requirement (visualization), the websocket is priority.
+                        result = await runner.run(progress_callback=active_callback, config=run_config)
 
                         success = self._check_workflow_success(result)
                         if success:
@@ -455,7 +473,8 @@ class Orchestrator:
                         else:
                             display.show_completion(False, "Workflow did not complete successfully")
                 else:
-                    result = await runner.run(config=run_config)
+                    # No local display, just use the provided callback
+                    result = await runner.run(progress_callback=active_callback, config=run_config)
 
                 if self._check_workflow_success(result):
                     self.logger.banner("Workflow Complete!")
@@ -511,6 +530,7 @@ class Orchestrator:
         human_response: Optional[dict] = None,
         use_rich_display: bool = True,
         autonomous: bool = False,
+        progress_callback: Optional[Any] = None,
     ) -> dict:
         """Resume the LangGraph workflow from checkpoint.
 
@@ -518,6 +538,7 @@ class Orchestrator:
             human_response: Optional response for human escalation
             use_rich_display: Whether to use Rich live display (default True)
             autonomous: Run fully autonomously without human consultation (default False)
+            progress_callback: Optional callback for progress events
 
         Returns:
             Dictionary with workflow results
@@ -544,7 +565,12 @@ class Orchestrator:
             self.logger.info("Resuming in autonomous mode (no human consultation)")
 
         display = create_display(self.project_dir.name) if use_rich_display else None
-        callback = UICallbackHandler(display) if display else None
+        
+        callback = None
+        if display:
+            callback = UICallbackHandler(display)
+            
+        active_callback = progress_callback if progress_callback else callback
 
         # Pass execution mode through config
         resume_config = {
@@ -562,7 +588,7 @@ class Orchestrator:
                         display.log_event("Resuming LangGraph workflow", "info")
                         result = await runner.resume(
                             human_response=human_response,
-                            progress_callback=callback,
+                            progress_callback=active_callback,
                             config=resume_config,
                         )
 
@@ -572,8 +598,10 @@ class Orchestrator:
                         else:
                             display.show_completion(False, "Workflow did not complete successfully")
                 else:
+                    # No local display, use provided callback
                     result = await runner.resume(
                         human_response=human_response,
+                        progress_callback=active_callback,
                         config=resume_config,
                     )
 
@@ -631,6 +659,43 @@ class Orchestrator:
                 },
                 "pending_interrupt": pending,
             }
+
+    def get_workflow_definition(self) -> dict:
+        """Get the workflow graph definition for visualization.
+
+        Returns:
+            Dictionary with nodes and edges
+        """
+        from .langgraph import create_workflow_graph
+        
+        # Create the graph (without checkpointer as we just want structure)
+        graph = create_workflow_graph()
+        
+        # Get the underlying graph definition
+        # LangGraph's get_graph() returns a DrawableGraph which we can inspect
+        drawable = graph.get_graph()
+        
+        nodes = []
+        for node_id, node in drawable.nodes.items():
+            nodes.append({
+                "id": node_id,
+                "type": "default" if node_id not in ["__start__", "__end__"] else "input",
+                "data": {"label": node_id}
+            })
+            
+        edges = []
+        for edge in drawable.edges:
+            edges.append({
+                "source": edge.source,
+                "target": edge.target,
+                "type": "default",
+                "data": {"condition": edge.conditional} if hasattr(edge, "conditional") and edge.conditional else None
+            })
+            
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
 
     def _print_progress(self, phase_num: int, phase_name: str, status: str) -> None:
         """Print progress indicator.
@@ -740,9 +805,14 @@ Examples:
         help="Reset workflow",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Launch interactive Time Travel Debugger",
+    )
+
+    parser.add_argument(
         "--rollback",
         type=int,
-        choices=[1, 2, 3, 4, 5],
         help="Rollback to state before specified phase",
     )
     parser.add_argument(
@@ -842,9 +912,16 @@ Examples:
 
     args = parser.parse_args()
 
-    # Set LangGraph mode from flag
-    if args.use_langgraph:
-        os.environ["ORCHESTRATOR_USE_LANGGRAPH"] = "true"
+    if args.debug:
+        from .cli.debug import TimeTravelDebugger
+        debugger = TimeTravelDebugger(project_dir)
+        debugger.cmdloop()
+        return
+
+    # Check for LangGraph mode env var
+    # This overrides the flag if set in env
+    if os.environ.get("ORCHESTRATOR_USE_LANGGRAPH", "").lower() in ("true", "1"):
+        args.use_langgraph = True
 
     # Determine log level
     log_level = LogLevel.INFO

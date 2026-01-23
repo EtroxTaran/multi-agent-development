@@ -4,13 +4,13 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from ..config.models import GEMINI_MODELS, DEFAULT_GEMINI_MODEL
 from .base import BaseAgent
 from .prompts import load_prompt, format_prompt
 
 
 # Available Gemini models
-GEMINI_MODELS = ["gemini-2.0-flash", "gemini-2.0-pro"]
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+# Managed in orchestrator.config.models
 
 
 class GeminiAgent(BaseAgent):
@@ -40,7 +40,7 @@ class GeminiAgent(BaseAgent):
             model: Optional model override (gemini-2.0-flash, gemini-2.0-pro)
         """
         super().__init__(project_dir, timeout)
-        self.model = model if model in GEMINI_MODELS else None
+        self.model = model if model in GEMINI_MODELS else DEFAULT_GEMINI_MODEL
 
     def get_cli_command(self) -> str:
         """Get the CLI command."""

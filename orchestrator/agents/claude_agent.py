@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
+from ..config.models import DEFAULT_CLAUDE_MODEL, CLAUDE_MODELS
 from .base import BaseAgent, AgentResult
 from .prompts import load_prompt, format_prompt
 
@@ -53,7 +54,7 @@ class ClaudeAgent(BaseAgent):
         enable_audit: bool = True,
         # Enhanced features
         enable_session_continuity: bool = True,
-        default_fallback_model: Optional[str] = "sonnet",
+        default_fallback_model: Optional[str] = DEFAULT_CLAUDE_MODEL,
         default_budget_usd: Optional[float] = None,
         schema_dir: Optional[Path] = None,
     ):

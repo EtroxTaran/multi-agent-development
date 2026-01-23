@@ -130,6 +130,18 @@ async def implementation_node(state: WorkflowState) -> dict[str, Any]:
     # Get validation feedback for context
     feedback_section = _build_feedback_section(state)
 
+    # Check for verification blockers (from Phase 4 rejection)
+    phase_4_status = phase_status.get("4", PhaseState())
+    if phase_4_status.blockers:
+        blockers_list = "\n".join(f"- {b}" for b in phase_4_status.blockers)
+        feedback_section += f"""
+
+CRITICAL FEEDBACK - VERIFICATION FAILED:
+The previous implementation failed verification. You MUST address these specific issues:
+{blockers_list}
+
+Please fix these issues and ensure tests pass."""
+
     # Check for clarification answers from human (from DB)
     clarification_answers = _load_clarification_answers(state["project_name"])
     if clarification_answers:

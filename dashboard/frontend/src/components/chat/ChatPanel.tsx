@@ -3,8 +3,8 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, Trash2 } from 'lucide-react';
-import { useStreamingChat } from '@/hooks';
+import { Send, StopCircle, Trash2, AlertCircle } from 'lucide-react';
+import { useStreamingChat, useWorkflowStatus, useResumeWorkflow } from '@/hooks';
 import {
   Button,
   Card,
@@ -48,17 +48,35 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
     stopStreaming,
     clearMessages,
   } = useStreamingChat(projectName);
+  
+  // HITL Integration
+  const { data: status } = useWorkflowStatus(projectName);
+  const resumeWorkflow = useResumeWorkflow(projectName);
+  const isPaused = status?.status === 'paused';
 
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, currentResponse]);
+  }, [messages, currentResponse, isPaused]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim()) return;
+
+    if (isPaused) {
+      // If paused, send input as resume response
+      // We assume the input is the "response" field
+      // The backend expects a dict, typically {"action": "approve"} or user input
+      // We'll send generic structure:
+      const humanResponse = { response: input, action: "continue" };
+      resumeWorkflow.mutate(humanResponse as any); // Type cast if needed
+      setInput('');
+      return;
+    }
+
+    if (isStreaming) return;
 
     sendMessage(input);
     setInput('');
@@ -68,7 +86,15 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
     <Card className="h-[600px] flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle>Chat with Claude</CardTitle>
+          <div className="flex items-center space-x-2">
+            <CardTitle>Chat with Claude</CardTitle>
+            {isPaused && (
+              <span className="flex items-center text-sm font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Input Required
+              </span>
+            )}
+          </div>
           <Button variant="ghost" size="sm" onClick={clearMessages}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -89,7 +115,18 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
                 }}
               />
             )}
-            {messages.length === 0 && !isStreaming && (
+            
+            {/* System Message for Pause */}
+            {isPaused && (
+              <div className="flex justify-start">
+                 <div className="max-w-[80%] rounded-lg px-4 py-2 bg-yellow-50 border border-yellow-200 text-yellow-800">
+                    <p className="font-semibold text-sm mb-1">Workflow Paused</p>
+                    <p className="text-sm">The workflow requires your input to continue. Please provide your response below.</p>
+                 </div>
+              </div>
+            )}
+
+            {messages.length === 0 && !isStreaming && !isPaused && (
               <div className="text-center text-muted-foreground py-8">
                 <p>Start a conversation with Claude</p>
                 <p className="text-sm mt-2">
@@ -106,11 +143,14 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 px-3 py-2 border rounded-md"
-            disabled={isStreaming}
+            placeholder={isPaused ? "Enter your response to continue..." : "Type a message..."}
+            className={cn(
+              "flex-1 px-3 py-2 border rounded-md transition-colors",
+              isPaused && "border-yellow-400 focus:ring-yellow-400"
+            )}
+            disabled={isStreaming && !isPaused}
           />
-          {isStreaming ? (
+          {isStreaming && !isPaused ? (
             <Button
               type="button"
               variant="destructive"
@@ -119,7 +159,11 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
               <StopCircle className="h-4 w-4" />
             </Button>
           ) : (
-            <Button type="submit" disabled={!input.trim()}>
+            <Button 
+              type="submit" 
+              disabled={!input.trim()}
+              className={cn(isPaused && "bg-yellow-600 hover:bg-yellow-700")}
+            >
               <Send className="h-4 w-4" />
             </Button>
           )}

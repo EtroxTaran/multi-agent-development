@@ -4,13 +4,13 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from ..config.models import CURSOR_MODELS, DEFAULT_CURSOR_MODEL
 from .base import BaseAgent
 from .prompts import load_prompt, format_prompt
 
 
 # Available Cursor models
-CURSOR_MODELS = ["codex-5.2", "composer"]
-DEFAULT_CURSOR_MODEL = "codex-5.2"
+# Managed in orchestrator.config.models
 
 
 class CursorAgent(BaseAgent):
@@ -40,7 +40,7 @@ class CursorAgent(BaseAgent):
             model: Optional model override (codex-5.2, composer)
         """
         super().__init__(project_dir, timeout)
-        self.model = model if model in CURSOR_MODELS else None
+        self.model = model if model in CURSOR_MODELS else DEFAULT_CURSOR_MODEL
 
     def get_cli_command(self) -> str:
         """Get the CLI command."""

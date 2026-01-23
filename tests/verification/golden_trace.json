@@ -1,0 +1,1253 @@
+[
+  {
+    "event": "start",
+    "node": "prerequisites",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "prerequisites_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "prerequisites",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "discuss",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "discuss_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "discuss",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "research",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "research_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "research",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "product_validation",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "product_validation_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "product_validation",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "error_dispatch",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "error_dispatch_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "error_dispatch",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "fixer_subgraph",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_triage",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_triage_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_triage",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "fixer_diagnose",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_diagnose_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_diagnose",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "subgraph_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_subgraph",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "human_escalation",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "human_escalation_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "human_escalation",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "planning",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "pending",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "planning",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "cursor_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "gemini_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "cursor_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "end",
+    "node": "gemini_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "validation_fan_in",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "pending",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "validation_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "validation_fan_in",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "planning",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "planning",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "cursor_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "gemini_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "cursor_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "end",
+    "node": "gemini_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "validation_fan_in",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "validation_router",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "validation_fan_in",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "planning",
+    "current_phase": 1,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "planning",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "cursor_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "gemini_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "cursor_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "end",
+    "node": "gemini_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "validation_fan_in",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "in_progress",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "validation_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "validation_fan_in",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "error_dispatch",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "error_dispatch_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "error_dispatch",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "fixer_subgraph",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_triage",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_triage_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_triage",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "fixer_diagnose",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_diagnose_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_diagnose",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "subgraph_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_subgraph",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "human_escalation",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "human_escalation_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "human_escalation",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "planning",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "planning",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "cursor_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "gemini_validate",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "cursor_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "end",
+    "node": "gemini_validate",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "validation_fan_in",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "validation_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "validation_fan_in",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "error_dispatch",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "error_dispatch_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "error_dispatch",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "fixer_subgraph",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_triage",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_triage_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_triage",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "fixer_diagnose",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "fixer_diagnose_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_diagnose",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  },
+  {
+    "event": "start",
+    "node": "subgraph_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "fixer_subgraph",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "human_escalation",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "start",
+    "node": "human_escalation_router",
+    "current_phase": 2,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": true,
+    "phase_status": {
+      "1": "completed",
+      "2": "failed",
+      "3": "pending",
+      "4": "pending",
+      "5": "pending"
+    }
+  },
+  {
+    "event": "end",
+    "node": "human_escalation",
+    "current_phase": null,
+    "task_count": 0,
+    "completed_tasks": 0,
+    "has_plan": false,
+    "phase_status": {}
+  }
+]

@@ -159,7 +159,7 @@ PROTECTED_FILES = {
 # Protected path patterns that should never be modified
 PROTECTED_PATHS = {
     ".workflow/state.json",
-    ".workflow/checkpoints.db",
+    ".project-config.json",
 }
 
 PROTECTED_PATTERNS = [

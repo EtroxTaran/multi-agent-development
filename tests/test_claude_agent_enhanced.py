@@ -239,7 +239,7 @@ class TestDefaults:
     def test_default_fallback_model(self, temp_project: Path):
         """Test default fallback model is sonnet."""
         agent = ClaudeAgent(temp_project)
-        assert agent.default_fallback_model == "sonnet"
+        assert agent.default_fallback_model == "claude-4-5-sonnet"
 
     def test_custom_fallback_model(self, temp_project: Path):
         """Test custom fallback model."""

@@ -5,10 +5,311 @@ reducers for merging parallel execution results.
 """
 
 import operator
+import traceback
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Optional, TypedDict
+
+
+# ============== ERROR CONTEXT ==============
+# Rich error context for the Bugfixer agent
+
+
+class ErrorContext(TypedDict, total=False):
+    """Rich error context for comprehensive debugging.
+
+    Provides full diagnostic information for the Bugfixer agent to
+    analyze and potentially auto-fix errors.
+
+    Attributes:
+        error_id: Unique error identifier for tracking
+        source_node: Which node failed
+        error_type: Exception class name
+        error_message: Human-readable error message
+        stack_trace: Full Python traceback
+        stderr: CLI stderr if error came from subprocess
+        state_snapshot: Relevant state at time of error (sanitized)
+        last_agent_execution: Agent execution context if error was from agent call
+        recoverable: Hint for fixer - is this likely auto-fixable?
+        suggested_actions: Potential fix strategies to try
+        timestamp: When the error occurred
+        retry_count: How many times this error has been retried
+        related_errors: IDs of related/similar errors
+    """
+
+    error_id: str
+    source_node: str
+    error_type: str
+    error_message: str
+    stack_trace: str
+    stderr: Optional[str]
+    state_snapshot: dict[str, Any]
+    last_agent_execution: Optional[dict]
+    recoverable: bool
+    suggested_actions: list[str]
+    timestamp: str
+    retry_count: int
+    related_errors: list[str]
+
+
+def create_error_context(
+    source_node: str,
+    exception: Exception,
+    state: Optional[dict] = None,
+    last_execution: Optional[dict] = None,
+    stderr: Optional[str] = None,
+    recoverable: bool = True,
+    suggested_actions: Optional[list[str]] = None,
+) -> ErrorContext:
+    """Create a rich ErrorContext from an exception.
+
+    Args:
+        source_node: Name of the node where error occurred
+        exception: The caught exception
+        state: Current workflow state (will be sanitized)
+        last_execution: Agent execution context if applicable
+        stderr: CLI stderr output if applicable
+        recoverable: Whether this error might be auto-fixable
+        suggested_actions: List of potential fix strategies
+
+    Returns:
+        ErrorContext with full diagnostic info
+    """
+    # Sanitize state - remove large/sensitive fields
+    sanitized_state = {}
+    if state:
+        # Keep only relevant fields for debugging
+        safe_fields = [
+            "current_phase", "current_task_id", "project_name",
+            "next_decision", "fixer_attempts", "iteration_count",
+        ]
+        sanitized_state = {
+            k: state.get(k)
+            for k in safe_fields
+            if k in state and state.get(k) is not None
+        }
+        # Include error summary if exists
+        if state.get("errors"):
+            sanitized_state["error_count"] = len(state["errors"])
+
+    # Classify error type for recovery hints
+    error_type = type(exception).__name__
+    auto_recoverable_types = {
+        "TimeoutError": True,
+        "ConnectionError": True,
+        "FileNotFoundError": True,
+        "ImportError": True,
+        "SyntaxError": True,
+        "JSONDecodeError": True,
+        "AssertionError": True,  # Test failures
+    }
+    is_recoverable = recoverable and auto_recoverable_types.get(error_type, False)
+
+    # Generate suggested actions based on error type
+    if suggested_actions is None:
+        suggested_actions = _suggest_recovery_actions(error_type, str(exception))
+
+    return ErrorContext(
+        error_id=str(uuid.uuid4())[:8],
+        source_node=source_node,
+        error_type=error_type,
+        error_message=str(exception),
+        stack_trace=traceback.format_exc(),
+        stderr=stderr,
+        state_snapshot=sanitized_state,
+        last_agent_execution=last_execution,
+        recoverable=is_recoverable,
+        suggested_actions=suggested_actions,
+        timestamp=datetime.now().isoformat(),
+        retry_count=0,
+        related_errors=[],
+    )
+
+
+def _suggest_recovery_actions(error_type: str, message: str) -> list[str]:
+    """Generate suggested recovery actions based on error type.
+
+    Args:
+        error_type: Exception class name
+        message: Error message
+
+    Returns:
+        List of suggested fix strategies
+    """
+    suggestions = {
+        "TimeoutError": ["retry_with_longer_timeout", "reduce_task_scope", "check_network"],
+        "ConnectionError": ["retry_after_delay", "check_network", "verify_endpoint"],
+        "FileNotFoundError": ["check_file_path", "create_missing_file", "verify_cwd"],
+        "ImportError": ["add_missing_import", "install_dependency", "check_module_path"],
+        "SyntaxError": ["regenerate_code", "fix_syntax", "validate_output"],
+        "JSONDecodeError": ["retry_with_structured_output", "validate_json", "fix_escaping"],
+        "AssertionError": ["iterate_with_ralph_loop", "fix_implementation", "update_test"],
+        "PermissionError": ["check_file_permissions", "use_sudo", "change_directory"],
+        "KeyError": ["check_state_fields", "add_default_value", "verify_input"],
+        "TypeError": ["check_argument_types", "add_type_conversion", "validate_input"],
+    }
+
+    base_actions = suggestions.get(error_type, ["analyze_error", "retry_operation"])
+
+    # Add context-specific suggestions
+    message_lower = message.lower()
+    if "rate limit" in message_lower:
+        base_actions.insert(0, "wait_and_retry")
+    if "authentication" in message_lower or "auth" in message_lower:
+        base_actions.insert(0, "check_credentials")
+    if "memory" in message_lower:
+        base_actions.insert(0, "reduce_batch_size")
+
+    return base_actions
+
+
+# ============== AGENT EXECUTION ==============
+# Tracks all agent calls for evaluation and optimization
+
+
+class AgentExecution(TypedDict, total=False):
+    """Tracks a single agent execution for evaluation.
+
+    Captures all information needed to evaluate agent quality
+    and potentially optimize prompts.
+
+    Attributes:
+        execution_id: Unique identifier for this execution
+        agent: Which agent ran (claude, cursor, gemini)
+        node: Which workflow node triggered the execution
+        template_name: Which prompt template was used
+        prompt: The actual prompt sent to the agent
+        output: The agent's response (may be truncated for storage)
+        success: Whether the execution succeeded
+        exit_code: CLI exit code if applicable
+        duration_seconds: How long the execution took
+        cost_usd: Estimated cost of this execution
+        model: Which model was used (e.g., sonnet, opus, gemini-2.0-flash)
+        task_id: Associated task ID if in task loop
+        input_tokens: Number of input tokens (if available)
+        output_tokens: Number of output tokens (if available)
+        timestamp: When execution started
+        retries: Number of retries before success/failure
+        error_context: ErrorContext if execution failed
+    """
+
+    execution_id: str
+    agent: str
+    node: str
+    template_name: str
+    prompt: str
+    output: str
+    success: bool
+    exit_code: int
+    duration_seconds: float
+    cost_usd: float
+    model: str
+    task_id: Optional[str]
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    timestamp: str
+    retries: int
+    error_context: Optional[ErrorContext]
+
+
+def create_agent_execution(
+    agent: str,
+    node: str,
+    template_name: str,
+    prompt: str,
+    output: str = "",
+    success: bool = False,
+    exit_code: int = 0,
+    duration_seconds: float = 0.0,
+    cost_usd: float = 0.0,
+    model: str = "",
+    task_id: Optional[str] = None,
+    input_tokens: Optional[int] = None,
+    output_tokens: Optional[int] = None,
+    retries: int = 0,
+    error_context: Optional[ErrorContext] = None,
+) -> AgentExecution:
+    """Create an AgentExecution record.
+
+    Args:
+        agent: Agent name (claude, cursor, gemini)
+        node: Workflow node name
+        template_name: Prompt template name
+        prompt: Prompt sent to agent (will be truncated if too long)
+        output: Agent response (will be truncated if too long)
+        success: Whether execution succeeded
+        exit_code: CLI exit code
+        duration_seconds: Execution duration
+        cost_usd: Estimated cost
+        model: Model used
+        task_id: Associated task ID
+        input_tokens: Input token count
+        output_tokens: Output token count
+        retries: Number of retries
+        error_context: Error context if failed
+
+    Returns:
+        AgentExecution record
+    """
+    # Truncate large strings to prevent state bloat
+    MAX_PROMPT_LENGTH = 10000
+    MAX_OUTPUT_LENGTH = 20000
+
+    truncated_prompt = prompt[:MAX_PROMPT_LENGTH] if len(prompt) > MAX_PROMPT_LENGTH else prompt
+    truncated_output = output[:MAX_OUTPUT_LENGTH] if len(output) > MAX_OUTPUT_LENGTH else output
+
+    return AgentExecution(
+        execution_id=str(uuid.uuid4())[:8],
+        agent=agent,
+        node=node,
+        template_name=template_name,
+        prompt=truncated_prompt,
+        output=truncated_output,
+        success=success,
+        exit_code=exit_code,
+        duration_seconds=duration_seconds,
+        cost_usd=cost_usd,
+        model=model,
+        task_id=task_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        timestamp=datetime.now().isoformat(),
+        retries=retries,
+        error_context=error_context,
+    )
+
+
+# Maximum executions to keep in history
+MAX_EXECUTION_HISTORY = 50
+
+
+def _append_executions(
+    existing: Optional[list[AgentExecution]],
+    new: list[AgentExecution],
+) -> list[AgentExecution]:
+    """Reducer for appending agent executions with size limit.
+
+    Keeps most recent MAX_EXECUTION_HISTORY executions.
+
+    Args:
+        existing: Existing execution list
+        new: New executions to append
+
+    Returns:
+        Combined list (limited to MAX_EXECUTION_HISTORY)
+    """
+    if existing is None:
+        result = list(new)
+    else:
+        result = list(existing) + list(new)
+
+    # Keep only most recent executions if over limit
+    if len(result) > MAX_EXECUTION_HISTORY:
+        result = result[-MAX_EXECUTION_HISTORY:]
+
+    return result
 
 
 class PhaseStatus(str, Enum):
@@ -565,6 +866,18 @@ class WorkflowState(TypedDict, total=False):
     current_fix_attempt: Optional[dict]
     fix_history: Annotated[list[dict], operator.add]
 
+    # Auto-improvement state
+    last_agent_execution: Optional[AgentExecution]  # Most recent agent execution for evaluation
+    last_evaluation: Optional[dict]  # Most recent evaluation result
+    last_analysis: Optional[dict]  # Most recent output analysis
+    optimization_queue: list[dict]  # Templates queued for optimization
+    optimization_results: list[dict]  # Results from optimization attempts
+    active_experiments: dict[str, str]  # A/B testing: template -> version_id
+
+    # Global error context (for Bugfixer agent)
+    error_context: Optional[ErrorContext]  # Rich error context for current error
+    execution_history: Annotated[list[AgentExecution], _append_executions]  # All agent executions
+
 
 def create_initial_state(
     project_dir: str,
@@ -643,6 +956,16 @@ def create_initial_state(
         fixer_circuit_breaker_open=False,
         current_fix_attempt=None,
         fix_history=[],
+        # Auto-improvement state
+        last_agent_execution=None,
+        last_evaluation=None,
+        last_analysis=None,
+        optimization_queue=[],
+        optimization_results=[],
+        active_experiments={},
+        # Global error context (for Bugfixer agent)
+        error_context=None,
+        execution_history=[],
     )
 
 

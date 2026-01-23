@@ -39,6 +39,7 @@ from .fixer import (
     fixer_validate_router,
     fixer_apply_router,
     fixer_verify_router,
+    fixer_research_router,
     should_use_fixer_router,
 )
 from ..nodes.error_dispatch import error_dispatch_router
@@ -82,9 +83,9 @@ __all__ = [
     "fixer_validate_router",
     "fixer_apply_router",
     "fixer_verify_router",
+    "fixer_research_router",
     "should_use_fixer_router",
-    # Error dispatch
-    "error_dispatch_router",
+    # Error dispatch router
     # Auto-improvement routers (evaluation and optimization)
     "evaluate_agent_router",
     "analyze_output_router",

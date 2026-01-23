@@ -69,6 +69,19 @@ from .schema import (
     get_schema_version,
 )
 
+from .migrations import (
+    BaseMigration,
+    MigrationContext,
+    MigrationRecord,
+    MigrationStatus,
+    MigrationError,
+    MigrationRunner,
+    get_pending_migrations,
+    apply_migrations,
+    rollback_migrations,
+    get_migration_status,
+)
+
 from .live import (
     LiveEvent,
     EventType,
@@ -119,6 +132,17 @@ __all__ = [
     "apply_schema",
     "ensure_schema",
     "get_schema_version",
+    # Migrations
+    "BaseMigration",
+    "MigrationContext",
+    "MigrationRecord",
+    "MigrationStatus",
+    "MigrationError",
+    "MigrationRunner",
+    "get_pending_migrations",
+    "apply_migrations",
+    "rollback_migrations",
+    "get_migration_status",
     # Live Queries
     "LiveEvent",
     "EventType",

@@ -10,6 +10,7 @@ import {
   useWorkflowHealth,
   useTasks,
   useWebSocket,
+  useResumeWorkflow,
 } from '@/hooks';
 import {
   Badge,
@@ -26,8 +27,10 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui';
+import { StartWorkflowDialog } from '@/components/workflow/StartWorkflowDialog';
 import { PhaseProgress } from '@/components/workflow/PhaseProgress';
 import { TaskBoard } from '@/components/workflow/TaskBoard';
+import { WorkflowGraph } from '@/components/workflow/WorkflowGraph';
 import { AgentFeed } from '@/components/agents/AgentFeed';
 import { BudgetOverview } from '@/components/budget/BudgetOverview';
 import { ChatPanel } from '@/components/chat/ChatPanel';
@@ -41,6 +44,7 @@ export function ProjectDashboard() {
   const { data: status, isLoading: statusLoading } = useWorkflowStatus(name);
   const { data: health } = useWorkflowHealth(name);
   const { data: tasks } = useTasks(name);
+  const resumeWorkflow = useResumeWorkflow(name);
 
   // Connect to WebSocket for real-time updates
   const { isConnected, lastEvent } = useWebSocket(name);
@@ -92,6 +96,19 @@ export function ProjectDashboard() {
           <p className="text-muted-foreground">{project.path}</p>
         </div>
         <div className="flex items-center space-x-2">
+          {status?.status === 'paused' && (
+            <Button 
+              size="sm" 
+              onClick={() => resumeWorkflow.mutate(false)}
+              disabled={resumeWorkflow.isPending}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", resumeWorkflow.isPending && "animate-spin")} />
+              Resume
+            </Button>
+          )}
+          {status?.status !== 'in_progress' && status?.status !== 'paused' && (
+            <StartWorkflowDialog projectName={name} />
+          )}
           {health && (
             <Badge
               variant="outline"
@@ -181,14 +198,19 @@ export function ProjectDashboard() {
       <Separator />
 
       {/* Main content tabs */}
-      <Tabs defaultValue="tasks" className="space-y-4">
+      <Tabs defaultValue="graph" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="graph">Graph</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
           <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="chat">Chat</TabsTrigger>
           <TabsTrigger value="errors">Errors</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="graph">
+          <WorkflowGraph projectName={name} />
+        </TabsContent>
 
         <TabsContent value="tasks">
           <TaskBoard projectName={name} />

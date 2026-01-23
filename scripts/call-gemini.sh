@@ -19,7 +19,7 @@ PROJECT_DIR="${3:-.}"
 PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
 
 # Model selection (Gemini 3 Pro is the latest, most capable model)
-# Options: gemini-3-pro, gemini-3-flash, gemini-2.5-pro, gemini-2.5-flash
+# Options: gemini-3-pro, gemini-3-flash
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-3-pro}"
 
 # Validate arguments
@@ -28,7 +28,7 @@ if [ -z "$PROMPT_FILE" ] || [ -z "$OUTPUT_FILE" ]; then
     echo ""
     echo "Environment variables:"
     echo "  GEMINI_MODEL - Model to use (default: gemini-3-pro)"
-    echo "                 Options: gemini-3-pro, gemini-3-flash, gemini-2.5-pro"
+    echo "                 Options: gemini-3-pro, gemini-3-flash"
     exit 1
 fi
 

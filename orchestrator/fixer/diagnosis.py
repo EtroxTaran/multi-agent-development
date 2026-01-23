@@ -74,6 +74,11 @@ class RootCause(str, Enum):
     VULNERABILITY = "vulnerability"
     EXPOSED_SECRET = "exposed_secret"
 
+    # Knowledge issues (triggers research)
+    API_MISUSE = "api_misuse"
+    MISSING_DOCUMENTATION = "missing_documentation"
+    DEPRECATED_FEATURE = "deprecated_feature"
+
     # Unknown
     UNKNOWN = "unknown"
 
@@ -271,8 +276,12 @@ class DiagnosisEngine:
             project_dir: Project directory for reading files
         """
         self.project_dir = Path(project_dir)
+        
+        # Initialize LLM diagnoser for complex errors
+        from .llm_diagnoser import LLMDiagnosisEngine
+        self.llm_engine = LLMDiagnosisEngine(self.project_dir)
 
-    def diagnose(
+    async def diagnose(
         self,
         error: FixerError,
         category: ErrorCategory,
@@ -293,20 +302,34 @@ class DiagnosisEngine:
         stack_trace = error.stack_trace or ""
         combined_text = f"{message}\n{stack_trace}"
 
-        # Determine root cause
+        # Determine root cause via regex (fast path)
         root_cause, confidence = self._identify_root_cause(combined_text, category)
 
         # Extract affected files
         affected_files = self._extract_affected_files(combined_text)
+
+        # Build context
+        context = self._build_context(error, workflow_state)
+
+        # If regex confidence is low or unknown, try LLM (slow path)
+        if confidence == DiagnosisConfidence.LOW or root_cause == RootCause.UNKNOWN:
+            logger.info("Regex diagnosis low confidence/unknown. Attempting LLM diagnosis...")
+            llm_result = await self.llm_engine.diagnose(
+                error=error,
+                category=category,
+                affected_files=affected_files,
+                context=context
+            )
+            if llm_result:
+                logger.info(f"LLM diagnosis successful: {llm_result.root_cause}")
+                return llm_result
+            logger.warning("LLM diagnosis failed, falling back to regex result")
 
         # Generate explanation
         explanation = self._generate_explanation(root_cause, error, affected_files)
 
         # Generate suggested fixes
         suggested_fixes = self._generate_suggested_fixes(root_cause, affected_files, error)
-
-        # Build context
-        context = self._build_context(error, workflow_state)
 
         return DiagnosisResult(
             error=error,

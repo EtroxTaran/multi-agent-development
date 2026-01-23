@@ -763,7 +763,56 @@ def resolve_conflict(v1_result, v2_result, issue_type):
 
 ---
 
-## Part 6: Workflow Integration
+## Part 6: Cognitive Orchestration (Self-Healing)
+
+### Architecture Upgrade (v4.0)
+
+The system now includes a **Cognitive Fixer Loop** that handles errors intelligently instead of blindly retrying.
+
+```
+ERROR OCCURS
+    │
+    ▼
+┌──────────────┐
+│  A05 FIXER   │
+│ (Triage Node)│
+└──────┬───────┘
+       │
+       ├──► Simple? (Syntax, Import) ──► Regex Fix ──► Apply
+       │
+       └──► Complex? (Logic, API) ──► LLM Diagnosis
+                                           │
+                                           ▼
+                                     Knowledge Gap?
+                                     (e.g., API misuse)
+                                      /          \
+                                    YES           NO
+                                     │             │
+                            ┌────────▼───────┐     │
+                            │ RESEARCH PHASE │     │
+                            │ (Read Docs)    │     │
+                            └────────┬───────┘     │
+                                     │             │
+                                     ▼             ▼
+                                Create Plan ──► Apply Fix
+```
+
+### Components
+
+| Component | Role | Logic |
+|-----------|------|-------|
+| **Triage** | Router | Regex-based categorization. Decides: Fix, Escalate, or Skip. |
+| **Diagnoser** | Analyst | **Fast Path**: Regex patterns. **Slow Path**: LLM analysis of stack trace + code. |
+| **Researcher** | Scholar | Spawns if `RootCause` is "API_MISUSE" or "MISSING_DOCS". Reads docs/files to learn correct usage. |
+| **Patcher** | Surgeon | Generates minimal diffs based on the plan. |
+
+### Dynamic Adaptation
+
+This architecture allows the system to **learn at runtime**. If a library implementation fails because the agent "hallucinated" an API, the Research Phase forces it to check the actual code/docs, correcting its internal context before retrying.
+
+---
+
+## Part 7: Workflow Integration
 
 ### Updated LangGraph Workflow
 
@@ -1109,7 +1158,7 @@ BOARD_NODES = [
 
 ---
 
-## Part 7: Directory Structure
+## Part 8: Directory Structure
 
 ### New Project Structure
 
@@ -1188,7 +1237,7 @@ conductor/
 
 ---
 
-## Part 8: Migration Path
+## Part 9: Migration Path
 
 ### Phase 1: Create Agent Definitions (Week 1)
 - [ ] Create `agents/` directory structure
@@ -1229,7 +1278,7 @@ conductor/
 
 ---
 
-## Part 9: Configuration
+## Part 10: Configuration
 
 ### Environment Variables
 
@@ -1281,7 +1330,7 @@ MAX_TASK_RETRIES=3
 
 ---
 
-## Part 10: Success Metrics
+## Part 11: Success Metrics
 
 ### Quality Metrics
 - **First-pass success rate**: % of tasks passing 4-eyes on first submission

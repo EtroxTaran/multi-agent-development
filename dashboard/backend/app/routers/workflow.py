@@ -19,6 +19,7 @@ from ..models import (
     WorkflowStatusResponse,
 )
 from ..websocket import get_connection_manager
+from ..callbacks import WebSocketProgressCallback
 
 # Import orchestrator modules
 import sys
@@ -85,6 +86,19 @@ async def get_workflow_health(
     return WorkflowHealthResponse(**health)
 
 
+@router.get(
+    "/graph",
+    summary="Get workflow graph definition",
+    description="Get the nodes and edges of the workflow graph.",
+)
+async def get_workflow_graph(
+    project_dir: Path = Depends(get_project_dir),
+) -> dict:
+    """Get workflow graph definition."""
+    orchestrator = Orchestrator(project_dir, console_output=False)
+    return orchestrator.get_workflow_definition()
+
+
 @router.post(
     "/start",
     response_model=WorkflowStartResponse,
@@ -111,6 +125,8 @@ async def start_workflow(
 
     # Start workflow in background
     async def run_workflow():
+        manager = get_connection_manager()
+        callback = WebSocketProgressCallback(manager, project_name)
         try:
             result = await orchestrator.run_langgraph(
                 start_phase=request.start_phase,
@@ -118,16 +134,15 @@ async def start_workflow(
                 skip_validation=request.skip_validation,
                 autonomous=request.autonomous,
                 use_rich_display=False,
+                progress_callback=callback,
             )
             # Broadcast completion event
-            manager = get_connection_manager()
             await manager.broadcast_to_project(
                 project_name,
                 "workflow_complete",
                 {"success": result.get("success", False), "results": result},
             )
         except Exception as e:
-            manager = get_connection_manager()
             await manager.broadcast_to_project(
                 project_name,
                 "workflow_error",
@@ -161,20 +176,21 @@ async def resume_workflow(
 
     # Resume workflow in background
     async def run_resume():
+        manager = get_connection_manager()
+        callback = WebSocketProgressCallback(manager, project_name)
         try:
             result = await orchestrator.resume_langgraph(
                 autonomous=autonomous,
                 use_rich_display=False,
+                progress_callback=callback,
             )
             # Broadcast completion event
-            manager = get_connection_manager()
             await manager.broadcast_to_project(
                 project_name,
                 "workflow_complete",
                 {"success": result.get("success", False), "results": result},
             )
         except Exception as e:
-            manager = get_connection_manager()
             await manager.broadcast_to_project(
                 project_name,
                 "workflow_error",

@@ -203,10 +203,11 @@ class TestErrorDispatchIntegration:
         assert result.decision == TriageDecision.ESCALATE
 
 
+@pytest.mark.asyncio
 class TestEndToEndFix:
     """End-to-end fix flow tests."""
 
-    def test_simple_fix_flow(self, tmp_path):
+    async def test_simple_fix_flow(self, tmp_path):
         """Test complete flow for a simple fix."""
         agent = FixerAgent(tmp_path)
 
@@ -224,7 +225,7 @@ class TestEndToEndFix:
         assert triage_result.category == ErrorCategory.IMPORT_ERROR
 
         # Step 2: Diagnose
-        diagnosis = agent.diagnose(error, triage_result.category)
+        diagnosis = await agent.diagnose(error, triage_result.category)
         assert diagnosis.root_cause == RootCause.MISSING_IMPORT
         assert diagnosis.confidence == DiagnosisConfidence.HIGH
 
@@ -282,10 +283,11 @@ class TestConfigIntegration:
         assert agent.circuit_breaker.failure_threshold == 10
 
 
+@pytest.mark.asyncio
 class TestDiagnosisIntegration:
     """Integration tests for diagnosis with triage."""
 
-    def test_diagnosis_uses_triage_category(self, tmp_path):
+    async def test_diagnosis_uses_triage_category(self, tmp_path):
         """Diagnosis uses category from triage."""
         agent = FixerAgent(tmp_path)
 
@@ -301,7 +303,7 @@ class TestDiagnosisIntegration:
         assert triage_result.category == ErrorCategory.SYNTAX_ERROR
 
         # Diagnosis uses triage category
-        diagnosis = agent.diagnose(error, triage_result.category)
+        diagnosis = await agent.diagnose(error, triage_result.category)
         assert diagnosis.category == ErrorCategory.SYNTAX_ERROR
         assert diagnosis.root_cause == RootCause.SYNTAX_ERROR
 

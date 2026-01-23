@@ -19,7 +19,7 @@ PROJECT_DIR="${3:-.}"
 PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
 
 # Model selection (GPT-5.2-Codex is the latest, most capable coding model)
-# Options: gpt-5.2-codex, gpt-5.1-codex, gpt-4.5-turbo, claude-sonnet-4
+# Options: gpt-5.2-codex, composer-v2, gpt-4o
 CURSOR_MODEL="${CURSOR_MODEL:-gpt-5.2-codex}"
 
 # Validate arguments
@@ -28,7 +28,7 @@ if [ -z "$PROMPT_FILE" ] || [ -z "$OUTPUT_FILE" ]; then
     echo ""
     echo "Environment variables:"
     echo "  CURSOR_MODEL - Model to use (default: gpt-5.2-codex)"
-    echo "                 Options: gpt-5.2-codex, gpt-5.1-codex, gpt-4.5-turbo"
+    echo "                 Options: gpt-5.2-codex, composer-v2, gpt-4o"
     exit 1
 fi
 

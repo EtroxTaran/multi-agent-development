@@ -41,6 +41,7 @@ from .fixer_diagnose import fixer_diagnose_node
 from .fixer_validate import fixer_validate_node
 from .fixer_apply import fixer_apply_node
 from .fixer_verify import fixer_verify_node
+from .fixer_research import fixer_research_node
 from .error_dispatch import error_dispatch_node
 
 # Auto-improvement nodes (evaluation and optimization)
@@ -87,11 +88,12 @@ __all__ = [
     # Fixer nodes (self-healing)
     "fixer_triage_node",
     "fixer_diagnose_node",
-    "fixer_validate_node",
-    "fixer_apply_node",
-    "fixer_verify_node",
+    fixer_validate_node,
+    fixer_apply_node,
+    fixer_verify_node,
+    fixer_research_node,
     # Error dispatch node
-    "error_dispatch_node",
+    error_dispatch_node,
     # Auto-improvement nodes (evaluation and optimization)
     "evaluate_agent_node",
     "analyze_output_node",

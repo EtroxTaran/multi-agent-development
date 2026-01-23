@@ -38,6 +38,7 @@ class AgentResult:
         model: Model used if known
         schema_validated: Whether output was validated against a schema
         validation_errors: List of validation errors if schema validation failed
+        evaluation: Evaluation result if evaluation was run
     """
 
     success: bool
@@ -51,6 +52,7 @@ class AgentResult:
     model: Optional[str] = None
     schema_validated: bool = False
     validation_errors: Optional[list[str]] = None
+    evaluation: Optional[dict] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -66,6 +68,7 @@ class AgentResult:
             "model": self.model,
             "schema_validated": self.schema_validated,
             "validation_errors": self.validation_errors,
+            "evaluation": self.evaluation,
         }
 
 
@@ -77,6 +80,7 @@ class BaseAgent(ABC):
     - Timeout management
     - Output parsing
     - Audit trail integration (optional)
+    - Auto-improvement evaluation (optional)
     """
 
     name: str = "base"
@@ -87,6 +91,7 @@ class BaseAgent(ABC):
         timeout: int = 300,
         phase_timeouts: Optional[dict[int, int]] = None,
         enable_audit: bool = True,
+        enable_evaluation: bool = False,
     ):
         """Initialize the agent.
 
@@ -95,14 +100,19 @@ class BaseAgent(ABC):
             timeout: Default timeout in seconds for command execution
             phase_timeouts: Optional per-phase timeout overrides
             enable_audit: Whether to enable audit trail logging
+            enable_evaluation: Whether to enable auto-improvement evaluation
         """
         self.project_dir = Path(project_dir)
         self.timeout = timeout
         self.phase_timeouts = phase_timeouts or PHASE_TIMEOUTS.copy()
         self.enable_audit = enable_audit
+        self.enable_evaluation = enable_evaluation
 
         # Lazily initialized audit trail
         self._audit_trail = None
+
+        # Lazily initialized evaluator
+        self._evaluator = None
 
     @property
     def audit_trail(self):
@@ -123,6 +133,25 @@ class BaseAgent(ABC):
                 except ImportError:
                     logger.debug("Audit trail not available")
         return self._audit_trail
+
+    @property
+    def evaluator(self):
+        """Get or create the evaluator for auto-improvement.
+
+        Returns:
+            AgentEvaluator instance or None if not enabled
+        """
+        if self._evaluator is None and self.enable_evaluation:
+            try:
+                from ..evaluation import AgentEvaluator
+                self._evaluator = AgentEvaluator(
+                    project_dir=self.project_dir,
+                    evaluator_model="haiku",
+                    enable_storage=True,
+                )
+            except ImportError:
+                logger.debug("Evaluation module not available")
+        return self._evaluator
 
     @abstractmethod
     def build_command(self, prompt: str, **kwargs) -> list[str]:
@@ -395,6 +424,44 @@ class BaseAgent(ABC):
         if context_file and context_file.exists():
             return context_file.read_text()
         return None
+
+    def get_execution_context(
+        self,
+        prompt: str,
+        result: AgentResult,
+        task_id: Optional[str] = None,
+        node: Optional[str] = None,
+        template_name: Optional[str] = None,
+    ) -> dict:
+        """Build execution context for evaluation.
+
+        This method creates the context dictionary that can be used
+        for post-execution evaluation in the workflow.
+
+        Args:
+            prompt: The prompt sent to the agent
+            result: The execution result
+            task_id: Optional task ID
+            node: Optional node name
+            template_name: Optional prompt template name
+
+        Returns:
+            Execution context dictionary
+        """
+        return {
+            "agent": self.name,
+            "node": node or f"{self.name}_execution",
+            "prompt": prompt,
+            "output": result.output or "",
+            "parsed_output": result.parsed_output,
+            "success": result.success,
+            "session_id": result.session_id,
+            "cost_usd": result.cost_usd,
+            "model": result.model,
+            "task_id": task_id,
+            "template_name": template_name or "default",
+            "duration_seconds": result.duration_seconds,
+        }
 
     # Schema cache for validation
     _schema_cache: dict[str, dict] = {}

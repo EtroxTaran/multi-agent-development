@@ -1056,6 +1056,32 @@ DONE   Attempt 2 (A04 new approach)
             DONE   ESCALATE
 ```
 
+### 14.4 Self-Healing & Time Travel Debugging
+
+Conductor includes advanced "Cognitive Orchestration" capabilities for resilience and debugging.
+
+#### Deep Semantic Diagnosis
+When errors occur, the system doesn't just blindly retry. It enters a "Fixer" loop:
+1. **Triage:** Is it a syntax error, test failure, or something deeper?
+2. **Diagnosis:** 
+   - **Regex:** Fast path for common issues (missing imports, typos).
+   - **Deep Semantic (LLM):** If complex, Claude analyzes the stack trace and logic to find the root cause.
+3. **Dynamic Adaptation:** If the diagnosis reveals a knowledge gap (e.g., "API Misuse"), the system dynamically inserts a **Research Phase** to read documentation and generate a correct usage guide before retrying.
+4. **Fix Application:** Generates and applies a specific patch.
+
+#### Time Travel Debugging
+Interactive debugging for the entire workflow state.
+
+```bash
+python -m orchestrator --project my-app --debug
+```
+
+**Debugger Commands:**
+- `list`: Show all checkpoints (Start, Pre-Implementation, Error states).
+- `checkout <id>`: Rollback the entire project state (files + memory) to that point.
+- `replay`: Resume execution from the restored state.
+- `inspect <id>`: View details of a checkpoint.
+
 ---
 
 ## 15. Security Model

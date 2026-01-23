@@ -26,6 +26,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from ..config.models import (
+    CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL,
+    GEMINI_MODELS, DEFAULT_GEMINI_MODEL,
+    CURSOR_MODELS, DEFAULT_CURSOR_MODEL
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -423,7 +429,7 @@ class ClaudeAdapter(AgentAdapter):
         '"status":"completed"',
     ]
 
-    AVAILABLE_MODELS = ["sonnet", "opus", "haiku"]
+    AVAILABLE_MODELS = CLAUDE_MODELS
 
     @property
     def agent_type(self) -> AgentType:
@@ -439,7 +445,7 @@ class ClaudeAdapter(AgentAdapter):
             supports_budget_flag=True,
             available_models=self.AVAILABLE_MODELS,
             completion_patterns=self.COMPLETION_PATTERNS,
-            default_model="sonnet",
+            default_model=DEFAULT_CLAUDE_MODEL,
         )
 
     def build_command(
@@ -453,7 +459,7 @@ class ClaudeAdapter(AgentAdapter):
         use_plan_mode: bool = False,
         resume_session: bool = False,
         json_schema: Optional[str] = None,
-        fallback_model: str = "sonnet",
+        fallback_model: str = DEFAULT_CLAUDE_MODEL,
         **kwargs,
     ) -> list[str]:
         """Build Claude CLI command."""
@@ -522,7 +528,7 @@ class CursorAdapter(AgentAdapter):
         '"status":"completed"',
     ]
 
-    AVAILABLE_MODELS = ["codex-5.2", "composer"]
+    AVAILABLE_MODELS = CURSOR_MODELS
 
     @property
     def agent_type(self) -> AgentType:
@@ -538,7 +544,7 @@ class CursorAdapter(AgentAdapter):
             supports_budget_flag=False,
             available_models=self.AVAILABLE_MODELS,
             completion_patterns=self.COMPLETION_PATTERNS,
-            default_model="codex-5.2",
+            default_model=DEFAULT_CURSOR_MODEL,
         )
 
     def build_command(
@@ -602,7 +608,7 @@ class GeminiAdapter(AgentAdapter):
         '"status": "completed"',
     ]
 
-    AVAILABLE_MODELS = ["gemini-2.0-flash", "gemini-2.0-pro"]
+    AVAILABLE_MODELS = GEMINI_MODELS
 
     @property
     def agent_type(self) -> AgentType:
@@ -618,7 +624,7 @@ class GeminiAdapter(AgentAdapter):
             supports_budget_flag=False,
             available_models=self.AVAILABLE_MODELS,
             completion_patterns=self.COMPLETION_PATTERNS,
-            default_model="gemini-2.0-flash",
+            default_model=DEFAULT_GEMINI_MODEL,
         )
 
     def build_command(

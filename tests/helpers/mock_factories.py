@@ -14,6 +14,7 @@ def create_mock_workflow_state():
     """
     mock_state = MagicMock()
     mock_state.project_dir = "/tmp/test"
+    mock_state.project_name = "test_project"  # Fixed: Add project_name
     mock_state.current_phase = 1
     mock_state.phase_status = {}
     mock_state.iteration_count = 0
@@ -27,8 +28,8 @@ def create_mock_workflow_state():
     mock_state.research_complete = False
     mock_state.research_findings = {}
     mock_state.token_usage = {}
-    mock_state.created_at = None
-    mock_state.updated_at = None
+    mock_state.created_at = "2024-01-01T00:00:00"
+    mock_state.updated_at = "2024-01-01T00:00:00"
     return mock_state
 
 
@@ -107,7 +108,7 @@ def create_mock_workflow_repo():
     mock_repo.initialize_state = AsyncMock(return_value=mock_state)
     mock_repo.update_state = AsyncMock(return_value=mock_state)
     mock_repo.set_phase = AsyncMock(return_value=mock_state)
-    mock_repo.reset_state = AsyncMock(return_value=mock_state)
+    mock_repo.reset_state = AsyncMock(return_value=None) # reset_state returns None
     mock_repo.reset_to_phase = AsyncMock(return_value=mock_state)
 
     # Async summary methods

@@ -165,7 +165,7 @@ class TestProtectedFiles:
 
     def test_workflow_files_protected(self):
         assert is_protected_file(".workflow/state.json") is True
-        assert is_protected_file(".workflow/checkpoints.db") is True
+        assert is_protected_file(".project-config.json") is True
 
     def test_credentials_pattern_protected(self):
         assert is_protected_file("credentials.json") is True

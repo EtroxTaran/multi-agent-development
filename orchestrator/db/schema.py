@@ -2,6 +2,10 @@
 
 Defines tables, fields, indexes, and relationships for the orchestrator.
 Schema is applied automatically on first connection to a database.
+
+NOTE: This module now delegates to the migrations system for schema management.
+The SCHEMA_DEFINITIONS constant is kept for reference but apply_schema() uses
+the migration runner to apply versioned migrations.
 """
 
 import logging
@@ -17,7 +21,8 @@ logger = logging.getLogger(__name__)
 # v2.1.0 - Added phase_outputs and logs tables for DB-only storage
 # v2.2.0 - Use FLEXIBLE TYPE object for nested objects (fixes SurrealDB v2.x issue)
 # v2.3.0 - Added auto-improvement tables (agent_evaluations, prompt_versions, golden_examples, optimization_history)
-SCHEMA_VERSION = "2.3.0"
+# v2.4.0 - Added LangGraph persistence tables (graph_checkpoints, graph_writes)
+SCHEMA_VERSION = "2.4.0"
 
 
 SCHEMA_DEFINITIONS = """
@@ -385,6 +390,40 @@ DEFINE INDEX IF NOT EXISTS idx_opt_method ON TABLE optimization_history COLUMNS 
 DEFINE INDEX IF NOT EXISTS idx_opt_success ON TABLE optimization_history COLUMNS success;
 DEFINE INDEX IF NOT EXISTS idx_opt_time ON TABLE optimization_history COLUMNS created_at;
 
+-- ============================================
+-- LangGraph State Persistence
+-- ============================================
+
+DEFINE TABLE IF NOT EXISTS graph_checkpoints SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS thread_id ON TABLE graph_checkpoints TYPE string ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS checkpoint_ns ON TABLE graph_checkpoints TYPE string DEFAULT "";
+DEFINE FIELD IF NOT EXISTS checkpoint_id ON TABLE graph_checkpoints TYPE string ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS parent_checkpoint_id ON TABLE graph_checkpoints TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS checkpoint ON TABLE graph_checkpoints TYPE string; -- Base64 encoded pickle
+DEFINE FIELD IF NOT EXISTS metadata ON TABLE graph_checkpoints TYPE string; -- Base64 encoded pickle
+DEFINE FIELD IF NOT EXISTS created_at ON TABLE graph_checkpoints TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX IF NOT EXISTS idx_graph_cp_thread ON TABLE graph_checkpoints COLUMNS thread_id;
+DEFINE INDEX IF NOT EXISTS idx_graph_cp_ns ON TABLE graph_checkpoints COLUMNS thread_id, checkpoint_ns;
+DEFINE INDEX IF NOT EXISTS idx_graph_cp_id ON TABLE graph_checkpoints COLUMNS thread_id, checkpoint_ns, checkpoint_id UNIQUE;
+
+
+DEFINE TABLE IF NOT EXISTS graph_writes SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS thread_id ON TABLE graph_writes TYPE string ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS checkpoint_ns ON TABLE graph_writes TYPE string DEFAULT "";
+DEFINE FIELD IF NOT EXISTS checkpoint_id ON TABLE graph_writes TYPE string ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS task_id ON TABLE graph_writes TYPE string ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS idx ON TABLE graph_writes TYPE int ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS channel ON TABLE graph_writes TYPE string ASSERT $value != NONE;
+DEFINE FIELD IF NOT EXISTS type ON TABLE graph_writes TYPE string; -- "json" or "pickle"
+DEFINE FIELD IF NOT EXISTS value ON TABLE graph_writes TYPE string; -- serialized value
+DEFINE FIELD IF NOT EXISTS created_at ON TABLE graph_writes TYPE datetime DEFAULT time::now();
+
+DEFINE INDEX IF NOT EXISTS idx_graph_writes_thread ON TABLE graph_writes COLUMNS thread_id;
+DEFINE INDEX IF NOT EXISTS idx_graph_writes_ns ON TABLE graph_writes COLUMNS thread_id, checkpoint_ns;
+DEFINE INDEX IF NOT EXISTS idx_graph_writes_cp ON TABLE graph_writes COLUMNS checkpoint_id;
+DEFINE INDEX IF NOT EXISTS idx_graph_writes_task ON TABLE graph_writes COLUMNS task_id;
+
 """
 
 
@@ -450,7 +489,62 @@ async def _migrate_to_flexible_types(conn: Connection) -> None:
 
 
 async def apply_schema(conn: Connection) -> bool:
-    """Apply schema to the database.
+    """Apply schema to the database using the migration system.
+
+    Args:
+        conn: Database connection
+
+    Returns:
+        True if schema was applied successfully
+    """
+    try:
+        # Import here to avoid circular imports
+        from .migrations import MigrationRunner
+        from .migrations.base import MigrationContext
+
+        # Create a temporary project name from the connection
+        # The connection is already scoped to a database
+        project_name = getattr(conn, '_database', 'default')
+
+        # Create migration context
+        ctx = MigrationContext(
+            conn=conn,
+            project_name=project_name,
+            dry_run=False,
+        )
+
+        # Use migration runner
+        runner = MigrationRunner(project_name)
+
+        # Apply pending migrations
+        result = await runner.apply(dry_run=False)
+
+        if result.success:
+            applied_count = len(result.applied)
+            if applied_count > 0:
+                logger.info(f"Applied {applied_count} migration(s)")
+            else:
+                logger.debug("Schema is up to date")
+            return True
+        else:
+            if result.failed:
+                logger.error(
+                    f"Migration failed: {result.failed.version}_{result.failed.name}: "
+                    f"{result.failed.error}"
+                )
+            return False
+
+    except ImportError:
+        # Fallback to legacy schema application if migrations not available
+        logger.warning("Migration system not available, using legacy schema")
+        return await _apply_schema_legacy(conn)
+    except Exception as e:
+        logger.error(f"Failed to apply schema: {e}")
+        return False
+
+
+async def _apply_schema_legacy(conn: Connection) -> bool:
+    """Legacy schema application (fallback).
 
     Args:
         conn: Database connection
