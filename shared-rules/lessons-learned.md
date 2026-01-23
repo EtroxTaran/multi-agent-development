@@ -2,8 +2,8 @@
 
 <!-- SHARED: This file applies to ALL agents -->
 <!-- Add new lessons at the TOP of this file -->
-<!-- Version: 1.6 -->
-<!-- Last Updated: 2026-01-22 -->
+<!-- Version: 1.7 -->
+<!-- Last Updated: 2026-01-23 -->
 
 ## How to Add a Lesson
 
@@ -16,6 +16,30 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons
+
+### 2026-01-23 - Dynamic Role Dispatch for Task-Aware Agent Selection
+
+- **Issue**: Conflict resolution between Cursor and Gemini used static weights (0.6/0.4), ignoring task context
+- **Root Cause**: All tasks treated equally regardless of whether they're security-focused (Cursor's strength) or architecture-focused (Gemini's strength)
+- **Fix**: Implemented Dynamic Role Dispatch system:
+  1. **Task Type Inference**: `infer_task_type()` analyzes task title, files, and acceptance criteria
+  2. **Role Assignment**: `get_role_assignment()` returns optimal weights based on task type:
+     - SECURITY → Cursor 0.8 / Gemini 0.2 (auth, crypto, vulnerability tasks)
+     - ARCHITECTURE → Cursor 0.3 / Gemini 0.7 (design patterns, refactoring)
+     - OPTIMIZATION → Cursor 0.5 / Gemini 0.5 (performance, caching)
+     - GENERAL → Cursor 0.6 / Gemini 0.4 (default)
+  3. **Dynamic Weights in Resolver**: `resolve()` accepts optional `cursor_weight`/`gemini_weight` params
+  4. **Integration**: Both validation and verification fan-in nodes use task-aware weights
+- **Prevention**:
+  - Use `infer_task_type()` before conflict resolution
+  - Pass role weights to `resolver.resolve()` for task-aware decisions
+  - Domain expert's opinion now carries more weight for their specialty
+- **Applies To**: all
+- **Files Changed**:
+  - `orchestrator/config/models.py` - Added TaskType, RoleAssignment, inference functions
+  - `orchestrator/review/resolver.py` - Added optional weight params to resolve()
+  - `orchestrator/langgraph/nodes/validation.py` - Role dispatch in validation_fan_in_node
+  - `orchestrator/langgraph/nodes/verification.py` - Role dispatch in verification_fan_in_node
 
 ### 2026-01-23 - Full SurrealDB Migration - Remove File-Based Storage
 

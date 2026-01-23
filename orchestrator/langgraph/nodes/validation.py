@@ -13,10 +13,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState, PhaseStatus, PhaseState, AgentFeedback
+from ..state import (
+    WorkflowState,
+    PhaseStatus,
+    PhaseState,
+    AgentFeedback,
+    create_agent_execution,
+    create_error_context,
+)
 from ..integrations.action_logging import get_node_logger
 from ...review.resolver import ConflictResolver
 from ...agents.prompts import load_prompt, format_prompt
+from ...config.models import get_role_assignment, infer_task_type
 
 logger = logging.getLogger(__name__)
 
@@ -280,14 +288,51 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
             details={"score": feedback.score, "assessment": feedback.assessment},
         )
 
+        # Track agent execution for evaluation
+        execution = create_agent_execution(
+            agent="cursor",
+            node="cursor_validate",
+            template_name="validation",
+            prompt=prompt[:5000],
+            output=json.dumps(feedback_data)[:10000] if feedback_data else "",
+            success=True,
+            exit_code=0,
+            duration_seconds=duration_ms / 1000,
+            model="cursor",
+        )
+
         return {
             "validation_feedback": {"cursor": feedback},
             "updated_at": datetime.now().isoformat(),
+            "last_agent_execution": execution,
+            "execution_history": [execution],
         }
 
     except Exception as e:
         logger.error(f"Cursor validation failed: {e}")
         action_logger.log_agent_error("cursor", str(e), phase=2, exception=e)
+
+        # Create error context for fixer
+        error_context = create_error_context(
+            source_node="cursor_validate",
+            exception=e,
+            state=dict(state),
+            recoverable=True,
+        )
+
+        # Track failed execution
+        failed_execution = create_agent_execution(
+            agent="cursor",
+            node="cursor_validate",
+            template_name="validation",
+            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            output=str(e),
+            success=False,
+            exit_code=1,
+            duration_seconds=(time.time() - start_time),
+            error_context=error_context,
+        )
+
         return {
             "validation_feedback": {
                 "cursor": AgentFeedback(
@@ -304,6 +349,9 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
                 "message": str(e),
                 "timestamp": datetime.now().isoformat(),
             }],
+            "error_context": error_context,
+            "last_agent_execution": failed_execution,
+            "execution_history": [failed_execution],
         }
 
 
@@ -419,14 +467,51 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
             details={"score": feedback.score, "assessment": feedback.assessment},
         )
 
+        # Track agent execution for evaluation
+        execution = create_agent_execution(
+            agent="gemini",
+            node="gemini_validate",
+            template_name="validation",
+            prompt=prompt[:5000],
+            output=output[:10000] if output else "",
+            success=True,
+            exit_code=0,
+            duration_seconds=duration_ms / 1000,
+            model="gemini-2.0-flash",
+        )
+
         return {
             "validation_feedback": {"gemini": feedback},
             "updated_at": datetime.now().isoformat(),
+            "last_agent_execution": execution,
+            "execution_history": [execution],
         }
 
     except Exception as e:
         logger.error(f"Gemini validation failed: {e}")
         action_logger.log_agent_error("gemini", str(e), phase=2, exception=e)
+
+        # Create error context for fixer
+        error_context = create_error_context(
+            source_node="gemini_validate",
+            exception=e,
+            state=dict(state),
+            recoverable=True,
+        )
+
+        # Track failed execution
+        failed_execution = create_agent_execution(
+            agent="gemini",
+            node="gemini_validate",
+            template_name="validation",
+            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            output=str(e),
+            success=False,
+            exit_code=1,
+            duration_seconds=(time.time() - start_time),
+            error_context=error_context,
+        )
+
         return {
             "validation_feedback": {
                 "gemini": AgentFeedback(
@@ -443,6 +528,9 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
                 "message": str(e),
                 "timestamp": datetime.now().isoformat(),
             }],
+            "error_context": error_context,
+            "last_agent_execution": failed_execution,
+            "execution_history": [failed_execution],
         }
 
 
@@ -496,9 +584,23 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
             "next_decision": "retry",
         }
 
-    # Resolve conflicts using 4-Eyes Protocol
+    # Get role assignment for dynamic weights based on task type
+    current_task = state.get("current_task") or state.get("plan", {}).get("tasks", [{}])[0]
+    role = get_role_assignment(current_task)
+    task_type = infer_task_type(current_task)
+    logger.info(
+        f"Validation using role dispatch: task_type={task_type.value}, "
+        f"weights=cursor:{role.cursor_weight}/gemini:{role.gemini_weight}"
+    )
+
+    # Resolve conflicts using 4-Eyes Protocol with task-aware weights
     resolver = ConflictResolver()
-    result = resolver.resolve(cursor_feedback, gemini_feedback)
+    result = resolver.resolve(
+        cursor_feedback,
+        gemini_feedback,
+        cursor_weight=role.cursor_weight,
+        gemini_weight=role.gemini_weight,
+    )
 
     # Determine approval
     approved = result.approved

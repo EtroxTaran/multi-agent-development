@@ -69,15 +69,19 @@ class ConflictResolver:
         self.weights = weights or self.DEFAULT_WEIGHTS
 
     def resolve(
-        self, 
-        cursor_review: Dict[str, Any], 
-        gemini_review: Dict[str, Any]
+        self,
+        cursor_review: Dict[str, Any],
+        gemini_review: Dict[str, Any],
+        cursor_weight: Optional[float] = None,
+        gemini_weight: Optional[float] = None,
     ) -> ResolutionResult:
         """Resolve verification results from multiple agents.
 
         Args:
             cursor_review: Feedback dict from Cursor (A07)
             gemini_review: Feedback dict from Gemini (A08)
+            cursor_weight: Optional override for cursor weight (for role dispatch)
+            gemini_weight: Optional override for gemini weight (for role dispatch)
 
         Returns:
             ResolutionResult
@@ -109,9 +113,10 @@ class ConflictResolver:
         # Normalize scores to 0-10 range if needed
         s1 = r1.score
         s2 = r2.score
-        
-        w1 = self.weights.get("cursor", 0.5)
-        w2 = self.weights.get("gemini", 0.5)
+
+        # Use provided weights (role dispatch) or fall back to defaults
+        w1 = cursor_weight if cursor_weight is not None else self.weights.get("cursor", 0.5)
+        w2 = gemini_weight if gemini_weight is not None else self.weights.get("gemini", 0.5)
         
         # Re-normalize weights to sum to 1.0
         total_w = w1 + w2

@@ -8,15 +8,24 @@ import asyncio
 import json
 import logging
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..state import WorkflowState, PhaseStatus, PhaseState, AgentFeedback
+from ..state import (
+    WorkflowState,
+    PhaseStatus,
+    PhaseState,
+    AgentFeedback,
+    create_agent_execution,
+    create_error_context,
+)
 from ...specialists.runner import SpecialistRunner
 from ...review.resolver import ConflictResolver
 from ...config import load_project_config
 from ...agents.prompts import load_prompt, format_prompt
+from ...config.models import get_role_assignment, infer_task_type
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +92,7 @@ async def cursor_review_node(state: WorkflowState) -> dict[str, Any]:
     """
     logger.info("Cursor reviewing implementation...")
 
+    start_time = time.time()
     project_dir = Path(state["project_dir"])
     plan = state.get("plan", {})
     impl_result = state.get("implementation_result", {})
@@ -213,13 +223,50 @@ TEST RESULTS:
 
         logger.info(f"Cursor review: approved={feedback.approved}, score={score}")
 
+        # Track agent execution for evaluation
+        execution = create_agent_execution(
+            agent="cursor",
+            node="cursor_review",
+            template_name="code_review",
+            prompt=prompt[:5000],
+            output=json.dumps(feedback_data)[:10000] if feedback_data else "",
+            success=True,
+            exit_code=0,
+            duration_seconds=(time.time() - start_time),
+            model="cursor",
+        )
+
         return {
             "verification_feedback": {"cursor": feedback},
             "updated_at": datetime.now().isoformat(),
+            "last_agent_execution": execution,
+            "execution_history": [execution],
         }
 
     except Exception as e:
         logger.error(f"Cursor review failed: {e}")
+
+        # Create error context for fixer
+        error_context = create_error_context(
+            source_node="cursor_review",
+            exception=e,
+            state=dict(state),
+            recoverable=True,
+        )
+
+        # Track failed execution
+        failed_execution = create_agent_execution(
+            agent="cursor",
+            node="cursor_review",
+            template_name="code_review",
+            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            output=str(e),
+            success=False,
+            exit_code=1,
+            duration_seconds=(time.time() - start_time),
+            error_context=error_context,
+        )
+
         return {
             "verification_feedback": {
                 "cursor": AgentFeedback(
@@ -236,6 +283,9 @@ TEST RESULTS:
                 "message": str(e),
                 "timestamp": datetime.now().isoformat(),
             }],
+            "error_context": error_context,
+            "last_agent_execution": failed_execution,
+            "execution_history": [failed_execution],
         }
 
 
@@ -250,6 +300,7 @@ async def gemini_review_node(state: WorkflowState) -> dict[str, Any]:
     """
     logger.info("Gemini reviewing implementation...")
 
+    start_time = time.time()
     project_dir = Path(state["project_dir"])
     plan = state.get("plan", {})
     impl_result = state.get("implementation_result", {})
@@ -347,13 +398,50 @@ FILES IMPLEMENTED:
 
         logger.info(f"Gemini review: approved={feedback.approved}, score={score}")
 
+        # Track agent execution for evaluation
+        execution = create_agent_execution(
+            agent="gemini",
+            node="gemini_review",
+            template_name="architecture_review",
+            prompt=prompt[:5000],
+            output=output[:10000] if output else "",
+            success=True,
+            exit_code=0,
+            duration_seconds=(time.time() - start_time),
+            model="gemini",
+        )
+
         return {
             "verification_feedback": {"gemini": feedback},
             "updated_at": datetime.now().isoformat(),
+            "last_agent_execution": execution,
+            "execution_history": [execution],
         }
 
     except Exception as e:
         logger.error(f"Gemini review failed: {e}")
+
+        # Create error context for fixer
+        error_context = create_error_context(
+            source_node="gemini_review",
+            exception=e,
+            state=dict(state),
+            recoverable=True,
+        )
+
+        # Track failed execution
+        failed_execution = create_agent_execution(
+            agent="gemini",
+            node="gemini_review",
+            template_name="architecture_review",
+            prompt=prompt[:5000] if 'prompt' in dir() else "",
+            output=str(e),
+            success=False,
+            exit_code=1,
+            duration_seconds=(time.time() - start_time),
+            error_context=error_context,
+        )
+
         return {
             "verification_feedback": {
                 "gemini": AgentFeedback(
@@ -370,6 +458,9 @@ FILES IMPLEMENTED:
                 "message": str(e),
                 "timestamp": datetime.now().isoformat(),
             }],
+            "error_context": error_context,
+            "last_agent_execution": failed_execution,
+            "execution_history": [failed_execution],
         }
 
 
@@ -439,9 +530,23 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
             "next_decision": "retry",
         }
 
-    # Resolve conflicts using 4-Eyes Protocol
+    # Get role assignment for dynamic weights based on task type
+    current_task = state.get("current_task") or {}
+    role = get_role_assignment(current_task)
+    task_type = infer_task_type(current_task)
+    logger.info(
+        f"Verification using role dispatch: task_type={task_type.value}, "
+        f"weights=cursor:{role.cursor_weight}/gemini:{role.gemini_weight}"
+    )
+
+    # Resolve conflicts using 4-Eyes Protocol with task-aware weights
     resolver = ConflictResolver()
-    result = resolver.resolve(cursor_feedback, gemini_feedback)
+    result = resolver.resolve(
+        cursor_feedback,
+        gemini_feedback,
+        cursor_weight=role.cursor_weight,
+        gemini_weight=role.gemini_weight,
+    )
 
     logger.info(f"Verification resolution: {result.action.upper()} - {result.decision_reason}")
 
