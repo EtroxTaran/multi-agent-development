@@ -17,6 +17,35 @@ When you discover a bug, mistake, or pattern that should be remembered:
 
 ## Recent Lessons
 
+### 2026-01-23 - Full SurrealDB Migration - Remove File-Based Storage
+
+- **Issue**: Workflow state stored in `.workflow/` files caused issues with state management, made debugging harder, and created unnecessary file boundary complexity
+- **Root Cause**: Original design used local files as fallback, but "if there's no internet, AI agents can't work anyway" - the fallback was unnecessary
+- **Fix**: Complete migration to SurrealDB as the ONLY storage backend:
+  1. **Schema Update**: Added `phase_outputs` and `logs` tables (schema v2.1.0)
+  2. **New Repositories**: `PhaseOutputRepository` and `LogsRepository` for type-safe data access
+  3. **Storage Adapters**: Removed file fallback from all 5 adapters (workflow, session, budget, checkpoint, audit)
+  4. **LangGraph Nodes**: Updated 17 nodes to use DB repositories instead of file writes
+  5. **Fail-Fast Validation**: `require_db()` in orchestrator startup
+  6. **Migration Script**: `scripts/migrate_workflow_to_db.py` for existing projects
+- **Prevention**:
+  - Never add file-based fallback for workflow state
+  - Use storage adapters and repositories for all state access
+  - Validate DB connection at startup before any workflow operations
+  - Keep state in SurrealDB tables, not local JSON files
+- **Applies To**: all
+- **Files Changed**:
+  - `orchestrator/db/schema.py` - Added phase_outputs, logs tables
+  - `orchestrator/db/repositories/phase_outputs.py` - New repository
+  - `orchestrator/db/repositories/logs.py` - New repository
+  - `orchestrator/db/config.py` - Added require_db(), DatabaseRequiredError
+  - `orchestrator/storage/*.py` - Removed file fallback (5 files)
+  - `orchestrator/langgraph/nodes/*.py` - DB storage (17 files)
+  - `orchestrator/orchestrator.py` - require_db() at startup
+  - `shared-rules/agent-overrides/claude.md` - Documentation updates
+  - `shared-rules/guardrails.md` - Storage guardrails
+  - `scripts/migrate_workflow_to_db.py` - Migration script
+
 ### 2026-01-22 - Native Claude Code Skills Architecture for Token Efficiency
 
 - **Issue**: Python-based orchestration spawning Claude via subprocess was token-inefficient (~13k overhead per spawn) and added complexity

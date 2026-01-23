@@ -50,19 +50,20 @@ async def product_validation_node(state: WorkflowState) -> dict[str, Any]:
     validator = ProductValidator()
     result = validator.validate_file(product_file)
 
-    # Save validation results
-    validation_dir = project_dir / ".workflow" / "phases" / "product_validation"
-    validation_dir.mkdir(parents=True, exist_ok=True)
+    # Save validation results to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
 
-    result_file = validation_dir / "product_validation.json"
-    result_file.write_text(json.dumps({
+    validation_result = {
         "timestamp": datetime.now().isoformat(),
         "valid": result.valid,
         "score": result.score,
         "issues": [i.to_dict() for i in result.issues],
         "section_scores": result.section_scores,
         "placeholder_count": result.placeholder_count,
-    }, indent=2))
+    }
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=0, output_type="product_validation", content=validation_result))
 
     if not result.valid:
         logger.warning(f"PRODUCT.md validation failed: score={result.score}, issues={len(result.issues)}")

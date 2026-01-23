@@ -104,11 +104,11 @@ TASK GRANULARITY REMINDER:
             else:
                 raise Exception("Could not parse plan from response")
 
-        # Save plan to file
-        plan_dir = project_dir / ".workflow" / "phases" / "planning"
-        plan_dir.mkdir(parents=True, exist_ok=True)
-        plan_file = plan_dir / "plan.json"
-        plan_file.write_text(json.dumps(plan, indent=2))
+        # Save plan to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository, OutputType
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_plan(plan))
 
         logger.info(f"Plan generated: {plan.get('plan_name', 'Unknown')}")
 
@@ -128,7 +128,7 @@ TASK GRANULARITY REMINDER:
         # Update phase status
         phase_1.status = PhaseStatus.COMPLETED
         phase_1.completed_at = datetime.now().isoformat()
-        phase_1.output = {"plan_file": str(plan_file)}
+        phase_1.output = {"plan_saved": True}
         phase_status["1"] = phase_1
 
         return {

@@ -9,7 +9,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from orchestrator import Orchestrator
-from orchestrator.utils.state import StateManager, PhaseStatus
+from orchestrator.models import PhaseStatus
+from orchestrator.storage.workflow_adapter import get_workflow_storage
 from orchestrator.agents.base import AgentResult
 
 

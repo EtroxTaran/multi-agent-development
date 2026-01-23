@@ -123,10 +123,10 @@ async def discuss_phase_node(state: WorkflowState) -> dict[str, Any]:
     try:
         preferences = await _gather_preferences(project_dir, state)
 
-        # Write CONTEXT.md
-        _write_context_md(context_file, preferences)
+        # Save discussion results to database
+        _write_context_md(context_file, preferences, state["project_name"])
 
-        logger.info(f"Discussion phase complete - CONTEXT.md written to {context_file}")
+        logger.info(f"Discussion phase complete - preferences saved to database")
 
         return {
             "discussion_complete": True,
@@ -530,12 +530,13 @@ def _extract_claude_md_preferences(project_dir: Path) -> dict[str, list[str]]:
     return preferences
 
 
-def _write_context_md(context_file: Path, preferences: dict[str, list[str]]) -> None:
-    """Write CONTEXT.md with captured preferences.
+def _write_context_md(context_file: Path, preferences: dict[str, list[str]], project_name: str) -> None:
+    """Write CONTEXT.md preferences to database.
 
     Args:
-        context_file: Path to write CONTEXT.md
+        context_file: Path (unused - DB storage)
         preferences: Preferences by category
+        project_name: Project name for DB storage
     """
     def format_list(items: list[str]) -> str:
         if not items:
@@ -552,5 +553,10 @@ def _write_context_md(context_file: Path, preferences: dict[str, list[str]]) -> 
         additional_notes=format_list(preferences.get("additional_notes", [])),
     )
 
-    context_file.write_text(content)
-    logger.info(f"Written CONTEXT.md to {context_file}")
+    # Save to database
+    from ...db.repositories.logs import get_logs_repository
+    from ...storage.async_utils import run_async
+
+    repo = get_logs_repository(project_name)
+    run_async(repo.save(log_type="discussion", content={"preferences": preferences, "formatted": content}))
+    logger.info(f"Discussion preferences saved to database")

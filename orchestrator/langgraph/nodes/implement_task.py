@@ -423,7 +423,7 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
             if output.get("status") == "needs_clarification":
                 task["status"] = TaskStatus.BLOCKED
                 task["error"] = f"Needs clarification: {output.get('question', 'Unknown')}"
-                _save_clarification_request(project_dir, task_id, output)
+                _save_clarification_request(project_dir, task_id, output, state["project_name"])
                 errors.append({
                     "type": "task_clarification_needed",
                     "task_id": task_id,
@@ -434,7 +434,7 @@ async def implement_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
                 should_escalate = True
                 continue
 
-            _save_task_result(project_dir, task_id, output)
+            _save_task_result(project_dir, task_id, output, state["project_name"])
             task["implementation_notes"] = output.get("implementation_notes", "")
         else:
             error_message = result.get("error") or "Task implementation failed"
@@ -650,7 +650,7 @@ async def _implement_with_ralph_loop(
                 "total_time_seconds": result.total_time_seconds,
                 "completion_reason": result.completion_reason,
                 **(result.final_output or {}),
-            })
+            }, state["project_name"])
 
             updated_task["implementation_notes"] = (
                 f"Completed via Ralph loop in {result.iterations} iteration(s). "
@@ -756,7 +756,7 @@ async def _implement_with_unified_loop(
                 "total_cost_usd": result.total_cost_usd,
                 "completion_reason": result.completion_reason,
                 **(result.final_output or {}),
-            })
+            }, state["project_name"])
 
             updated_task["implementation_notes"] = (
                 f"Completed via unified loop ({result.agent_type}) "
@@ -853,7 +853,7 @@ async def _implement_standard(
             updated_task["error"] = f"Needs clarification: {output.get('question', 'Unknown')}"
 
             # Save clarification request
-            _save_clarification_request(project_dir, task_id, output)
+            _save_clarification_request(project_dir, task_id, output, state["project_name"])
 
             return {
                 "tasks": [updated_task],
@@ -869,7 +869,7 @@ async def _implement_standard(
             }
 
         # Task implemented - save result
-        _save_task_result(project_dir, task_id, output)
+        _save_task_result(project_dir, task_id, output, state["project_name"])
 
         # Update task with implementation notes
         updated_task["implementation_notes"] = output.get("implementation_notes", "")
@@ -1235,32 +1235,32 @@ def _load_task_clarification_answers(project_dir: Path, task_id: str) -> dict:
     return {}
 
 
-def _save_clarification_request(project_dir: Path, task_id: str, request: dict) -> None:
-    """Save clarification request for human review."""
-    clarification_dir = project_dir / ".workflow" / "task_clarifications"
-    clarification_dir.mkdir(parents=True, exist_ok=True)
+def _save_clarification_request(project_dir: Path, task_id: str, request: dict, project_name: str) -> None:
+    """Save clarification request to database for human review."""
+    from ...db.repositories.logs import get_logs_repository, LogType
+    from ...storage.async_utils import run_async
 
-    request_file = clarification_dir / f"{task_id}_request.json"
     request_data = {
         **request,
         "task_id": task_id,
         "timestamp": datetime.now().isoformat(),
     }
-    request_file.write_text(json.dumps(request_data, indent=2))
+    repo = get_logs_repository(project_name)
+    run_async(repo.save(LogType.ERROR, request_data, task_id=task_id))
 
 
-def _save_task_result(project_dir: Path, task_id: str, result: dict) -> None:
-    """Save task implementation result."""
-    results_dir = project_dir / ".workflow" / "phases" / "task_implementation"
-    results_dir.mkdir(parents=True, exist_ok=True)
+def _save_task_result(project_dir: Path, task_id: str, result: dict, project_name: str) -> None:
+    """Save task implementation result to database."""
+    from ...db.repositories.phase_outputs import get_phase_output_repository, OutputType
+    from ...storage.async_utils import run_async
 
-    result_file = results_dir / f"{task_id}_result.json"
     result_data = {
         **result,
         "task_id": task_id,
         "timestamp": datetime.now().isoformat(),
     }
-    result_file.write_text(json.dumps(result_data, indent=2))
+    repo = get_phase_output_repository(project_name)
+    run_async(repo.save_task_result(task_id, result_data))
 
 
 def _handle_task_error(task: Task, error_message: str) -> dict[str, Any]:

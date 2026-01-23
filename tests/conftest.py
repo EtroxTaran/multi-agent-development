@@ -6,7 +6,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from orchestrator.utils.state import StateManager, WorkflowState, PhaseState, PhaseStatus
+from orchestrator.models import WorkflowState, PhaseState, PhaseStatus
+from orchestrator.storage.workflow_adapter import get_workflow_storage
 from orchestrator.utils.logging import OrchestrationLogger, LogLevel
 
 
@@ -37,12 +38,23 @@ A comprehensive test feature for testing the orchestrator.
 
 
 @pytest.fixture
-def state_manager(temp_project_dir):
-    """Create a state manager for testing."""
-    manager = StateManager(temp_project_dir)
-    manager.ensure_workflow_dir()
-    manager.load()
-    return manager
+def workflow_storage(temp_project_dir):
+    """Create a workflow storage adapter for testing."""
+    # Ensure workflow dir exists
+    workflow_dir = temp_project_dir / ".workflow"
+    workflow_dir.mkdir(exist_ok=True)
+
+    # Get storage adapter
+    storage = get_workflow_storage(temp_project_dir)
+    storage.initialize_state(str(temp_project_dir))
+    return storage
+
+
+# Backwards compatibility alias
+@pytest.fixture
+def state_manager(workflow_storage):
+    """Backwards compatibility alias for workflow_storage."""
+    return workflow_storage
 
 
 @pytest.fixture

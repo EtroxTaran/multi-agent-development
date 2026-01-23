@@ -106,7 +106,7 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
             "files_check": files_check,
             "test_result": test_result,
             "verified_at": datetime.now().isoformat(),
-        })
+        }, state["project_name"])
 
         # Generate UAT document (GSD pattern)
         _generate_task_uat(
@@ -114,6 +114,7 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
             task=task,
             phase=state.get("current_phase", 3),
             test_output=test_result.get("output", ""),
+            project_name=state["project_name"],
         )
 
         # Update task status in trackers
@@ -234,7 +235,7 @@ async def verify_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
                 "files_check": files_check,
                 "test_result": test_result,
                 "verified_at": datetime.now().isoformat(),
-            })
+            }, state["project_name"])
 
             # Generate UAT document (GSD pattern)
             _generate_task_uat(
@@ -242,6 +243,7 @@ async def verify_tasks_parallel_node(state: WorkflowState) -> dict[str, Any]:
                 task=task,
                 phase=state.get("current_phase", 3),
                 test_output=test_result.get("output", ""),
+                project_name=state["project_name"],
             )
 
             completion_notes = "Task verified successfully - all tests passed"
@@ -502,19 +504,20 @@ async def _run_command(project_dir: Path, cmd_parts: list[str]) -> dict:
         }
 
 
-def _save_verification_result(project_dir: Path, task_id: str, result: dict) -> None:
-    """Save task verification result.
+def _save_verification_result(project_dir: Path, task_id: str, result: dict, project_name: str) -> None:
+    """Save task verification result to database.
 
     Args:
-        project_dir: Project directory
+        project_dir: Project directory (unused - DB storage)
         task_id: Task ID
         result: Verification result
+        project_name: Project name for DB storage
     """
-    results_dir = project_dir / ".workflow" / "phases" / "task_verification"
-    results_dir.mkdir(parents=True, exist_ok=True)
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
 
-    result_file = results_dir / f"{task_id}_verification.json"
-    result_file.write_text(json.dumps(result, indent=2))
+    repo = get_phase_output_repository(project_name)
+    run_async(repo.save(phase=4, output_type="task_verification", content=result, task_id=task_id))
 
 
 def _handle_verification_failure(
@@ -629,6 +632,7 @@ def _generate_task_uat(
     phase: int,
     test_output: str = "",
     git_diff: str = "",
+    project_name: str = "",
 ) -> None:
     """Generate UAT document for a completed task.
 
@@ -638,6 +642,7 @@ def _generate_task_uat(
         phase: Current phase number
         test_output: Test command output
         git_diff: Git diff output
+        project_name: Project name for DB storage
     """
     try:
         uat_generator = create_uat_generator(project_dir)
@@ -653,10 +658,15 @@ def _generate_task_uat(
             git_diff=git_diff,
         )
 
-        # Save both markdown and JSON
-        saved = uat_generator.save_uat(uat, format="both")
+        # Save to database
+        from ...db.repositories.logs import get_logs_repository
+        from ...storage.async_utils import run_async
 
-        logger.info(f"Generated UAT document for task {task.get('id')}: {saved.get('markdown')}")
+        task_id = task.get("id", "unknown")
+        repo = get_logs_repository(project_name or project_dir.name)
+        run_async(repo.save(log_type="uat_document", task_id=task_id, content=uat.to_dict() if hasattr(uat, "to_dict") else uat))
+
+        logger.info(f"Generated UAT document for task {task_id} saved to database")
 
     except Exception as e:
         logger.warning(f"Failed to generate UAT for task {task.get('id')}: {e}")

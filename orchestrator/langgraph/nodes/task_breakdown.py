@@ -155,17 +155,18 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
             "next_decision": "escalate",
         }
 
-    # Save tasks to workflow directory
+    # Save tasks to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
+
     tasks_output = {
         "tasks": [dict(t) for t in tasks],
         "milestones": [dict(m) for m in milestones],
         "created_at": datetime.now().isoformat(),
         "source": "task_breakdown_node",
     }
-
-    tasks_dir = project_dir / ".workflow" / "phases" / "task_breakdown"
-    tasks_dir.mkdir(parents=True, exist_ok=True)
-    (tasks_dir / "tasks.json").write_text(json.dumps(tasks_output, indent=2))
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=1, output_type="task_breakdown", content=tasks_output))
 
     # Create Linear issues (if configured)
     linear_adapter = create_linear_adapter(project_dir)

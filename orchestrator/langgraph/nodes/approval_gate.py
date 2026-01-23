@@ -62,17 +62,18 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
     if execution_mode == "afk":
         logger.info(f"[AUTONOMOUS] Auto-approving phase {current_phase} (autonomous mode)")
 
-        # Save auto-approval record for audit trail
-        approval_dir = project_dir / ".workflow" / "phases" / "approvals"
-        approval_dir.mkdir(parents=True, exist_ok=True)
+        # Save auto-approval record for audit trail to database
+        from ...db.repositories.logs import get_logs_repository
+        from ...storage.async_utils import run_async
 
-        response_file = approval_dir / f"phase_{current_phase}_response.json"
-        response_file.write_text(json.dumps({
+        repo = get_logs_repository(state["project_name"])
+        run_async(repo.save(log_type="approval_response", content={
+            "phase": current_phase,
             "timestamp": datetime.now().isoformat(),
             "action": "approve",
             "feedback": "Auto-approved in autonomous mode",
             "autonomous": True,
-        }, indent=2))
+        }))
 
         return {
             "updated_at": datetime.now().isoformat(),
@@ -82,12 +83,15 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
     # Prepare approval context
     approval_context = _build_approval_context(state, current_phase)
 
-    # Save context for human review
-    approval_dir = project_dir / ".workflow" / "phases" / "approvals"
-    approval_dir.mkdir(parents=True, exist_ok=True)
+    # Save context for human review to database
+    from ...db.repositories.logs import get_logs_repository
+    from ...storage.async_utils import run_async
 
-    context_file = approval_dir / f"phase_{current_phase}_context.json"
-    context_file.write_text(json.dumps(approval_context, indent=2))
+    repo = get_logs_repository(state["project_name"])
+    run_async(repo.save(log_type="approval_context", content={
+        "phase": current_phase,
+        "context": approval_context,
+    }))
 
     logger.info(f"Waiting for human approval at phase {current_phase}")
 
@@ -108,13 +112,13 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
 
     logger.info(f"Received approval response: action={action}")
 
-    # Save response
-    response_file = approval_dir / f"phase_{current_phase}_response.json"
-    response_file.write_text(json.dumps({
+    # Save response to database
+    run_async(repo.save(log_type="approval_response", content={
+        "phase": current_phase,
         "timestamp": datetime.now().isoformat(),
         "action": action,
         "feedback": feedback,
-    }, indent=2))
+    }))
 
     if action == "approve":
         return {

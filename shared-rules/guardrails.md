@@ -23,15 +23,17 @@
 
 ---
 
-## Orchestrator File Boundary Guardrails
+## Orchestrator Storage Guardrails
 
 **These rules apply specifically to the orchestrator (Claude as lead orchestrator).**
 
-### Orchestrator CAN Write To
-```
-projects/<name>/.workflow/**         <- Workflow state, phase outputs
-projects/<name>/.project-config.json <- Project configuration
-```
+### Storage Architecture
+All workflow state is stored in **SurrealDB** - there is no local file storage for workflow state.
+
+### Orchestrator CAN
+- Store workflow state in SurrealDB (via storage adapters)
+- Read project files (Docs/, PRODUCT.md, CLAUDE.md)
+- Spawn worker Claude for code changes
 
 ### Orchestrator CANNOT Write To
 ```
@@ -51,21 +53,21 @@ projects/<name>/.cursor/**           <- Cursor context files
 
 ### Never Do (Orchestrator)
 - Write application code directly (spawn workers instead)
-- Modify files outside `.workflow/` directory
+- Write workflow state to local files (use DB)
 - Change project context files (CLAUDE.md, GEMINI.md)
-- Bypass boundary validation with direct file writes
+- Run workflow without SurrealDB connection
 
 ### Always Do (Orchestrator)
-- Use `safe_write_workflow_file()` for workflow state
-- Use `safe_write_project_config()` for configuration
+- Use storage adapters for workflow state
+- Use repositories for phase outputs and logs
 - Spawn worker Claude for any code changes
-- Validate paths before writing
+- Verify DB connection before starting workflow
 
 ### Error Recovery
-If you see `OrchestratorBoundaryError`:
-1. Check that you're writing to `.workflow/` or `.project-config.json`
-2. Use the safe write methods in ProjectManager
-3. If code changes are needed, spawn a worker Claude
+If you see `DatabaseRequiredError`:
+1. Set `SURREAL_URL` environment variable
+2. Verify SurrealDB instance is running
+3. Check network connectivity to database
 
 ---
 
@@ -95,9 +97,9 @@ If you see `OrchestratorBoundaryError`:
 - Mark tasks complete when they're not
 
 ### Always Do
-- Update state.json after phase transitions
-- Document decisions in decisions.md
-- Write handoff notes for session resumption
+- Update workflow state in DB after phase transitions
+- Store phase outputs in `phase_outputs` table
+- Log decisions and escalations in `logs` table
 - Check prerequisites before starting phases
 
 ---
@@ -176,6 +178,7 @@ If you see `OrchestratorBoundaryError`:
 - Verify `PRODUCT.md` exists with proper structure
 - Check project is a git repository (for worktree support)
 - Confirm no uncommitted changes (recommended)
+- Verify SurrealDB connection is configured
 
 ### Never Do
 - Assume external projects have same structure as nested
@@ -185,4 +188,4 @@ If you see `OrchestratorBoundaryError`:
 ### Always Do
 - Use `--project-path` flag for external projects
 - Validate project structure before starting workflow
-- Create `.workflow/` directory if missing
+- Ensure `SURREAL_URL` environment variable is set

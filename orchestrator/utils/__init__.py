@@ -1,6 +1,7 @@
 """Utility modules for the orchestrator."""
 
-from .state import StateManager, PhaseStatus, PhaseState, WorkflowState
+# Data models moved to orchestrator.models (DB-only storage)
+from orchestrator.models import PhaseStatus, PhaseState, WorkflowState
 from .logging import OrchestrationLogger
 from .context import ContextManager, ContextState, FileChecksum, DriftResult
 from .approval import (
@@ -79,12 +80,7 @@ from .uat_generator import (
     create_uat_generator,
     generate_uat_from_verification,
 )
-from .checkpoint import (
-    Checkpoint,
-    CheckpointManager,
-    create_checkpoint_manager,
-    quick_checkpoint,
-)
+# Checkpoint manager removed - using DB-based checkpoints via storage adapters
 from .task_config import (
     TaskSizeConfig,
     TaskValidationResult,
@@ -104,8 +100,7 @@ from .task_config import (
 )
 
 __all__ = [
-    # State management
-    "StateManager",
+    # Data models (from orchestrator.models)
     "PhaseStatus",
     "PhaseState",
     "WorkflowState",
@@ -182,11 +177,7 @@ __all__ = [
     "TestResults",
     "create_uat_generator",
     "generate_uat_from_verification",
-    # Checkpoint manager (GSD pattern)
-    "Checkpoint",
-    "CheckpointManager",
-    "create_checkpoint_manager",
-    "quick_checkpoint",
+    # Checkpoint functionality moved to DB-based storage adapters
     # Task size configuration and complexity scoring
     "TaskSizeConfig",
     "TaskValidationResult",

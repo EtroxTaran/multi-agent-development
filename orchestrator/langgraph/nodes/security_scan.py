@@ -54,12 +54,12 @@ async def security_scan_node(state: WorkflowState) -> dict[str, Any]:
     )
     result = scanner.scan()
 
-    # Save results
-    scan_dir = project_dir / ".workflow" / "phases" / "security_scan"
-    scan_dir.mkdir(parents=True, exist_ok=True)
+    # Save results to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
 
-    result_file = scan_dir / "security_scan.json"
-    result_file.write_text(json.dumps(result.to_dict(), indent=2))
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=4, output_type="security_scan", content=result.to_dict()))
 
     logger.info(
         f"Security scan complete: {result.total_findings} findings, "

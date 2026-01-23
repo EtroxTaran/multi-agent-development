@@ -204,11 +204,11 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
             raw_output=feedback_data,
         )
 
-        # Save feedback
-        feedback_dir = project_dir / ".workflow" / "phases" / "validation"
-        feedback_dir.mkdir(parents=True, exist_ok=True)
-        feedback_file = feedback_dir / "cursor_feedback.json"
-        feedback_file.write_text(json.dumps(feedback.to_dict(), indent=2))
+        # Save feedback to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_cursor_feedback(feedback.to_dict()))
 
         duration_ms = (time.time() - start_time) * 1000
         logger.info(f"Cursor validation: {feedback.assessment}, score: {feedback.score}")
@@ -336,11 +336,11 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
             raw_output=feedback_data,
         )
 
-        # Save feedback
-        feedback_dir = project_dir / ".workflow" / "phases" / "validation"
-        feedback_dir.mkdir(parents=True, exist_ok=True)
-        feedback_file = feedback_dir / "gemini_feedback.json"
-        feedback_file.write_text(json.dumps(feedback.to_dict(), indent=2))
+        # Save feedback to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_gemini_feedback(feedback.to_dict()))
 
         duration_ms = (time.time() - start_time) * 1000
         logger.info(f"Gemini validation: {feedback.assessment}, score: {feedback.score}")
@@ -464,9 +464,11 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
         "timestamp": datetime.now().isoformat(),
     }
 
-    feedback_dir = project_dir / ".workflow" / "phases" / "validation"
-    feedback_dir.mkdir(parents=True, exist_ok=True)
-    (feedback_dir / "consolidated.json").write_text(json.dumps(consolidated, indent=2))
+    # Save consolidated feedback to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=2, output_type="consolidated", content=consolidated))
 
     if approved:
         phase_2.status = PhaseStatus.COMPLETED

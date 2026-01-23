@@ -160,11 +160,13 @@ async def implementation_node(state: WorkflowState) -> dict[str, Any]:
         clarifications = _extract_clarifications(implementation_result)
         if clarifications:
             logger.info(f"Worker needs clarification on {len(clarifications)} items")
-            # Save partial progress and escalate
-            impl_dir = project_dir / ".workflow" / "phases" / "implementation"
-            impl_dir.mkdir(parents=True, exist_ok=True)
-            (impl_dir / "partial_result.json").write_text(json.dumps(implementation_result, indent=2))
-            (impl_dir / "clarifications_needed.json").write_text(json.dumps(clarifications, indent=2))
+            # Save partial progress and escalate to database
+            from ...db.repositories.phase_outputs import get_phase_output_repository
+            from ...storage.async_utils import run_async
+
+            repo = get_phase_output_repository(state["project_name"])
+            run_async(repo.save(phase=3, output_type="partial_result", content=implementation_result))
+            run_async(repo.save(phase=3, output_type="clarifications_needed", content={"clarifications": clarifications}))
 
             phase_3.status = PhaseStatus.BLOCKED
             phase_status["3"] = phase_3
@@ -192,10 +194,12 @@ async def implementation_node(state: WorkflowState) -> dict[str, Any]:
             else:
                 raise Exception(f"Tests failed: {test_result.get('error', 'Unknown error')}")
 
-        # Save implementation result
-        impl_dir = project_dir / ".workflow" / "phases" / "implementation"
-        impl_dir.mkdir(parents=True, exist_ok=True)
-        (impl_dir / "result.json").write_text(json.dumps(implementation_result, indent=2))
+        # Save implementation result to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save(phase=3, output_type="implementation_result", content=implementation_result))
 
         # Update phase status
         phase_3.status = PhaseStatus.COMPLETED

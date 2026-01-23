@@ -48,12 +48,12 @@ async def coverage_check_node(state: WorkflowState) -> dict[str, Any]:
     )
     result = checker.check()
 
-    # Save results
-    check_dir = project_dir / ".workflow" / "phases" / "coverage_check"
-    check_dir.mkdir(parents=True, exist_ok=True)
+    # Save results to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
 
-    result_file = check_dir / "coverage_check.json"
-    result_file.write_text(json.dumps(result.to_dict(), indent=2))
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=4, output_type="coverage_check", content=result.to_dict()))
 
     # Log result
     if result.status.value == "skipped":

@@ -158,11 +158,12 @@ async def research_phase_node(state: WorkflowState) -> dict[str, Any]:
 
     # Run research agents in parallel
     findings = ResearchFindings()
+    project_name = state["project_name"]
 
     try:
         # Spawn agents concurrently
         tasks = [
-            _run_research_agent(project_dir, agent, research_dir)
+            _run_research_agent(project_dir, agent, research_dir, project_name)
             for agent in RESEARCH_AGENTS
         ]
 
@@ -186,8 +187,8 @@ async def research_phase_node(state: WorkflowState) -> dict[str, Any]:
 
         findings.completed_at = datetime.now().isoformat()
 
-        # Save aggregated findings
-        _save_aggregated_findings(research_dir, findings)
+        # Save aggregated findings to database
+        _save_aggregated_findings(research_dir, findings, project_name)
 
         logger.info(
             f"Research phase complete. "
@@ -218,13 +219,15 @@ async def _run_research_agent(
     project_dir: Path,
     agent: ResearchAgent,
     output_dir: Path,
+    project_name: str,
 ) -> dict:
     """Run a single research agent.
 
     Args:
         project_dir: Project directory to analyze
         agent: Research agent definition
-        output_dir: Directory to save results
+        output_dir: Directory to save results (unused - DB storage)
+        project_name: Project name for DB storage
 
     Returns:
         Parsed research findings as dict
@@ -258,10 +261,13 @@ IMPORTANT:
         # Parse JSON output
         parsed = _parse_research_output(result)
 
-        # Save to output file
-        output_file = output_dir / agent.output_file
-        output_file.write_text(json.dumps(parsed, indent=2))
-        logger.info(f"Research agent {agent.id} saved results to {output_file}")
+        # Save to database
+        from ...db.repositories.logs import get_logs_repository
+        from ...storage.async_utils import run_async
+
+        repo = get_logs_repository(project_name)
+        run_async(repo.save(log_type="research", content={"agent_id": agent.id, "findings": parsed}))
+        logger.info(f"Research agent {agent.id} saved results to database")
 
         return parsed
 
@@ -394,15 +400,19 @@ def _is_research_fresh(research_dir: Path, max_age_hours: int = 1) -> bool:
         return False
 
 
-def _save_aggregated_findings(research_dir: Path, findings: ResearchFindings) -> None:
-    """Save aggregated findings to file.
+def _save_aggregated_findings(research_dir: Path, findings: ResearchFindings, project_name: str) -> None:
+    """Save aggregated findings to database.
 
     Args:
-        research_dir: Research output directory
+        research_dir: Research output directory (unused - DB storage)
         findings: Aggregated findings
+        project_name: Project name for DB storage
     """
-    output_file = research_dir / "findings.json"
-    output_file.write_text(json.dumps(findings.to_dict(), indent=2))
+    from ...db.repositories.logs import get_logs_repository
+    from ...storage.async_utils import run_async
+
+    repo = get_logs_repository(project_name)
+    run_async(repo.save(log_type="research_aggregated", content=findings.to_dict()))
 
 
 async def quick_research(project_dir: Path) -> ResearchFindings:

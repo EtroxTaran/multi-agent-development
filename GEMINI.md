@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-22 21:30:24 -->
+<!-- Last synced: 2026-01-23 08:20:44 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Gemini as architecture reviewer.
@@ -284,15 +284,17 @@ The following rules apply to all agents in the workflow.
 
 ---
 
-## Orchestrator File Boundary Guardrails
+## Orchestrator Storage Guardrails
 
 **These rules apply specifically to the orchestrator (Claude as lead orchestrator).**
 
-### Orchestrator CAN Write To
-```
-projects/<name>/.workflow/**         <- Workflow state, phase outputs
-projects/<name>/.project-config.json <- Project configuration
-```
+### Storage Architecture
+All workflow state is stored in **SurrealDB** - there is no local file storage for workflow state.
+
+### Orchestrator CAN
+- Store workflow state in SurrealDB (via storage adapters)
+- Read project files (Docs/, PRODUCT.md, CLAUDE.md)
+- Spawn worker Claude for code changes
 
 ### Orchestrator CANNOT Write To
 ```
@@ -312,21 +314,21 @@ projects/<name>/.cursor/**           <- Cursor context files
 
 ### Never Do (Orchestrator)
 - Write application code directly (spawn workers instead)
-- Modify files outside `.workflow/` directory
+- Write workflow state to local files (use DB)
 - Change project context files (CLAUDE.md, GEMINI.md)
-- Bypass boundary validation with direct file writes
+- Run workflow without SurrealDB connection
 
 ### Always Do (Orchestrator)
-- Use `safe_write_workflow_file()` for workflow state
-- Use `safe_write_project_config()` for configuration
+- Use storage adapters for workflow state
+- Use repositories for phase outputs and logs
 - Spawn worker Claude for any code changes
-- Validate paths before writing
+- Verify DB connection before starting workflow
 
 ### Error Recovery
-If you see `OrchestratorBoundaryError`:
-1. Check that you're writing to `.workflow/` or `.project-config.json`
-2. Use the safe write methods in ProjectManager
-3. If code changes are needed, spawn a worker Claude
+If you see `DatabaseRequiredError`:
+1. Set `SURREAL_URL` environment variable
+2. Verify SurrealDB instance is running
+3. Check network connectivity to database
 
 ---
 
@@ -356,9 +358,9 @@ If you see `OrchestratorBoundaryError`:
 - Mark tasks complete when they're not
 
 ### Always Do
-- Update state.json after phase transitions
-- Document decisions in decisions.md
-- Write handoff notes for session resumption
+- Update workflow state in DB after phase transitions
+- Store phase outputs in `phase_outputs` table
+- Log decisions and escalations in `logs` table
 - Check prerequisites before starting phases
 
 ---
@@ -437,6 +439,7 @@ If you see `OrchestratorBoundaryError`:
 - Verify `PRODUCT.md` exists with proper structure
 - Check project is a git repository (for worktree support)
 - Confirm no uncommitted changes (recommended)
+- Verify SurrealDB connection is configured
 
 ### Never Do
 - Assume external projects have same structure as nested
@@ -446,7 +449,7 @@ If you see `OrchestratorBoundaryError`:
 ### Always Do
 - Use `--project-path` flag for external projects
 - Validate project structure before starting workflow
-- Create `.workflow/` directory if missing
+- Ensure `SURREAL_URL` environment variable is set
 
 ---
 
@@ -947,6 +950,35 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons
+
+### 2026-01-23 - Full SurrealDB Migration - Remove File-Based Storage
+
+- **Issue**: Workflow state stored in `.workflow/` files caused issues with state management, made debugging harder, and created unnecessary file boundary complexity
+- **Root Cause**: Original design used local files as fallback, but "if there's no internet, AI agents can't work anyway" - the fallback was unnecessary
+- **Fix**: Complete migration to SurrealDB as the ONLY storage backend:
+  1. **Schema Update**: Added `phase_outputs` and `logs` tables (schema v2.1.0)
+  2. **New Repositories**: `PhaseOutputRepository` and `LogsRepository` for type-safe data access
+  3. **Storage Adapters**: Removed file fallback from all 5 adapters (workflow, session, budget, checkpoint, audit)
+  4. **LangGraph Nodes**: Updated 17 nodes to use DB repositories instead of file writes
+  5. **Fail-Fast Validation**: `require_db()` in orchestrator startup
+  6. **Migration Script**: `scripts/migrate_workflow_to_db.py` for existing projects
+- **Prevention**:
+  - Never add file-based fallback for workflow state
+  - Use storage adapters and repositories for all state access
+  - Validate DB connection at startup before any workflow operations
+  - Keep state in SurrealDB tables, not local JSON files
+- **Applies To**: all
+- **Files Changed**:
+  - `orchestrator/db/schema.py` - Added phase_outputs, logs tables
+  - `orchestrator/db/repositories/phase_outputs.py` - New repository
+  - `orchestrator/db/repositories/logs.py` - New repository
+  - `orchestrator/db/config.py` - Added require_db(), DatabaseRequiredError
+  - `orchestrator/storage/*.py` - Removed file fallback (5 files)
+  - `orchestrator/langgraph/nodes/*.py` - DB storage (17 files)
+  - `orchestrator/orchestrator.py` - require_db() at startup
+  - `shared-rules/agent-overrides/claude.md` - Documentation updates
+  - `shared-rules/guardrails.md` - Storage guardrails
+  - `scripts/migrate_workflow_to_db.py` - Migration script
 
 ### 2026-01-22 - Native Claude Code Skills Architecture for Token Efficiency
 

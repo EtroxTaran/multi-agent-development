@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from orchestrator.orchestrator import Orchestrator
-from orchestrator.utils.state import PhaseStatus
+from orchestrator.models import PhaseStatus
 
 
 class TestOrchestrator:
@@ -22,7 +22,7 @@ class TestOrchestrator:
         assert orch.project_dir == temp_project_dir
         assert orch.max_retries == 5
         assert orch.auto_commit is False
-        assert orch.state is not None
+        assert orch.storage is not None
         assert orch.logger is not None
 
     def test_check_prerequisites_missing_product(self, temp_project_dir):
@@ -66,33 +66,35 @@ class TestOrchestrator:
         orch = Orchestrator(temp_project_dir)
 
         # Simulate some progress
-        orch.state.start_phase(1)
-        orch.state.complete_phase(1)
-        orch.state.start_phase(2)
+        orch.storage.set_phase(1, "in_progress")
+        orch.storage.set_phase(1, "completed")
+        orch.storage.set_phase(2, "in_progress")
 
         # Reset
         orch.reset()
 
         # Verify reset
-        for phase_name, phase in orch.state.state.phases.items():
-            assert phase.status == PhaseStatus.PENDING
-            assert phase.attempts == 0
+        state = orch.storage.get_state()
+        for phase_key in ["1", "2", "3", "4", "5"]:
+            phase_info = state.phase_status.get(phase_key, {})
+            assert phase_info.get("status") == "pending"
+            assert phase_info.get("attempts", 0) == 0
 
     def test_reset_single_phase(self, temp_project_dir):
         """Test resetting a single phase."""
         orch = Orchestrator(temp_project_dir)
 
         # Simulate progress
-        orch.state.start_phase(1)
-        orch.state.fail_phase(1, "test error")
+        orch.storage.set_phase(1, "in_progress")
+        orch.storage.set_phase(1, "failed")
 
         # Reset phase 1
         orch.reset(phase=1)
 
         # Verify
-        phase = orch.state.get_phase(1)
-        assert phase.status == PhaseStatus.PENDING
-        assert phase.error is None
+        state = orch.storage.get_state()
+        phase_info = state.phase_status.get("1", {})
+        assert phase_info.get("status") == "pending"
 
     @patch.object(Orchestrator, "check_prerequisites")
     def test_run_executes_workflow(
@@ -199,11 +201,9 @@ class TestOrchestrator:
             return_value={"success": True, "current_phase": 5, "resumed_from": 3}
         )
 
-        # Complete first two phases
-        orch.state.load()
-        orch.state.state.phases["planning"].status = PhaseStatus.COMPLETED
-        orch.state.state.phases["validation"].status = PhaseStatus.COMPLETED
-        orch.state.save()
+        # Complete first two phases via storage adapter
+        orch.storage.set_phase(1, "completed")
+        orch.storage.set_phase(2, "completed")
 
         result = orch.resume()
 

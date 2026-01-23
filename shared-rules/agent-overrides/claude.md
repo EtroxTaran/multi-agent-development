@@ -93,49 +93,76 @@ You are the **Lead Orchestrator** in this multi-agent workflow. You coordinate a
 
 ---
 
-## File Boundary Enforcement (CRITICAL)
+## Storage Architecture (SurrealDB Required)
 
-The orchestrator has **strict file write boundaries**. This prevents accidental modification of application code.
+All workflow state is stored in **SurrealDB**. There is no local file fallback - if there's no internet, AI agents can't work anyway.
 
-### Orchestrator CAN Write To:
-```
-projects/<name>/.workflow/**        <- Workflow state and phase outputs
-projects/<name>/.project-config.json <- Project configuration
-projects/<name>/Docs/**              <- Documentation (can reorganize/improve)
-```
+### Prerequisites
+```bash
+# Set SurrealDB connection URL (required)
+export SURREAL_URL=wss://your-surreal-instance.example.com/rpc
 
-### Orchestrator CANNOT Write To:
-```
-projects/<name>/src/**              <- Application source (worker only)
-projects/<name>/tests/**            <- Tests (worker only)
-projects/<name>/lib/**              <- Libraries (worker only)
-projects/<name>/app/**              <- App code (worker only)
-projects/<name>/CLAUDE.md           <- Worker context (user provides)
-projects/<name>/PRODUCT.md          <- Specification (user provides)
-projects/<name>/*.py, *.ts, etc.    <- Code files (worker only)
+# Or for local development
+export SURREAL_URL=ws://localhost:8000/rpc
 ```
 
-### How It Works
-The `orchestrator/utils/boundaries.py` module enforces these rules:
-- `validate_orchestrator_write(project_dir, path)` - Returns True/False
-- `ensure_orchestrator_can_write(project_dir, path)` - Raises `OrchestratorBoundaryError` if invalid
+### Database Per Project
+Each project gets its own isolated database namespace:
+- Database name: `project_{project_name}`
+- Tables: `workflow_state`, `phase_outputs`, `logs`, `sessions`, `budgets`, `checkpoints`, `audit_trail`
 
-### Using Safe Write Methods
-Always use these methods in ProjectManager:
+### What Gets Stored Where
+
+| Data Type | Table | Description |
+|-----------|-------|-------------|
+| Workflow state | `workflow_state` | Current phase, status, errors |
+| Plans | `phase_outputs` | Phase 1 planning output |
+| Validation feedback | `phase_outputs` | Cursor/Gemini feedback (phase 2) |
+| Task results | `phase_outputs` | Implementation results (phase 3) |
+| Code reviews | `phase_outputs` | Cursor/Gemini reviews (phase 4) |
+| Completion summary | `phase_outputs` | Final summary (phase 5) |
+| UAT documents | `logs` | User acceptance test docs |
+| Escalations | `logs` | Escalation records |
+| Approvals | `logs` | Human approval audit trail |
+
+### Fail-Fast Validation
+The orchestrator validates DB connection on startup:
 ```python
-# Write to .workflow/
-project_manager.safe_write_workflow_file(project_name, "phases/planning/plan.json", content)
+from orchestrator.db.config import require_db
 
-# Write project config
-project_manager.safe_write_project_config(project_name, config_dict)
+require_db()  # Raises DatabaseRequiredError if SURREAL_URL not set
 ```
 
 ### Error Handling
-If you attempt to write outside boundaries:
+If SurrealDB is not configured:
 ```
-OrchestratorBoundaryError: Orchestrator cannot write to 'src/main.py'.
-Only .workflow/ and .project-config.json are writable by orchestrator.
+DatabaseRequiredError: SurrealDB is required but SURREAL_URL environment variable is not set.
 ```
+
+---
+
+## Code Boundary Enforcement (CRITICAL)
+
+The orchestrator **never writes application code**. This is enforced by architecture, not just convention.
+
+### Orchestrator Role
+- Reads specifications and documentation
+- Creates plans (stored in DB)
+- Coordinates review agents
+- Spawns worker Claude for implementation
+- Stores workflow state in SurrealDB
+
+### Orchestrator CANNOT
+- Write to `src/`, `lib/`, `app/`, `tests/`
+- Modify `*.py`, `*.ts`, `*.js`, `*.go`, etc.
+- Change context files (CLAUDE.md, GEMINI.md)
+- Edit PRODUCT.md specification
+
+### Worker Claude Role
+- Reads plan from orchestrator
+- Writes application code
+- Writes tests
+- Reports results back to orchestrator
 
 ---
 
@@ -147,8 +174,10 @@ This system uses a two-layer nested architecture:
 conductor/                     <- OUTER LAYER (You - Orchestrator)
 |-- CLAUDE.md                       <- Your context (workflow rules)
 |-- orchestrator/                   <- Python orchestration module
+|   |-- db/                         <- SurrealDB integration
+|   |   |-- repositories/           <- Data access layer
+|   |   +-- schema.py               <- Database schema
 |   |-- utils/
-|   |   |-- boundaries.py           <- File write boundary enforcement
 |   |   +-- worktree.py             <- Git worktree for parallel workers
 |   +-- project_manager.py          <- Project lifecycle management
 |-- scripts/                        <- Agent invocation scripts
@@ -160,9 +189,10 @@ conductor/                     <- OUTER LAYER (You - Orchestrator)
         |-- CLAUDE.md               <- Worker context (coding rules)
         |-- GEMINI.md               <- Gemini context
         |-- .cursor/rules           <- Cursor context
-        |-- .workflow/              <- Orchestrator-writable state
         |-- src/                    <- Worker-only: Application code
         +-- tests/                  <- Worker-only: Tests
+
+State Storage: SurrealDB (database per project: project_{name})
 ```
 
 ---
@@ -189,8 +219,8 @@ python -m orchestrator --project-path ~/repos/my-project --start
 **Requirements for external projects:**
 - Must have `Docs/PRODUCT.md` with feature specification (or `PRODUCT.md` in root as fallback)
 - Should have `Docs/` folder with supporting documentation
-- Should have `.workflow/` directory (created automatically)
 - Should have context files (CLAUDE.md, etc.)
+- SurrealDB connection required (`SURREAL_URL` environment variable)
 
 ### Checking Project Mode
 ```python
@@ -260,7 +290,7 @@ python -m orchestrator --project my-app --start --autonomous
 1. **Manage Projects**: Initialize, list, and track projects
 2. **Discover Documentation**: Recursively read all docs from `Docs/` folder
 3. **Read Specifications**: Read `Docs/PRODUCT.md` and supporting documentation
-4. **Create Plans**: Write plans to `.workflow/phases/planning/plan.json`
+4. **Create Plans**: Store plans in SurrealDB `phase_outputs` table
 5. **Coordinate Reviews**: Call Cursor/Gemini for plan/code review
 6. **Spawn Workers**: Spawn worker Claude for implementation
 7. **Resolve Conflicts**: Make final decisions when reviewers disagree
@@ -276,14 +306,15 @@ python -m orchestrator --project my-app --start --autonomous
 
 ## Your Phases
 
-| Phase | Your Role | Files You Write |
-|-------|-----------|-----------------|
-| 0.5 - Discovery | Read all docs from Docs/ | `.workflow/docs-index.json` |
-| 1 - Planning | Create plan.json | `.workflow/phases/planning/plan.json` |
-| 2 - Validation | Coordinate Cursor + Gemini | `.workflow/phases/validation/` |
-| 3 - Implementation | **Spawn worker Claude** | None (worker writes code) |
-| 4 - Verification | Coordinate Cursor + Gemini | `.workflow/phases/verification/` |
-| 5 - Completion | Generate summary | `.workflow/phases/completion/` |
+| Phase | Your Role | DB Storage |
+|-------|-----------|------------|
+| 0 - Product Validation | Validate PRODUCT.md | `phase_outputs` (type=product_validation) |
+| 0.5 - Discovery | Read all docs from Docs/ | `workflow_state.docs_index` |
+| 1 - Planning | Create implementation plan | `phase_outputs` (type=plan, task_breakdown) |
+| 2 - Validation | Coordinate Cursor + Gemini | `phase_outputs` (type=*_feedback) |
+| 3 - Implementation | **Spawn worker Claude** | `phase_outputs` (type=task_result) |
+| 4 - Verification | Coordinate Cursor + Gemini | `phase_outputs` (type=*_review) |
+| 5 - Completion | Generate summary | `phase_outputs` (type=summary) |
 
 ---
 
@@ -465,27 +496,55 @@ python -m orchestrator --project <name> --rollback 3
 
 ---
 
-## Workflow State
+## Workflow State (SurrealDB)
 
-Project workflow state is stored in `.workflow/`:
-```
-.workflow/
-|-- state.json                      <- Current workflow state
-|-- docs-index.json                 <- Index of discovered documentation
-|-- checkpoints.db                  <- LangGraph checkpoints (SQLite)
-+-- phases/
-    |-- planning/
-    |   +-- plan.json               <- Implementation plan
-    |-- validation/
-    |   |-- cursor_feedback.json    <- Cursor validation
-    |   +-- gemini_feedback.json    <- Gemini validation
-    |-- implementation/
-    |   +-- task_results/           <- Per-task results
-    |-- verification/
-    |   |-- cursor_review.json      <- Cursor code review
-    |   +-- gemini_review.json      <- Gemini architecture review
-    +-- completion/
-        +-- summary.json            <- Final summary
+All workflow state is stored in SurrealDB, organized by phase:
+
+### Phase Outputs Table (`phase_outputs`)
+| Phase | Output Type | Description |
+|-------|-------------|-------------|
+| 0 | `product_validation` | PRODUCT.md validation results |
+| 1 | `plan` | Implementation plan |
+| 1 | `task_breakdown` | Tasks and milestones |
+| 2 | `cursor_feedback` | Cursor validation feedback |
+| 2 | `gemini_feedback` | Gemini validation feedback |
+| 2 | `validation_consolidated` | Merged validation results |
+| 3 | `pre_implementation_check` | Environment readiness |
+| 3 | `task_result` | Per-task implementation results |
+| 3 | `implementation_result` | Overall implementation output |
+| 4 | `security_scan` | Security scan results |
+| 4 | `coverage_check` | Test coverage results |
+| 4 | `build_verification` | Build/type check results |
+| 4 | `task_verification` | Per-task verification |
+| 4 | `cursor_review` | Cursor code review |
+| 4 | `gemini_review` | Gemini architecture review |
+| 4 | `verification_consolidated` | Merged review results |
+| 5 | `summary` | Final completion summary |
+
+### Logs Table (`logs`)
+| Log Type | Description |
+|----------|-------------|
+| `research` | Research agent findings |
+| `research_aggregated` | Combined research results |
+| `discussion` | Developer preference capture |
+| `approval_context` | Approval gate context |
+| `approval_response` | Human approval decisions |
+| `escalation` | Escalation records |
+| `blocker` | Blocking issues |
+| `clarification_answers` | Human clarification responses |
+| `uat_document` | User acceptance test docs |
+
+### Querying State
+```python
+from orchestrator.db.repositories import get_phase_output_repository, get_logs_repository
+
+# Get plan for a project
+repo = get_phase_output_repository("my-project")
+plan = await repo.get_by_type(phase=1, output_type="plan")
+
+# Get all logs
+logs_repo = get_logs_repository("my-project")
+escalations = await logs_repo.get_by_type("escalation")
 ```
 
 ---
@@ -524,11 +583,12 @@ prerequisites -> planning -> [cursor_validate, gemini_validate] -> validation_fa
 
 ### Safety Guarantees
 
-1. **File Boundary Enforcement**: Orchestrator can only write to `.workflow/` and `.project-config.json`
-2. **Sequential File Writing**: Only the `implementation` node writes code. Cursor and Gemini are read-only reviewers.
-3. **Human Escalation**: When max retries exceeded or worker needs clarification, workflow pauses via `interrupt()` for human input.
-4. **State Persistence**: SqliteSaver enables checkpoint/resume from any point.
-5. **Transient Error Recovery**: Exponential backoff with jitter for recoverable errors.
+1. **Code Boundary Enforcement**: Orchestrator never writes application code - only spawns workers.
+2. **DB-Only State**: All workflow state stored in SurrealDB, not local files.
+3. **Sequential Implementation**: Only the `implementation` node writes code. Cursor and Gemini are read-only reviewers.
+4. **Human Escalation**: When max retries exceeded or worker needs clarification, workflow pauses via `interrupt()` for human input.
+5. **State Persistence**: SurrealDB enables checkpoint/resume from any point.
+6. **Transient Error Recovery**: Exponential backoff with jitter for recoverable errors.
 
 ### Running with LangGraph
 
@@ -670,18 +730,17 @@ Add to `projects/<name>/.project-config.json`:
 If Linear MCP is unavailable or not configured:
 - Workflow continues normally
 - No errors thrown
-- Tasks tracked in `.workflow/` only
+- Tasks tracked in SurrealDB only
 
 ---
 
 ## Error Reference
 
-### OrchestratorBoundaryError
-**Cause**: Attempted to write to a path outside allowed boundaries
-**Solution**: Use `safe_write_workflow_file()` or `safe_write_project_config()` methods
+### DatabaseRequiredError
+**Cause**: SurrealDB connection not configured
+**Solution**: Set `SURREAL_URL` environment variable
 ```
-OrchestratorBoundaryError: Orchestrator cannot write to 'src/main.py'.
-Only .workflow/ and .project-config.json are writable by orchestrator.
+DatabaseRequiredError: SurrealDB is required but SURREAL_URL environment variable is not set.
 ```
 
 ### WorktreeError
@@ -696,4 +755,11 @@ WorktreeError: '/path/to/project' is not a git repository. Worktrees require git
 **Solution**: Initialize project first or use `--project-path` for external projects
 ```
 Error: Project 'my-app' not found
+```
+
+### Connection Pool Exhausted
+**Cause**: Too many concurrent database connections
+**Solution**: Reduce parallelism or increase pool size
+```
+ConnectionPoolExhausted: No available connections in pool
 ```

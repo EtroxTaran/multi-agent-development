@@ -105,12 +105,12 @@ async def build_verification_node(state: WorkflowState) -> dict[str, Any]:
     else:
         logger.info(f"No build command for project type: {project_type}")
 
-    # Save results
-    verify_dir = project_dir / ".workflow" / "phases" / "build_verification"
-    verify_dir.mkdir(parents=True, exist_ok=True)
+    # Save results to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
 
-    result_file = verify_dir / "build_verification.json"
-    result_file.write_text(json.dumps(results, indent=2))
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=4, output_type="build_verification", content=results))
 
     if not results["passed"]:
         # Format error message

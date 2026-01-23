@@ -49,12 +49,11 @@ async def pre_implementation_node(state: WorkflowState) -> dict[str, Any]:
     checker = EnvironmentChecker(project_dir)
     result = checker.check()
 
-    # Save check results
-    check_dir = project_dir / ".workflow" / "phases" / "pre_implementation"
-    check_dir.mkdir(parents=True, exist_ok=True)
+    # Save check results to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
 
-    result_file = check_dir / "pre_implementation_check.json"
-    result_file.write_text(json.dumps({
+    check_result = {
         "timestamp": datetime.now().isoformat(),
         "ready": result.ready,
         "project_type": result.project_type.value,
@@ -63,7 +62,9 @@ async def pre_implementation_node(state: WorkflowState) -> dict[str, Any]:
         "test_framework": result.test_framework,
         "build_command": result.build_command,
         "test_command": result.test_command,
-    }, indent=2))
+    }
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=3, output_type="pre_implementation_check", content=check_result))
 
     if not result.ready:
         # Format failed checks

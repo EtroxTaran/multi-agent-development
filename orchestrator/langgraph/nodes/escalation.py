@@ -258,35 +258,24 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
     escalation["issue_summary"] = issue_summary
     escalation["suggested_actions"] = suggested_actions
 
-    # Save escalation details
-    workflow_dir = project_dir / ".workflow"
-    workflow_dir.mkdir(parents=True, exist_ok=True)
+    # Save escalation details to database
+    from ...db.repositories.logs import get_logs_repository
+    from ...storage.async_utils import run_async
 
-    escalation_file = workflow_dir / "escalation.json"
-    escalation_file.write_text(json.dumps(escalation, indent=2))
+    repo = get_logs_repository(state["project_name"])
+    run_async(repo.save(log_type="escalation", content=escalation))
 
-    # Log to blockers.md
-    blockers_file = workflow_dir / "blockers.md"
-    blocker_entry = f"""
-## Escalation - {datetime.now().isoformat()}
+    # Also save blocker entry
+    blocker_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "phase": current_phase,
+        "issue_summary": issue_summary,
+        "recent_errors": errors[-3:] if errors else [],
+        "suggested_actions": suggested_actions,
+    }
+    run_async(repo.save(log_type="blocker", content=blocker_entry))
 
-**Phase:** {current_phase}
-**Issue:** {issue_summary}
-
-### Recent Errors
-```json
-{json.dumps(errors[-3:] if errors else [], indent=2)}
-```
-
-### Suggested Actions
-{chr(10).join(f'- {action}' for action in suggested_actions)}
-
----
-"""
-    with open(blockers_file, "a") as f:
-        f.write(blocker_entry)
-
-    logger.info(f"Escalation saved to: {escalation_file}")
+    logger.info(f"Escalation saved to database")
 
     # Check execution mode
     execution_mode = state.get("execution_mode", "hitl")
@@ -366,19 +355,12 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         # Human answered clarification question - save and retry implementation
         answers = human_response.get("answers", {})
         if answers:
-            # Save answers to workflow directory for implementation to read
-            clarification_file = workflow_dir / "clarification_answers.json"
-            existing = {}
-            if clarification_file.exists():
-                try:
-                    existing = json.loads(clarification_file.read_text())
-                except json.JSONDecodeError:
-                    pass
-            existing.update(answers)
-            existing["timestamp"] = datetime.now().isoformat()
-            clarification_file.write_text(json.dumps(existing, indent=2))
-
-            logger.info(f"Saved clarification answers: {list(answers.keys())}")
+            # Save clarification answers to database
+            run_async(repo.save(log_type="clarification_answers", content={
+                "answers": answers,
+                "timestamp": datetime.now().isoformat(),
+            }))
+            logger.info(f"Saved clarification answers to database: {list(answers.keys())}")
 
         return {
             "next_decision": "retry",

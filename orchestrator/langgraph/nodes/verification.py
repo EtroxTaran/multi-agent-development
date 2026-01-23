@@ -45,9 +45,11 @@ async def cursor_review_node(state: WorkflowState) -> dict[str, Any]:
             blocking_issues=[],
             summary="Review skipped for docs-only changes.",
         )
-        feedback_dir = project_dir / ".workflow" / "phases" / "verification"
-        feedback_dir.mkdir(parents=True, exist_ok=True)
-        (feedback_dir / "cursor_review.json").write_text(json.dumps(feedback.to_dict(), indent=2))
+        # Save to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_cursor_review(feedback.to_dict()))
         return {
             "verification_feedback": {"cursor": feedback},
             "updated_at": datetime.now().isoformat(),
@@ -138,10 +140,11 @@ FILES IMPLEMENTED:
             raw_output=feedback_data,
         )
 
-        # Save feedback
-        feedback_dir = project_dir / ".workflow" / "phases" / "verification"
-        feedback_dir.mkdir(parents=True, exist_ok=True)
-        (feedback_dir / "cursor_review.json").write_text(json.dumps(feedback.to_dict(), indent=2))
+        # Save feedback to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_cursor_review(feedback.to_dict()))
 
         logger.info(f"Cursor review: approved={feedback.approved}, score={score}")
 
@@ -196,9 +199,11 @@ async def gemini_review_node(state: WorkflowState) -> dict[str, Any]:
             blocking_issues=[],
             summary="Review skipped for docs-only changes.",
         )
-        feedback_dir = project_dir / ".workflow" / "phases" / "verification"
-        feedback_dir.mkdir(parents=True, exist_ok=True)
-        (feedback_dir / "gemini_review.json").write_text(json.dumps(feedback.to_dict(), indent=2))
+        # Save to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_gemini_review(feedback.to_dict()))
         return {
             "verification_feedback": {"gemini": feedback},
             "updated_at": datetime.now().isoformat(),
@@ -284,10 +289,11 @@ FILES IMPLEMENTED:
             raw_output=feedback_data,
         )
 
-        # Save feedback
-        feedback_dir = project_dir / ".workflow" / "phases" / "verification"
-        feedback_dir.mkdir(parents=True, exist_ok=True)
-        (feedback_dir / "gemini_review.json").write_text(json.dumps(feedback.to_dict(), indent=2))
+        # Save feedback to database
+        from ...db.repositories.phase_outputs import get_phase_output_repository
+        from ...storage.async_utils import run_async
+        repo = get_phase_output_repository(state["project_name"])
+        run_async(repo.save_gemini_review(feedback.to_dict()))
 
         logger.info(f"Gemini review: approved={feedback.approved}, score={score}")
 
@@ -379,9 +385,11 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
         "timestamp": datetime.now().isoformat(),
     }
 
-    feedback_dir = project_dir / ".workflow" / "phases" / "verification"
-    feedback_dir.mkdir(parents=True, exist_ok=True)
-    (feedback_dir / "consolidated.json").write_text(json.dumps(consolidated, indent=2))
+    # Save consolidated feedback to database
+    from ...db.repositories.phase_outputs import get_phase_output_repository
+    from ...storage.async_utils import run_async
+    repo = get_phase_output_repository(state["project_name"])
+    run_async(repo.save(phase=4, output_type="consolidated", content=consolidated))
 
     if result.approved:
         phase_4.status = PhaseStatus.COMPLETED

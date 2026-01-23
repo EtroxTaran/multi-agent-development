@@ -82,46 +82,43 @@ class StatusDashboard:
         return f"{left}{fill * (self.width - 2)}{right}"
 
     def _load_state(self) -> Optional[dict]:
-        """Load workflow state.
+        """Load workflow state from database.
 
-        Uses StateProjector to get state from checkpoint if available,
-        falling back to state.json for backwards compatibility.
+        Uses WorkflowStorageAdapter to get state from SurrealDB.
         """
         try:
-            from .utils.state_projector import StateProjector
-            projector = StateProjector(self.project_dir)
-            state = projector.get_state()
-            if state is not None:
-                return state
-        except ImportError:
-            pass  # StateProjector not available, fall back to direct read
+            from .storage.workflow_adapter import get_workflow_storage
+
+            storage = get_workflow_storage(self.project_dir)
+            state_data = storage.get_state()
+            if state_data is not None:
+                return {
+                    "project_name": self.project_dir.name,
+                    "current_phase": state_data.current_phase,
+                    "phase_status": state_data.phase_status,
+                    "iteration_count": state_data.iteration_count,
+                    "execution_mode": state_data.execution_mode,
+                    "created_at": state_data.created_at.isoformat() if state_data.created_at else None,
+                    "updated_at": state_data.updated_at.isoformat() if state_data.updated_at else None,
+                }
         except Exception as e:
-            # Log but don't fail - fall back to direct read
             import logging
-            logging.getLogger(__name__).debug(f"StateProjector failed: {e}")
+            logging.getLogger(__name__).debug(f"Storage adapter failed: {e}")
 
-        # Fallback: direct read from state.json
-        state_file = self.workflow_dir / "state.json"
-        if not state_file.exists():
-            return None
-
-        try:
-            with open(state_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return None
+        return None
 
     def _load_tasks(self) -> list[dict]:
-        """Load task information."""
-        tasks_file = self.workflow_dir / "phases" / "planning" / "tasks.json"
-        if not tasks_file.exists():
-            return []
-
+        """Load task information from database."""
         try:
-            with open(tasks_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("tasks", [])
-        except (json.JSONDecodeError, IOError):
+            from .db.repositories.tasks import get_task_repository
+
+            repo = get_task_repository(self.project_dir.name)
+            from .storage.async_utils import run_async
+            tasks = run_async(repo.list_tasks())
+            return [t.to_dict() if hasattr(t, 'to_dict') else t for t in tasks] if tasks else []
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"Failed to load tasks: {e}")
             return []
 
     def _format_duration(self, seconds: float) -> str:
