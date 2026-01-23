@@ -488,3 +488,4 @@ docs/api/
 *.zip
 *.bz2
 *.xz
+dashboard/backend-nestjs/node_modules_old/

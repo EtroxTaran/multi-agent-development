@@ -1,6 +1,13 @@
 {
   "name": "conductor-dashboard-api",
   "version": "1.0.0",
+  "overrides": {
+    "lodash": "4.17.23",
+    "glob": "11.1.0",
+    "js-yaml": "4.1.1",
+    "@fastify/middie": "9.1.0",
+    "tmp": "0.2.5"
+  },
   "description": "Conductor Dashboard API - NestJS + Fastify",
   "author": "Conductor Team",
   "private": true,
