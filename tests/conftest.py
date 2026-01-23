@@ -22,6 +22,19 @@ from orchestrator.models import WorkflowState, PhaseState, PhaseStatus
 from orchestrator.storage.workflow_adapter import get_workflow_storage
 from orchestrator.utils.logging import OrchestrationLogger, LogLevel
 
+# Import mock factories
+from tests.helpers.mock_factories import (
+    create_mock_phase_output_repo,
+    create_mock_logs_repo,
+    create_mock_workflow_repo,
+    create_mock_session_repo,
+    create_mock_budget_repo,
+    create_mock_audit_repo,
+    create_mock_checkpoint_repo,
+    create_mock_task_repo,
+    create_mock_workflow_state,
+)
+
 
 # -------------------------------------------------------------------
 # DB Mock Fixtures for Unit Tests
@@ -31,197 +44,49 @@ from orchestrator.utils.logging import OrchestrationLogger, LogLevel
 @pytest.fixture
 def mock_phase_output_repo():
     """Create a mock PhaseOutputRepository."""
-    mock_repo = MagicMock()
-    # Async methods
-    mock_repo.save_output = AsyncMock(return_value=MagicMock(id="test-id", content={}))
-    mock_repo.save_plan = AsyncMock(return_value=MagicMock(id="test-id", content={}))
-    mock_repo.save_cursor_feedback = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_gemini_feedback = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_task_result = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_cursor_review = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_gemini_review = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_summary = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.get_output = AsyncMock(return_value=None)
-    mock_repo.get_plan = AsyncMock(return_value=None)
-    mock_repo.get_task_result = AsyncMock(return_value=None)
-    mock_repo.get_phase_outputs = AsyncMock(return_value=[])
-    mock_repo.get_task_outputs = AsyncMock(return_value=[])
-    mock_repo.clear_phase = AsyncMock(return_value=0)
-    return mock_repo
+    return create_mock_phase_output_repo()
 
 
 @pytest.fixture
 def mock_logs_repo():
     """Create a mock LogsRepository."""
-    mock_repo = MagicMock()
-    # Async methods
-    mock_repo.create_log = AsyncMock(return_value=MagicMock(id="test-id", content={}))
-    mock_repo.save_uat_document = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_handoff_brief = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_discussion = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.save_research = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.log_error = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.log_debug = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.get_by_type = AsyncMock(return_value=[])
-    mock_repo.get_by_task = AsyncMock(return_value=[])
-    mock_repo.get_latest = AsyncMock(return_value=None)
-    mock_repo.get_uat_document = AsyncMock(return_value=None)
-    mock_repo.get_latest_handoff_brief = AsyncMock(return_value=None)
-    mock_repo.clear_by_type = AsyncMock(return_value=0)
-    mock_repo.clear_by_task = AsyncMock(return_value=0)
-    return mock_repo
+    return create_mock_logs_repo()
 
 
 @pytest.fixture
 def mock_workflow_repo():
     """Create a mock WorkflowRepository."""
-    mock_repo = MagicMock()
-    mock_state = MagicMock()
-    mock_state.project_dir = "/tmp/test"
-    mock_state.current_phase = 1
-    mock_state.phase_status = {}
-    mock_state.iteration_count = 0
-    mock_state.plan = None
-    mock_state.validation_feedback = {}
-    mock_state.verification_feedback = {}
-    mock_state.implementation_result = None
-    mock_state.next_decision = None
-    mock_state.execution_mode = "afk"
-    mock_state.discussion_complete = False
-    mock_state.research_complete = False
-    mock_state.research_findings = {}
-    mock_state.token_usage = {}
-    mock_state.created_at = None
-    mock_state.updated_at = None
-
-    # Async methods
-    mock_repo.get_state = AsyncMock(return_value=mock_state)
-    mock_repo.initialize_state = AsyncMock(return_value=mock_state)
-    mock_repo.update_state = AsyncMock(return_value=mock_state)
-    mock_repo.set_phase = AsyncMock(return_value=mock_state)
-    mock_repo.reset_state = AsyncMock(return_value=mock_state)
-    mock_repo.get_summary = AsyncMock(return_value={"current_phase": 1, "project": "test"})
-    mock_repo.increment_iteration = AsyncMock(return_value=mock_state)
-    mock_repo.set_plan = AsyncMock(return_value=mock_state)
-    mock_repo.set_validation_feedback = AsyncMock(return_value=mock_state)
-    mock_repo.set_verification_feedback = AsyncMock(return_value=mock_state)
-    mock_repo.set_implementation_result = AsyncMock(return_value=mock_state)
-    mock_repo.record_git_commit = AsyncMock(return_value={})
-    mock_repo.get_git_commits = AsyncMock(return_value=[])
-    mock_repo.reset_to_phase = AsyncMock(return_value=mock_state)
-    return mock_repo
+    return create_mock_workflow_repo()
 
 
 @pytest.fixture
 def mock_session_repo():
     """Create a mock SessionRepository."""
-    mock_repo = MagicMock()
-    mock_session = MagicMock()
-    mock_session.task_id = "T1"
-    mock_session.session_id = "test-session-id"
-    mock_session.agent = "claude"
-    mock_session.status = "active"
-    mock_session.created_at = None
-    mock_session.updated_at = None
-    mock_session.invocation_count = 0
-    mock_session.total_cost_usd = 0.0
-
-    # Async methods
-    mock_repo.create_session = AsyncMock(return_value=mock_session)
-    mock_repo.get_active_session = AsyncMock(return_value=None)
-    mock_repo.close_session = AsyncMock(return_value=True)
-    mock_repo.touch_session = AsyncMock(return_value=mock_session)
-    mock_repo.record_invocation = AsyncMock(return_value=mock_session)
-    mock_repo.get_task_sessions = AsyncMock(return_value=[])
-    return mock_repo
+    return create_mock_session_repo()
 
 
 @pytest.fixture
 def mock_budget_repo():
     """Create a mock BudgetRepository."""
-    mock_repo = MagicMock()
-    # Async methods
-    mock_repo.record_spend = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_repo.get_task_cost = AsyncMock(return_value=0.0)
-    mock_repo.get_total_cost = AsyncMock(return_value=0.0)
-    mock_repo.get_cost_by_agent = AsyncMock(return_value={})
-    mock_repo.get_summary = AsyncMock(
-        return_value=MagicMock(
-            total_cost_usd=0.0,
-            by_agent={},
-            by_task={},
-            record_count=0,
-        )
-    )
-    return mock_repo
+    return create_mock_budget_repo()
 
 
 @pytest.fixture
 def mock_audit_repo():
     """Create a mock AuditRepository."""
-    mock_repo = MagicMock()
-    mock_entry = MagicMock()
-    mock_entry.id = "test-entry-id"
-
-    # Async methods
-    mock_repo.create_entry = AsyncMock(return_value=mock_entry)
-    mock_repo.update_result = AsyncMock(return_value=mock_entry)
-    mock_repo.find_by_task = AsyncMock(return_value=[])
-    mock_repo.find_by_agent = AsyncMock(return_value=[])
-    mock_repo.find_by_status = AsyncMock(return_value=[])
-    mock_repo.find_since = AsyncMock(return_value=[])
-    mock_repo.find_all = AsyncMock(return_value=[])
-    mock_repo.get_statistics = AsyncMock(
-        return_value=MagicMock(
-            total=0,
-            success_count=0,
-            failed_count=0,
-            timeout_count=0,
-            success_rate=0.0,
-            total_cost_usd=0.0,
-            total_duration_seconds=0.0,
-            avg_duration_seconds=0.0,
-            by_agent={},
-            by_status={},
-        )
-    )
-    return mock_repo
+    return create_mock_audit_repo()
 
 
 @pytest.fixture
 def mock_checkpoint_repo():
     """Create a mock CheckpointRepository."""
-    mock_repo = MagicMock()
-    mock_checkpoint = MagicMock()
-    mock_checkpoint.id = "test-checkpoint-id"
-    mock_checkpoint.name = "test-checkpoint"
-    mock_checkpoint.notes = None
-
-    # Async methods
-    mock_repo.create = AsyncMock(return_value=mock_checkpoint)
-    mock_repo.list_all = AsyncMock(return_value=[])
-    mock_repo.get_by_id = AsyncMock(return_value=None)
-    mock_repo.get_latest = AsyncMock(return_value=None)
-    mock_repo.delete = AsyncMock(return_value=True)
-    mock_repo.prune = AsyncMock(return_value=0)
-    return mock_repo
+    return create_mock_checkpoint_repo()
 
 
 @pytest.fixture
 def mock_task_repo():
     """Create a mock TaskRepository."""
-    mock_repo = MagicMock()
-    # Async methods
-    mock_repo.create_task = AsyncMock(return_value=MagicMock(id="T1"))
-    mock_repo.get_task = AsyncMock(return_value=None)
-    mock_repo.update_task = AsyncMock(return_value=MagicMock(id="T1"))
-    mock_repo.get_all_tasks = AsyncMock(return_value=[])
-    mock_repo.get_pending_tasks = AsyncMock(return_value=[])
-    mock_repo.get_next_task = AsyncMock(return_value=None)
-    mock_repo.get_progress = AsyncMock(
-        return_value=MagicMock(total=0, completed=0, in_progress=0, pending=0)
-    )
-    return mock_repo
+    return create_mock_task_repo()
 
 
 @pytest.fixture
@@ -298,115 +163,62 @@ def auto_patch_db_repos():
     Tests that need real DB connections should mark themselves with
     pytest.mark.db_integration.
     """
-    # Create mock repositories
-    mock_phase_output = MagicMock()
-    mock_phase_output.save_output = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_phase_output.save_plan = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_phase_output.save_cursor_feedback = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_phase_output.save_gemini_feedback = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_phase_output.save_task_result = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_phase_output.get_output = AsyncMock(return_value=None)
-    mock_phase_output.get_plan = AsyncMock(return_value=None)
-    mock_phase_output.get_phase_outputs = AsyncMock(return_value=[])
-
-    mock_logs = MagicMock()
-    mock_logs.create_log = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_logs.save_uat_document = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_logs.get_by_type = AsyncMock(return_value=[])
-    mock_logs.get_by_task = AsyncMock(return_value=[])
-
-    mock_workflow = MagicMock()
-    mock_state = MagicMock()
-    mock_state.project_dir = "/tmp/test"
-    mock_state.current_phase = 1
-    mock_state.phase_status = {}
-    mock_state.iteration_count = 0
-    mock_state.plan = None
-    mock_state.validation_feedback = {}
-    mock_state.verification_feedback = {}
-    mock_state.implementation_result = None
-    mock_state.next_decision = None
-    mock_state.execution_mode = "afk"
-    mock_state.discussion_complete = False
-    mock_state.research_complete = False
-    mock_state.research_findings = {}
-    mock_state.token_usage = {}
-    mock_workflow.get_state = AsyncMock(return_value=mock_state)
-    mock_workflow.initialize_state = AsyncMock(return_value=mock_state)
-    mock_workflow.update_state = AsyncMock(return_value=mock_state)
-    mock_workflow.set_phase = AsyncMock(return_value=mock_state)
-    mock_workflow.reset_state = AsyncMock(return_value=mock_state)
-    mock_workflow.reset_to_phase = AsyncMock(return_value=mock_state)
-    mock_workflow.get_summary = AsyncMock(return_value={"current_phase": 1, "project": "test"})
-    mock_workflow.increment_iteration = AsyncMock(return_value=mock_state)
-    mock_workflow.set_plan = AsyncMock(return_value=mock_state)
-    mock_workflow.set_validation_feedback = AsyncMock(return_value=mock_state)
-    mock_workflow.set_verification_feedback = AsyncMock(return_value=mock_state)
-    mock_workflow.set_implementation_result = AsyncMock(return_value=mock_state)
-    mock_workflow.record_git_commit = AsyncMock(return_value={})
-
-    mock_session = MagicMock()
-    mock_session.create_session = AsyncMock(return_value=MagicMock(id="test-session"))
-    mock_session.get_active_session = AsyncMock(return_value=None)
-    mock_session.get_session = AsyncMock(return_value=None)
-    mock_session.close_session = AsyncMock(return_value=True)
-    mock_session.touch_session = AsyncMock(return_value=MagicMock())
-    mock_session.record_invocation = AsyncMock(return_value=MagicMock())
-    mock_session.close_task_sessions = AsyncMock(return_value=0)
-    mock_session.get_task_sessions = AsyncMock(return_value=[])
-
-    mock_budget = MagicMock()
-    mock_budget.record_spend = AsyncMock(return_value=MagicMock(id="test-id"))
-    mock_budget.get_task_cost = AsyncMock(return_value=0.0)
-    mock_budget.get_total_cost = AsyncMock(return_value=0.0)
-    mock_budget.get_summary = AsyncMock(return_value=MagicMock(
-        total_cost_usd=0.0, by_agent={}, by_task={}, record_count=0,
-        total_tokens_input=0, total_tokens_output=0, by_model={},
-    ))
-
-    mock_audit = MagicMock()
-    mock_audit.create_entry = AsyncMock(return_value=MagicMock(id="test-entry"))
-    mock_audit.update_result = AsyncMock(return_value=MagicMock())
-    mock_audit.find_by_task = AsyncMock(return_value=[])
-    mock_audit.find_all = AsyncMock(return_value=[])
-    mock_audit.get_statistics = AsyncMock(return_value=MagicMock(
-        total=0, success_count=0, failed_count=0, timeout_count=0,
-        success_rate=0.0, total_cost_usd=0.0, total_duration_seconds=0.0,
-        avg_duration_seconds=0.0, by_agent={}, by_status={},
-    ))
-
-    mock_checkpoint = MagicMock()
-    mock_checkpoint.create_checkpoint = AsyncMock(return_value=MagicMock(id="test-cp"))
-    mock_checkpoint.list_checkpoints = AsyncMock(return_value=[])
-    mock_checkpoint.get_checkpoint = AsyncMock(return_value=None)
-    mock_checkpoint.get_latest = AsyncMock(return_value=None)
-    mock_checkpoint.delete_checkpoint = AsyncMock(return_value=True)
-    mock_checkpoint.prune_old_checkpoints = AsyncMock(return_value=0)
-
-    mock_task = MagicMock()
-    mock_task.create_task = AsyncMock(return_value=MagicMock(id="T1"))
-    mock_task.get_task = AsyncMock(return_value=None)
-    mock_task.update_task = AsyncMock(return_value=MagicMock(id="T1"))
-    mock_task.get_all_tasks = AsyncMock(return_value=[])
-    mock_task.get_pending_tasks = AsyncMock(return_value=[])
-    mock_task.get_next_task = AsyncMock(return_value=None)
-    mock_task.get_progress = AsyncMock(return_value={"total": 0, "completed": 0, "in_progress": 0, "pending": 0, "completion_rate": 0.0})
-
     with (
-        patch("orchestrator.db.repositories.phase_outputs.get_phase_output_repository", return_value=mock_phase_output),
-        patch("orchestrator.db.repositories.logs.get_logs_repository", return_value=mock_logs),
-        patch("orchestrator.db.repositories.workflow.get_workflow_repository", return_value=mock_workflow),
-        patch("orchestrator.db.repositories.sessions.get_session_repository", return_value=mock_session),
-        patch("orchestrator.db.repositories.budget.get_budget_repository", return_value=mock_budget),
-        patch("orchestrator.db.repositories.audit.get_audit_repository", return_value=mock_audit),
-        patch("orchestrator.db.repositories.checkpoints.get_checkpoint_repository", return_value=mock_checkpoint),
-        patch("orchestrator.db.repositories.tasks.get_task_repository", return_value=mock_task),
+        patch(
+            "orchestrator.db.repositories.phase_outputs.get_phase_output_repository",
+            return_value=create_mock_phase_output_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.logs.get_logs_repository",
+            return_value=create_mock_logs_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=create_mock_workflow_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.sessions.get_session_repository",
+            return_value=create_mock_session_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.budget.get_budget_repository",
+            return_value=create_mock_budget_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.audit.get_audit_repository",
+            return_value=create_mock_audit_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.checkpoints.get_checkpoint_repository",
+            return_value=create_mock_checkpoint_repo(),
+        ),
+        patch(
+            "orchestrator.db.repositories.tasks.get_task_repository",
+            return_value=create_mock_task_repo(),
+        ),
     ):
         yield
 
 
 # -------------------------------------------------------------------
-# Original Fixtures
+# Global State Cleanup
+# -------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def cleanup_global_state():
+    """Reset global state after each test.
+
+    This ensures test isolation by cleaning up any global singletons
+    or cached state that may persist between tests.
+    """
+    yield
+    # Add cleanup for any known global singletons here
+    # Example: ModuleName._instance = None
+
+
+# -------------------------------------------------------------------
+# Project Directory Fixtures
 # -------------------------------------------------------------------
 
 
@@ -466,6 +278,11 @@ def logger(temp_project_dir):
         console_output=False,  # Disable console output in tests
         min_level=LogLevel.DEBUG,
     )
+
+
+# -------------------------------------------------------------------
+# Agent Mock Fixtures
+# -------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -587,6 +404,11 @@ def mock_gemini_agent():
         },
     )
     return mock
+
+
+# -------------------------------------------------------------------
+# Sample Data Fixtures
+# -------------------------------------------------------------------
 
 
 @pytest.fixture

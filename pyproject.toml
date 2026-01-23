@@ -62,7 +62,9 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "pytest-asyncio>=0.21.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.0.0",
+    "pytest-xdist>=3.0.0",
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.0.0",
@@ -87,8 +89,19 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+timeout = 30
+timeout_method = "signal"
 filterwarnings = [
     "ignore::DeprecationWarning",
+]
+markers = [
+    "unit: Fast unit tests with mocked dependencies",
+    "integration: Tests requiring external services",
+    "db_integration: Tests requiring real SurrealDB",
+    "slow: Tests taking >5 seconds",
+    "subprocess: Tests that spawn subprocesses",
 ]
 
 [tool.black]
@@ -143,16 +156,20 @@ ignore = [
 [tool.coverage.run]
 source = ["orchestrator"]
 branch = true
+parallel = true
 omit = [
     "tests/*",
-    "*/__init__.py",
+    "orchestrator/__main__.py",
 ]
 
 [tool.coverage.report]
+fail_under = 60
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+    "class.*Protocol.*:",
 ]
