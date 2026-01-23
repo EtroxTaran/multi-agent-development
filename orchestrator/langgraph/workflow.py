@@ -66,6 +66,10 @@ from .nodes import (
     fixer_verify_node,
     # Error dispatch node
     error_dispatch_node,
+    # Auto-improvement nodes (evaluation and optimization)
+    evaluate_agent_node,
+    analyze_output_node,
+    optimize_prompts_node,
 )
 from .routers import (
     prerequisites_router,
@@ -103,6 +107,10 @@ from .routers import (
     should_use_fixer_router,
     # Error dispatch router
     error_dispatch_router,
+    # Auto-improvement routers (evaluation and optimization)
+    evaluate_agent_router,
+    analyze_output_router,
+    optimize_prompts_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -313,6 +321,11 @@ def create_workflow_graph(
     # Handoff node (GSD pattern) - generates session brief before END
     graph.add_node("generate_handoff", generate_handoff_node)
 
+    # Auto-improvement nodes (evaluation and optimization)
+    graph.add_node("evaluate_agent", evaluate_agent_node)
+    graph.add_node("analyze_output", analyze_output_node)
+    graph.add_node("optimize_prompts", optimize_prompts_node)
+
     if retry_enabled:
         logger.info("Retry policies enabled for agent nodes")
 
@@ -465,16 +478,45 @@ def create_workflow_graph(
         },
     )
 
-    # Verify task → LOOP BACK to select_task or retry (via fix_bug)
+    # Verify task → evaluate_agent (for auto-improvement) or fix_bug
+    # Changed: route through evaluate_agent before continuing to select_task
     graph.add_conditional_edges(
         "verify_task",
         verify_task_router,
         {
-            "select_task": "select_task",  # LOOP BACK - get next task
+            "select_task": "evaluate_agent",  # Changed: evaluate before next task
             "implement_task": "fix_bug",  # Retry via Bug Fixer
             "human_escalation": "error_dispatch",  # Route through error_dispatch
         },
     )
+
+    # ========== AUTO-IMPROVEMENT FLOW ==========
+    # Evaluation nodes run after task verification to assess and improve agent quality
+
+    # Evaluate agent → continue to select_task or analyze_output (if score low)
+    graph.add_conditional_edges(
+        "evaluate_agent",
+        evaluate_agent_router,
+        {
+            "analyze_output": "analyze_output",
+            "continue_workflow": "select_task",  # Continue task loop
+        },
+    )
+
+    # Analyze output → optimize prompts or continue
+    graph.add_conditional_edges(
+        "analyze_output",
+        analyze_output_router,
+        {
+            "optimize_prompts": "optimize_prompts",
+            "continue_workflow": "select_task",
+        },
+    )
+
+    # Optimize prompts → always continue to select_task
+    graph.add_edge("optimize_prompts", "select_task")
+
+    # ========== END AUTO-IMPROVEMENT FLOW ==========
 
     # Verify tasks parallel → LOOP BACK to select_task or retry
     graph.add_conditional_edges(
@@ -621,15 +663,14 @@ def create_workflow_graph(
         },
     )
 
-    # Fixer verify → resume workflow or escalate
-    # Note: resume_workflow returns to the node that would have been
-    # executed after the error, determined by current_phase
+    # Fixer verify → resume workflow (via evaluate_agent) or escalate
+    # Note: resume_workflow routes through evaluate_agent to assess fix quality
     graph.add_conditional_edges(
         "fixer_verify",
         fixer_verify_router,
         {
-            # Resume goes back to select_task to continue the workflow
-            "resume_workflow": "select_task",
+            # Resume goes through evaluation before continuing
+            "resume_workflow": "evaluate_agent",
             "human_escalation": "human_escalation",
         },
     )
@@ -774,6 +815,9 @@ class WorkflowRunner:
         if config:
             run_config.update(config)
 
+        # Bootstrap prompt versions if needed (first run)
+        await self._ensure_prompt_versions()
+
         logger.info(f"Starting workflow for project: {self.project_name}")
 
         if progress_callback:
@@ -785,6 +829,42 @@ class WorkflowRunner:
 
         logger.info(f"Workflow completed for project: {self.project_name}")
         return result
+
+    async def _ensure_prompt_versions(self) -> None:
+        """Ensure initial prompt versions exist in database.
+
+        Bootstraps prompt versions from template files if they don't exist.
+        This is a non-blocking operation - if it fails, the workflow continues.
+        """
+        try:
+            # Import bootstrap function
+            from pathlib import Path
+            import sys
+
+            scripts_dir = Path(__file__).parent.parent.parent / "scripts"
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+
+            from bootstrap_prompts import bootstrap_prompts, verify_bootstrap
+
+            # Check if bootstrap is needed
+            needs_bootstrap = not await verify_bootstrap(self.project_name)
+
+            if needs_bootstrap:
+                logger.info("Bootstrapping initial prompt versions...")
+                results = await bootstrap_prompts(self.project_name, force=False)
+                if results["created"] > 0:
+                    logger.info(f"Bootstrapped {results['created']} prompt versions")
+                if results["errors"] > 0:
+                    logger.warning(f"Bootstrap had {results['errors']} errors")
+            else:
+                logger.debug("Prompt versions already exist, skipping bootstrap")
+
+        except ImportError as e:
+            logger.debug(f"Bootstrap script not available: {e}")
+        except Exception as e:
+            # Non-fatal error - workflow can continue without prompt optimization
+            logger.warning(f"Prompt bootstrap failed (non-fatal): {e}")
 
     async def _run_with_callbacks(
         self,

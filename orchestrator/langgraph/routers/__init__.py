@@ -42,6 +42,12 @@ from .fixer import (
     should_use_fixer_router,
 )
 from ..nodes.error_dispatch import error_dispatch_router
+from .evaluation import (
+    evaluate_agent_router,
+    analyze_output_router,
+    optimize_prompts_router,
+    should_evaluate_router,
+)
 
 __all__ = [
     "validation_router",
@@ -79,4 +85,9 @@ __all__ = [
     "should_use_fixer_router",
     # Error dispatch
     "error_dispatch_router",
+    # Auto-improvement routers (evaluation and optimization)
+    "evaluate_agent_router",
+    "analyze_output_router",
+    "optimize_prompts_router",
+    "should_evaluate_router",
 ]

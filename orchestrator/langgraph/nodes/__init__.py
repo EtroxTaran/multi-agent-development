@@ -43,6 +43,13 @@ from .fixer_apply import fixer_apply_node
 from .fixer_verify import fixer_verify_node
 from .error_dispatch import error_dispatch_node
 
+# Auto-improvement nodes (evaluation and optimization)
+from .evaluate_agent import (
+    evaluate_agent_node,
+    analyze_output_node,
+    optimize_prompts_node,
+)
+
 __all__ = [
     "prerequisites_node",
     "planning_node",
@@ -85,4 +92,8 @@ __all__ = [
     "fixer_verify_node",
     # Error dispatch node
     "error_dispatch_node",
+    # Auto-improvement nodes (evaluation and optimization)
+    "evaluate_agent_node",
+    "analyze_output_node",
+    "optimize_prompts_node",
 ]

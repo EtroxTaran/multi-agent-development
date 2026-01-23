@@ -16,6 +16,14 @@ from .metrics import (
 )
 from .g_eval import GEvalEvaluator
 from .analyzer import OutputAnalyzer, AnalysisResult
+from .config import (
+    AutoImprovementConfig,
+    EvaluationConfig,
+    OptimizationConfig,
+    DeploymentConfig,
+    get_config,
+    clear_config_cache,
+)
 
 __all__ = [
     "AgentEvaluator",
@@ -27,4 +35,11 @@ __all__ = [
     "GEvalEvaluator",
     "OutputAnalyzer",
     "AnalysisResult",
+    # Configuration
+    "AutoImprovementConfig",
+    "EvaluationConfig",
+    "OptimizationConfig",
+    "DeploymentConfig",
+    "get_config",
+    "clear_config_cache",
 ]

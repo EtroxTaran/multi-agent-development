@@ -135,6 +135,8 @@ class AgentEvaluator:
 
     Orchestrates G-Eval evaluation and provides high-level
     methods for evaluating different types of agent outputs.
+
+    Supports cost controls via sampling_rate and max_cost_per_eval.
     """
 
     def __init__(
@@ -143,6 +145,8 @@ class AgentEvaluator:
         evaluator_model: str = "haiku",
         thresholds: Optional[ScoreThresholds] = None,
         enable_storage: bool = True,
+        sampling_rate: float = 1.0,
+        max_cost_per_eval: float = 0.05,
     ):
         """Initialize the evaluator.
 
@@ -151,11 +155,15 @@ class AgentEvaluator:
             evaluator_model: Model to use for evaluation (haiku recommended)
             thresholds: Score thresholds for decisions
             enable_storage: Whether to store evaluations in DB
+            sampling_rate: Rate of evaluations to run (0.0-1.0)
+            max_cost_per_eval: Maximum cost per evaluation in USD
         """
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.evaluator_model = evaluator_model
         self.thresholds = thresholds or DEFAULT_THRESHOLDS
         self.enable_storage = enable_storage
+        self.sampling_rate = max(0.0, min(1.0, sampling_rate))
+        self.max_cost_per_eval = max_cost_per_eval
 
         # Initialize G-Eval evaluator
         self._g_eval = GEvalEvaluator(
@@ -165,6 +173,10 @@ class AgentEvaluator:
 
         # Lazy-loaded storage
         self._storage = None
+
+        # Cost tracking
+        self._eval_count = 0
+        self._skipped_count = 0
 
     @property
     def storage(self):
@@ -189,8 +201,12 @@ class AgentEvaluator:
         requirements: Optional[list[str]] = None,
         prompt_version: Optional[str] = None,
         metadata: Optional[dict] = None,
-    ) -> EvaluationResult:
+        force: bool = False,
+    ) -> Optional[EvaluationResult]:
         """Evaluate an agent output.
+
+        Respects sampling_rate for probabilistic evaluation. Use force=True
+        to bypass sampling for critical evaluations.
 
         Args:
             agent: Agent name (claude, cursor, gemini)
@@ -202,18 +218,37 @@ class AgentEvaluator:
             requirements: Optional acceptance criteria
             prompt_version: Optional prompt version identifier
             metadata: Optional additional metadata
+            force: Bypass sampling rate check
 
         Returns:
-            EvaluationResult with scores and feedback
+            EvaluationResult with scores and feedback, or None if skipped
         """
-        # Run G-Eval
-        g_eval_result = self._g_eval.evaluate(
+        import random
+
+        # Apply sampling unless forced
+        if not force and self.sampling_rate < 1.0:
+            if random.random() > self.sampling_rate:
+                self._skipped_count += 1
+                logger.debug(
+                    f"Skipping evaluation due to sampling "
+                    f"(rate={self.sampling_rate:.2f}, skipped={self._skipped_count})"
+                )
+                return None
+
+        self._eval_count += 1
+
+        # Determine metrics to evaluate based on cost
+        metrics = self._select_metrics_for_cost()
+
+        # Run G-Eval (async)
+        g_eval_result = await self._g_eval.evaluate(
             agent=agent,
             node=node,
             prompt=prompt,
             output=output,
             task_id=task_id,
             requirements=requirements,
+            metrics=metrics,
         )
 
         # Build feedback string from evaluations
@@ -254,6 +289,59 @@ class AgentEvaluator:
                 logger.warning(f"Failed to store evaluation: {e}")
 
         return result
+
+    def _select_metrics_for_cost(self) -> Optional[list[EvaluationMetric]]:
+        """Select metrics to evaluate based on cost constraints.
+
+        If max_cost_per_eval is below the full evaluation cost (~$0.007),
+        returns a subset of the most important metrics.
+
+        Returns:
+            List of metrics to evaluate, or None for all metrics
+        """
+        # Approximate cost per criterion evaluation (~$0.001 with haiku)
+        COST_PER_CRITERION = 0.001
+
+        # Full evaluation has 7 criteria
+        full_eval_cost = 7 * COST_PER_CRITERION
+
+        if self.max_cost_per_eval >= full_eval_cost:
+            return None  # Evaluate all metrics
+
+        # Calculate how many criteria we can afford
+        max_criteria = max(1, int(self.max_cost_per_eval / COST_PER_CRITERION))
+
+        # Priority order of metrics (most important first)
+        priority_metrics = [
+            EvaluationMetric.TASK_COMPLETION,    # Most important
+            EvaluationMetric.OUTPUT_QUALITY,
+            EvaluationMetric.REASONING_QUALITY,
+            EvaluationMetric.TOOL_UTILIZATION,
+            EvaluationMetric.TOKEN_EFFICIENCY,
+            EvaluationMetric.CONTEXT_RETENTION,
+            EvaluationMetric.SAFETY,             # Least weighted
+        ]
+
+        selected = priority_metrics[:max_criteria]
+        logger.debug(
+            f"Cost-constrained evaluation: {len(selected)}/{len(priority_metrics)} metrics "
+            f"(max_cost=${self.max_cost_per_eval:.3f})"
+        )
+
+        return selected
+
+    def get_stats(self) -> dict:
+        """Get evaluation statistics.
+
+        Returns:
+            Dict with eval_count, skipped_count, and sampling_rate
+        """
+        return {
+            "eval_count": self._eval_count,
+            "skipped_count": self._skipped_count,
+            "sampling_rate": self.sampling_rate,
+            "max_cost_per_eval": self.max_cost_per_eval,
+        }
 
     async def _store_evaluation(self, result: EvaluationResult) -> None:
         """Store evaluation in database.
