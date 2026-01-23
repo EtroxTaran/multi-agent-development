@@ -38,6 +38,15 @@ class SurrealWorkflowRepository(StorageRepository):
             self._db_backend = get_workflow_repository(self.project_name)
         return self._db_backend
 
+    async def get_state_async(self) -> Optional[Any]:
+        """Retrieve the current workflow state asynchronously.
+
+        Returns:
+            Workflow state object or None if not found.
+        """
+        db = self._get_db_backend()
+        return await db.get_state()
+
     def get_state(self) -> Optional[Any]:
         """Retrieve the current workflow state.
 
@@ -59,6 +68,15 @@ class SurrealWorkflowRepository(StorageRepository):
         # For now, we'll log a warning if used, as we prefer granular updates.
         logger.warning("save_state called on SurrealWorkflowRepository - prefer granular updates")
         pass
+
+    async def get_summary_async(self) -> dict:
+        """Get a summary of the workflow status asynchronously.
+
+        Returns:
+            Dictionary with project status summary.
+        """
+        db = self._get_db_backend()
+        return await db.get_summary()
 
     def get_summary(self) -> dict:
         """Get a summary of the workflow status.

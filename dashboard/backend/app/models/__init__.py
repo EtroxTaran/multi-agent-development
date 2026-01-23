@@ -25,6 +25,7 @@ from .schemas import (  # Enums; Project models; Workflow models; Task models; A
     ProjectInitResponse,
     ProjectStatus,
     ProjectSummary,
+    ResumeRequest,
     SessionInfo,
     SessionListResponse,
     TaskInfo,
@@ -60,6 +61,7 @@ __all__ = [
     "WorkflowStartRequest",
     "WorkflowStartResponse",
     "WorkflowStatusResponse",
+    "ResumeRequest",
     # Task models
     "TaskInfo",
     "TaskListResponse",

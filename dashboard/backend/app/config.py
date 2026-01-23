@@ -30,12 +30,13 @@ class Settings(BaseSettings):
     projects_dir: Optional[Path] = Field(
         default=None,
         description="Projects directory (defaults to conductor_root/projects)",
+        validation_alias="PROJECTS_DIR",
     )
 
     # Database settings
     use_surrealdb: bool = Field(default=True, description="Use SurrealDB")
     surrealdb_url: str = Field(
-        default="ws://localhost:8000/rpc",
+        default="ws://localhost:8001/rpc",
         description="SurrealDB connection URL",
     )
     surrealdb_namespace: str = Field(default="conductor", description="SurrealDB namespace")
@@ -56,12 +57,25 @@ class Settings(BaseSettings):
             return self.projects_dir
         return self.conductor_root / "projects"
 
+    # AI settings
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key")
+    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API Key")
+
+    # Orchestrator settings
+    orchestrator_api_url: Optional[str] = Field(
+        default="http://localhost:8090", description="Orchestrator API URL"
+    )
+
+    # Environment
+    node_env: str = Field(default="development", description="Node environment")
+
     class Config:
         """Pydantic config."""
 
         env_prefix = "DASHBOARD_"
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 
 # Global settings instance

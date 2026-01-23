@@ -46,6 +46,7 @@ dependencies = [
     "requests>=2.31.0",
     # LangGraph for workflow orchestration
     "langgraph>=0.2.0",
+    "langchain-core>=0.1.0",
     "langgraph-checkpoint-sqlite>=1.0.0",
     # Validation and data models
     "pydantic>=2.0.0",

@@ -4,6 +4,7 @@
 # Import orchestrator modules
 import sys
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
@@ -12,6 +13,7 @@ from ..config import get_settings
 from ..deps import get_project_dir
 from ..models import (
     ErrorResponse,
+    ResumeRequest,
     WorkflowHealthResponse,
     WorkflowRollbackResponse,
     WorkflowStartRequest,
@@ -55,7 +57,7 @@ async def get_workflow_status(
         )
     except Exception as e:
         # Fall back to basic status
-        basic_status = orchestrator.status()
+        basic_status = await orchestrator.status_async()
         return WorkflowStatusResponse(
             mode="langgraph",
             status=WorkflowStatus.NOT_STARTED
@@ -80,7 +82,7 @@ async def get_workflow_health(
 ) -> WorkflowHealthResponse:
     """Get workflow health status."""
     orchestrator = Orchestrator(project_dir, console_output=False)
-    health = orchestrator.health_check()
+    health = await orchestrator.health_check_async()
     return WorkflowHealthResponse(**health)
 
 
@@ -165,12 +167,17 @@ async def start_workflow(
 )
 async def resume_workflow(
     project_name: str,
-    autonomous: bool = False,
+    request: Optional[ResumeRequest] = None,
+    autonomous: bool = False,  # Keep query param for backward compatibility
     background_tasks: BackgroundTasks = None,
     project_dir: Path = Depends(get_project_dir),
 ) -> WorkflowStartResponse:
     """Resume the workflow."""
     orchestrator = Orchestrator(project_dir, console_output=False)
+
+    # Resolve autonomous flag: prefer request body if present, else query param
+    is_autonomous = request.autonomous if request else autonomous
+    human_response = request.human_response if request else None
 
     # Resume workflow in background
     async def run_resume():
@@ -178,7 +185,8 @@ async def resume_workflow(
         callback = WebSocketProgressCallback(manager, project_name)
         try:
             result = await orchestrator.resume_langgraph(
-                autonomous=autonomous,
+                autonomous=is_autonomous,
+                human_response=human_response,
                 use_rich_display=False,
                 progress_callback=callback,
             )

@@ -149,7 +149,7 @@ const WorkflowGraphInner = React.memo(function WorkflowGraphInner({
   const { data: graphData, isLoading } = useQuery<GraphDefinition>({
     queryKey: ["workflow", "graph", projectName],
     queryFn: async () => {
-      const res = await fetch(`/api/projects/${projectName}/workflow/graph`);
+      const res = await fetch(`/api/projects/${projectName}/graph`);
       if (!res.ok) throw new Error("Failed to fetch graph");
       return res.json();
     },

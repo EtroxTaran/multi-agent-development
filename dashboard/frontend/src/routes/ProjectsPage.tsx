@@ -2,10 +2,23 @@
  * Projects list page
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
-import { FolderOpen, Plus, RefreshCw } from "lucide-react";
-import { useProjects, useInitProject } from "@/hooks";
+import {
+  FolderOpen,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Terminal,
+  Clock,
+  Folder,
+} from "lucide-react";
+import {
+  useProjects,
+  useInitProject,
+  useDeleteProject,
+  useWorkspaceFolders,
+} from "@/hooks";
 import {
   Button,
   Card,
@@ -17,207 +30,395 @@ import {
   Input,
   Label,
   Guidance,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui";
 import { cn, formatDate, getStatusColor, getPhaseName } from "@/lib/utils";
 
 export function ProjectsPage() {
   const { data: projects, isLoading, error, refetch } = useProjects();
+  const { data: workspaceFolders } = useWorkspaceFolders();
   const initProject = useInitProject();
+  const deleteProject = useDeleteProject();
+
   const [newProjectName, setNewProjectName] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState<string>("new");
   const [showNewProject, setShowNewProject] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [deleteSource, setDeleteSource] = useState(false);
+
+  // Filter folders that are NOT already projects
+  const availableFolders = useMemo(() => {
+    if (!workspaceFolders) return [];
+    return workspaceFolders.filter((f) => !f.is_project);
+  }, [workspaceFolders]);
 
   const handleCreateProject = async () => {
-    if (!newProjectName.trim()) return;
+    const nameToUse =
+      selectedFolder === "new" ? newProjectName : selectedFolder;
+
+    if (!nameToUse.trim()) return;
 
     try {
-      await initProject.mutateAsync(newProjectName);
+      await initProject.mutateAsync(nameToUse);
       setNewProjectName("");
+      setSelectedFolder("new");
       setShowNewProject(false);
     } catch (e) {
       console.error("Failed to create project:", e);
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+    try {
+      await deleteProject.mutateAsync({
+        name: projectToDelete,
+        removeSource: deleteSource,
+      });
+      setProjectToDelete(null);
+      setDeleteSource(false);
+    } catch (e) {
+      console.error("Failed to delete project:", e);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-muted-foreground animate-pulse">
+            Loading workspace...
+          </p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <p className="text-destructive">
-          Failed to load projects: {error.message}
-        </p>
-        <Button onClick={() => refetch()}>Retry</Button>
+      <div className="flex flex-col items-center justify-center h-[50vh] space-y-6">
+        <div className="bg-destructive/10 p-6 rounded-full">
+          <FolderOpen className="h-12 w-12 text-destructive" />
+        </div>
+        <div className="text-center space-y-2">
+          <h3 className="text-xl font-semibold">Failed to load projects</h3>
+          <p className="text-muted-foreground max-w-md">{error.message}</p>
+        </div>
+        <Button onClick={() => refetch()} variant="outline">
+          Try Again
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in-up">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Projects</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-1">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
+            Projects
+          </h1>
+          <p className="text-lg text-muted-foreground">
             Manage your Conductor orchestration projects
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+        <div className="flex items-center space-x-3">
+          <Button variant="outline" onClick={() => refetch()} className="group">
+            <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform" />
             Refresh
           </Button>
-          <Button onClick={() => setShowNewProject(true)}>
+          <Button
+            onClick={() => setShowNewProject(true)}
+            className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow"
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Project
           </Button>
         </div>
       </div>
 
-      {/* New project form */}
-      {showNewProject && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Create New Project</CardTitle>
-            <CardDescription>
-              Initialize a new orchestration project
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col space-y-4">
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="projectName">Project Name</Label>
-                  <Guidance content="The name of your new orchestration project. Use only letters, numbers, underscores, and hyphens." />
-                </div>
-                <div className="flex items-center space-x-4">
-                  <Input
-                    id="projectName"
-                    type="text"
-                    placeholder="e.g. my-awesome-project"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    className="flex-1"
-                    pattern="[a-zA-Z0-9_-]+"
-                  />
-                  <Button
-                    onClick={handleCreateProject}
-                    disabled={initProject.isPending}
-                  >
-                    {initProject.isPending ? "Creating..." : "Create"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowNewProject(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-            {initProject.isError && (
-              <p className="mt-2 text-sm text-destructive">
-                {initProject.error?.message || "Failed to create project"}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Project list */}
       {projects && projects.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
-            <Link
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {projects.map((project, index) => (
+            <div
               key={project.name}
-              to="/project/$name"
-              params={{ name: project.name }}
-              className="block"
+              className="group relative"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
-              <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <Badge
-                      className={cn(
-                        getStatusColor(
-                          project.workflow_status || "not_started",
-                        ),
-                      )}
-                    >
-                      {project.workflow_status || "Not Started"}
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-xs">
-                    {project.path}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Phase</span>
-                      <span className="font-medium">
-                        {project.current_phase > 0
-                          ? `${project.current_phase}/5 - ${getPhaseName(
-                              project.current_phase,
-                            )}`
-                          : "Not started"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Docs</span>
-                      <span>
-                        {project.has_documents ? (
-                          <Badge variant="success">Ready</Badge>
-                        ) : (
-                          <Badge variant="warning">Missing</Badge>
+              <Link
+                to="/project/$name"
+                params={{ name: project.name }}
+                className="block h-full"
+              >
+                <Card className="h-full hover:shadow-xl hover:ring-2 hover:ring-primary/20 transition-all duration-300 hover:-translate-y-1">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "uppercase text-[10px] tracking-wider font-semibold",
+                          getStatusColor(
+                            project.workflow_status || "not_started",
+                          ),
                         )}
-                      </span>
+                      >
+                        {project.workflow_status?.replace(/_/g, " ") ||
+                          "Not Started"}
+                      </Badge>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setProjectToDelete(project.name);
+                        }}
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-md hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Context</span>
-                      <span className="flex space-x-1">
+                    <CardTitle className="text-xl font-bold line-clamp-1 flex items-center gap-2">
+                      <Folder className="h-5 w-5 text-primary/60" />
+                      {project.name}
+                    </CardTitle>
+                    <CardDescription className="text-xs font-mono truncate pl-7">
+                      {project.path}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-sm py-2 border-b border-border/50">
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <Terminal className="h-3 w-3" /> Phase
+                        </span>
+                        <span className="font-medium bg-secondary px-2 py-0.5 rounded-full text-xs">
+                          {project.current_phase > 0
+                            ? `${project.current_phase}/5: ${getPhaseName(
+                                project.current_phase,
+                              )}`
+                            : "Ready to start"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm py-2 border-b border-border/50">
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <Clock className="h-3 w-3" /> Updated
+                        </span>
+                        <span className="text-xs">
+                          {project.last_activity
+                            ? formatDate(project.last_activity)
+                            : "Never"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        {project.has_documents && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-transparent"
+                          >
+                            DOCS
+                          </Badge>
+                        )}
                         {project.has_claude_md && (
-                          <Badge variant="secondary">Claude</Badge>
-                        )}
-                        {project.has_gemini_md && (
-                          <Badge variant="secondary">Gemini</Badge>
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-transparent"
+                          >
+                            AI
+                          </Badge>
                         )}
                         {project.has_cursor_rules && (
-                          <Badge variant="secondary">Cursor</Badge>
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] bg-slate-500/10 text-slate-600 dark:text-slate-400 border-transparent"
+                          >
+                            CURSOR
+                          </Badge>
                         )}
-                      </span>
-                    </div>
-                    {project.last_activity && (
-                      <div className="text-xs text-muted-foreground pt-2">
-                        Last activity: {formatDate(project.last_activity)}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">No projects yet</p>
-            <p className="text-muted-foreground">
-              Create your first project to get started
+        <Card className="border-dashed border-2 bg-muted/30">
+          <CardContent className="flex flex-col items-center justify-center py-20 animate-fade-in-up">
+            <div className="bg-background p-4 rounded-full shadow-sm mb-6 ring-1 ring-border">
+              <FolderOpen className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">No projects found</h3>
+            <p className="text-muted-foreground text-center max-w-sm mb-8">
+              Get started by creating a new orchestration project or importing
+              an existing folder.
             </p>
-            <Button className="mt-4" onClick={() => setShowNewProject(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Project
+            <Button
+              onClick={() => setShowNewProject(true)}
+              size="lg"
+              className="shadow-lg"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create First Project
             </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* New Project Dialog */}
+      <Dialog open={showNewProject} onOpenChange={setShowNewProject}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Initialize Project</DialogTitle>
+            <DialogDescription>
+              Create a new project or initialize an existing workspace folder.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-6 py-4">
+            <div className="space-y-2">
+              <Label>Source</Label>
+              <Select value={selectedFolder} onValueChange={setSelectedFolder}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">
+                    <span className="flex items-center">
+                      <Plus className="h-4 w-4 mr-2 text-muted-foreground" />
+                      Create New Folder
+                    </span>
+                  </SelectItem>
+                  {availableFolders && availableFolders.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        Existing Folders
+                      </div>
+                      {availableFolders.map((folder) => (
+                        <SelectItem key={folder.name} value={folder.name}>
+                          <span className="flex items-center">
+                            <Folder className="h-4 w-4 mr-2 text-blue-500" />
+                            {folder.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedFolder === "new" && (
+              <div className="space-y-2 animate-accordion-down">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="projectName">Project Name</Label>
+                  <span className="text-xs text-muted-foreground">
+                    Max 64 chars
+                  </span>
+                </div>
+                <Input
+                  id="projectName"
+                  placeholder="my-new-project"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  pattern="[a-zA-Z0-9_-]+"
+                  className="font-mono"
+                />
+                <Guidance content="Use only letters, numbers, underscores, and hyphens." />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewProject(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={initProject.isPending}
+            >
+              {initProject.isPending && (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {selectedFolder === "new"
+                ? "Create Project"
+                : "Initialize Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog
+        open={!!projectToDelete}
+        onOpenChange={(open) => !open && setProjectToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">
+              Delete Project?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the workflow state for{" "}
+              <strong>{projectToDelete}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex items-center space-x-2 py-4">
+            <input
+              type="checkbox"
+              id="deleteSource"
+              checked={deleteSource}
+              onChange={(e) => setDeleteSource(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-destructive focus:ring-destructive"
+            />
+            <Label
+              htmlFor="deleteSource"
+              className="text-destructive font-medium cursor-pointer"
+            >
+              Also delete source files (Dangerous!)
+            </Label>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setProjectToDelete(null);
+                setDeleteSource(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteProject.isPending ? "Deleting..." : "Delete Project"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

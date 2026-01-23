@@ -18,7 +18,7 @@ test.describe("Projects Page", () => {
     await projectsPage.goto();
 
     await expect(projectsPage.heading).toBeVisible();
-    await expect(page.getByText("test-project")).toBeVisible();
+    await expect(projectsPage.getProjectCard("test-project")).toBeVisible();
   });
 
   test("should allow creating a new project", async ({ page }) => {
@@ -26,7 +26,9 @@ test.describe("Projects Page", () => {
     await projectsPage.goto();
 
     await projectsPage.clickNewProject();
-    await expect(page.getByText("Create New Project")).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Initialize Project" }),
+    ).toBeVisible();
 
     await projectsPage.projectNameInput.fill("new-project");
 

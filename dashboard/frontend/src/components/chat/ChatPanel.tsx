@@ -74,8 +74,12 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
       // We assume the input is the "response" field
       // The backend expects a dict, typically {"action": "approve"} or user input
       // We'll send generic structure:
-      const humanResponse = { response: input, action: "continue" };
-      resumeWorkflow.mutate(humanResponse as any); // Type cast if needed
+      // We'll send generic structure:
+      const humanResponse = {
+        action: "continue",
+        response: input,
+      };
+      resumeWorkflow.mutate(humanResponse);
       setInput("");
       return;
     }

@@ -39,6 +39,14 @@ export interface ProjectSummary {
   last_activity?: string;
 }
 
+export interface GitInfo {
+  branch: string;
+  commit: string;
+  repo_url?: string;
+  is_dirty: boolean;
+  last_commit_msg?: string;
+}
+
 export interface ProjectStatus {
   name: string;
   path: string;
@@ -46,6 +54,7 @@ export interface ProjectStatus {
   state?: Record<string, unknown>;
   files: Record<string, boolean>;
   phases: Record<string, { exists: boolean; has_output: boolean }>;
+  git_info?: GitInfo;
 }
 
 export interface FolderInfo {

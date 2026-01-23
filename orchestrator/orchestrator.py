@@ -155,9 +155,32 @@ class Orchestrator:
         errors = []
 
         # Check PRODUCT.md exists
-        product_file = self.project_dir / "PRODUCT.md"
-        if not product_file.exists():
-            errors.append("PRODUCT.md not found. Create it with your feature specification.")
+        # Check for documentation in various locations
+        # We accept PRODUCT.md, README.md, or content in standard documentation folders
+        doc_files = ["PRODUCT.md", "README.md", "product.md", "readme.md"]
+        doc_dirs = ["Documents", "documents", "Docs", "docs", "Documentation", "documentation"]
+
+        has_doc_file = any((self.project_dir / f).exists() for f in doc_files)
+
+        has_doc_dir_content = False
+        found_dirs = []
+
+        for d in doc_dirs:
+            d_path = self.project_dir / d
+            if d_path.exists() and d_path.is_dir():
+                found_dirs.append(d)
+                # Check if there are any files (recursive)
+                if any(f.is_file() for f in d_path.glob("**/*")):
+                    has_doc_dir_content = True
+                    break
+
+        if not has_doc_file and not has_doc_dir_content:
+            msg = "No documentation found. "
+            if found_dirs:
+                msg += f"Found empty directories: {', '.join(found_dirs)}. Please add files to them or create a PRODUCT.md."
+            else:
+                msg += "Create 'PRODUCT.md', 'README.md', or add content to a 'docs/' folder."
+            errors.append(msg)
 
         # Check CLI tools
         from .agents import ClaudeAgent, CursorAgent, GeminiAgent
@@ -364,7 +387,72 @@ class Orchestrator:
             "langgraph_enabled": is_langgraph_enabled(),
             "has_context": summary.get("discussion_complete", False),
             "total_commits": summary.get("total_commits", 0),
+            "total_commits": summary.get("total_commits", 0),
         }
+
+    async def health_check_async(self) -> dict:
+        """Return current health status asynchronously.
+
+        Returns:
+            Dictionary with health status information
+        """
+        # Use async methods if available in storage, else fallback (carefully)
+        if hasattr(self.storage, "get_state_async"):
+            state = await self.storage.get_state_async()
+            summary = await self.storage.get_summary_async()
+        else:
+            # If storage doesn't support async, we might risk loop issues if it uses run_async
+            # But normally we should be using SurrealWorkflowRepository which now does.
+            state = self.storage.get_state()
+            summary = self.storage.get_summary()
+
+        from .agents import ClaudeAgent, CursorAgent, GeminiAgent
+
+        claude = ClaudeAgent(self.project_dir)
+        cursor = CursorAgent(self.project_dir)
+        gemini = GeminiAgent(self.project_dir)
+
+        agents_status = {
+            "claude": claude.check_available(),
+            "cursor": cursor.check_available(),
+            "gemini": gemini.check_available(),
+        }
+
+        all_agents_available = all(agents_status.values())
+        current_phase_status = None
+        if state and state.phase_status:
+            phase_key = str(state.current_phase)
+            phase_info = state.phase_status.get(phase_key, {})
+            current_phase_status = phase_info.get("status")
+
+        health_status = "healthy"
+        if not all_agents_available:
+            health_status = "degraded"
+        if current_phase_status == "failed":
+            health_status = "unhealthy"
+
+        return {
+            "status": health_status,
+            "project": summary.get("project_name", self.project_dir.name),
+            "current_phase": state.current_phase if state else None,
+            "phase_status": current_phase_status,
+            "iteration_count": state.iteration_count if state else 0,
+            "last_updated": state.updated_at.isoformat() if state and state.updated_at else None,
+            "agents": agents_status,
+            "langgraph_enabled": is_langgraph_enabled(),
+            "has_context": summary.get("discussion_complete", False),
+            "total_commits": summary.get("total_commits", 0),
+        }
+
+    async def status_async(self) -> dict:
+        """Get current workflow status asynchronously.
+
+        Returns:
+            Dictionary with status information
+        """
+        if hasattr(self.storage, "get_summary_async"):
+            return await self.storage.get_summary_async()
+        return self.storage.get_summary()
 
     async def run_langgraph(
         self,

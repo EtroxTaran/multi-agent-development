@@ -43,9 +43,9 @@ test.describe("Project Navigation", () => {
     await projectsPage.goto();
 
     // Check different status badges
-    await expect(page.getByText("in_progress")).toBeVisible();
+    await expect(page.getByText("in progress")).toBeVisible();
     await expect(page.getByText("completed")).toBeVisible();
-    await expect(page.getByText("not_started")).toBeVisible();
+    await expect(page.getByText("not started")).toBeVisible();
   });
 
   test("should navigate to project dashboard on click", async ({ page }) => {

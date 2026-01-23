@@ -386,6 +386,27 @@ AGENT_REGISTRY: dict[str, AgentConfig] = {
         max_iterations=3,
         timeout_seconds=480,
     ),
+    "A15": AgentConfig(
+        id="A15",
+        name="Watchdog Agent",
+        description="Proactive runtime error monitoring and self-healing",
+        primary_cli="python",
+        backup_cli=None,
+        context_file=None,
+        tools_file=None,
+        reviewers=["A08", "A07"],
+        fallback_reviewer=None,
+        can_write_files=False,
+        can_read_files=True,
+        allowed_paths=[
+            ".workflow/errors/**/*",
+            "logs/**/*",
+        ],
+        forbidden_paths=[],
+        output_schema=None,
+        max_iterations=0,
+        timeout_seconds=0,
+    ),
 }
 
 

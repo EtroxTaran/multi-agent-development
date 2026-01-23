@@ -4,6 +4,7 @@ Routers determine the next node based on state conditions.
 Used for conditional edges in the workflow graph.
 """
 
+from .error_dispatch import error_dispatch_router
 from .evaluation import (
     analyze_output_router,
     evaluate_agent_router,
@@ -88,6 +89,7 @@ __all__ = [
     "fixer_research_router",
     "should_use_fixer_router",
     # Error dispatch router
+    "error_dispatch_router",
     # Auto-improvement routers (evaluation and optimization)
     "evaluate_agent_router",
     "analyze_output_router",

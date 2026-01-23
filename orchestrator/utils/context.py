@@ -138,7 +138,7 @@ class ContextManager:
     # Files tracked by default
     TRACKED_FILES = {
         "agents": "AGENTS.md",
-        "product": "PRODUCT.md",
+        # "product": "PRODUCT.md",  # Now optional/discovered
         "cursor_rules": ".cursor/rules",
         "gemini": "GEMINI.md",
         "claude": "CLAUDE.md",
@@ -163,6 +163,41 @@ class ContextManager:
         """
         self.project_dir = Path(project_dir)
         self._tracked_files = self.TRACKED_FILES.copy()
+
+        # Auto-discover documents
+        self._discover_documents()
+
+    def _discover_documents(self) -> None:
+        """Discover and track files in documentation directories."""
+        # Ensure PRODUCT.md is tracked if it exists (legacy/root support)
+        # Also check for README.md
+        root_docs = ["PRODUCT.md", "README.md", "product.md", "readme.md"]
+        for doc_file in root_docs:
+            path = self.project_dir / doc_file
+            if path.exists():
+                self._tracked_files[doc_file.lower()] = doc_file
+
+        # Check for standard documentation folders
+        doc_dirs = ["Documents", "documents", "Docs", "docs", "Documentation", "documentation"]
+
+        found_dirs = []
+        for d in doc_dirs:
+            d_path = self.project_dir / d
+            if d_path.exists() and d_path.is_dir():
+                found_dirs.append(d_path)
+
+        # Track files in all found directories
+        for docs_dir in found_dirs:
+            for path in docs_dir.glob("**/*"):
+                if path.is_file() and not path.name.startswith("."):
+                    # Create a unique key based on relative path
+                    rel_path = path.relative_to(self.project_dir)
+                    # Use a stable key that doesn't depend on the specific folder capitalization if possible
+                    # but distinct enough to avoid collisions if multiple folders exist (unlikely but possible)
+                    key = (
+                        f"doc_{rel_path.stem}_{hashlib.md5(str(rel_path).encode()).hexdigest()[:6]}"
+                    )
+                    self._tracked_files[key] = str(rel_path)
 
     def add_tracked_file(self, key: str, relative_path: str) -> None:
         """Add a file to be tracked.

@@ -490,3 +490,7 @@ docs/api/
 *.xz
 dashboard/backend-nestjs/node_modules_old/
 .claude/skills/ui-design-system/reference
+
+# Playwright
+playwright-report/
+test-results/

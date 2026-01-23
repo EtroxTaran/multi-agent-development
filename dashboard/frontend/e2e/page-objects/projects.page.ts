@@ -31,23 +31,21 @@ export class ProjectsPage extends BasePage {
     this.refreshButton = page.getByRole("button", { name: "Refresh" });
     this.projectCards = page.locator('[class*="grid"] a[href^="/project/"]');
     this.loadingSpinner = page.locator(".animate-spin");
-    this.emptyState = page.getByText("No projects yet");
+    this.emptyState = page.getByText("No projects found");
     this.errorMessage = page.locator(".text-destructive");
-    this.retryButton = page.getByRole("button", { name: "Retry" });
+    this.retryButton = page.getByRole("button", { name: "Try Again" });
 
-    // New project form
-    this.newProjectForm = page
-      .locator('[class*="Card"]')
-      .filter({ hasText: "Create New Project" });
-    this.projectNameInput = page.getByPlaceholder("Project name");
+    // New project form (Dialog)
+    this.newProjectForm = page.getByRole("dialog", {
+      name: "Initialize Project",
+    });
+    this.projectNameInput = page.getByLabel("Project Name");
     this.createButton = page.getByRole("button", {
-      name: "Create",
+      name: "Create Project",
       exact: true,
     });
     this.cancelButton = page.getByRole("button", { name: "Cancel" });
-    this.createError = page
-      .locator(".text-destructive")
-      .filter({ hasText: "Failed" });
+    this.createError = page.locator(".text-destructive");
   }
 
   /**

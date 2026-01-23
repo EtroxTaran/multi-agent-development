@@ -199,7 +199,11 @@ class ProjectManager:
         project_dir = self.projects_dir / name
 
         if project_dir.exists():
-            return {"success": False, "error": f"Project '{name}' already exists"}
+            # If it exists, check if it's already a project
+            if (project_dir / ".project-config.json").exists():
+                return {"success": False, "error": f"Project '{name}' already exists"}
+            # If it exists but no config, we proceed (turning folder into project)
+            logger.info(f"Initializing existing folder '{name}' as project")
 
         try:
             # Create project structure
@@ -358,7 +362,70 @@ class ProjectManager:
             "state": state,
             "files": files_status,
             "phases": phases_status,
+            "git_info": self._get_git_info(project_dir),
         }
+
+    def _get_git_info(self, project_dir: Path) -> Optional[dict]:
+        """Get git information for a project.
+
+        Args:
+            project_dir: Path to project directory
+
+        Returns:
+            Dict with git info or None if not a git repo
+        """
+        if not (project_dir / ".git").exists():
+            return None
+
+        try:
+            # Helper to run git command
+            def run_git(args: list[str]) -> str:
+                return subprocess.check_output(
+                    ["git"] + args, cwd=project_dir, stderr=subprocess.DEVNULL, text=True
+                ).strip()
+
+            # Get branch
+            try:
+                branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
+            except subprocess.CalledProcessError:
+                branch = "unknown"
+
+            # Get commit hash
+            try:
+                commit = run_git(["rev-parse", "--short", "HEAD"])
+            except subprocess.CalledProcessError:
+                commit = "unknown"
+
+            # Get dirty status
+            try:
+                status = run_git(["status", "--porcelain"])
+                is_dirty = bool(status)
+            except subprocess.CalledProcessError:
+                is_dirty = False
+
+            # Get remote URL
+            try:
+                repo_url = run_git(["remote", "get-url", "origin"])
+            except subprocess.CalledProcessError:
+                repo_url = None
+
+            # Get last commit message
+            try:
+                last_commit_msg = run_git(["log", "-1", "--pretty=%s"])
+            except subprocess.CalledProcessError:
+                last_commit_msg = None
+
+            return {
+                "branch": branch,
+                "commit": commit,
+                "is_dirty": is_dirty,
+                "repo_url": repo_url,
+                "last_commit_msg": last_commit_msg,
+            }
+
+        except Exception as e:
+            logger.warning(f"Failed to get git info for {project_dir}: {e}")
+            return None
 
     def _load_project_config(self, project_dir: Path) -> Optional[dict]:
         """Load project configuration.

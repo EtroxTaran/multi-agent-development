@@ -62,6 +62,16 @@ class ProjectSummary(BaseModel):
     has_cursor_rules: bool = False
 
 
+class GitInfo(BaseModel):
+    """Git information for a project."""
+
+    branch: str
+    commit: str
+    repo_url: Optional[str] = None
+    is_dirty: bool = False
+    last_commit_msg: Optional[str] = None
+
+
 class ProjectStatus(BaseModel):
     """Detailed project status."""
 
@@ -71,6 +81,7 @@ class ProjectStatus(BaseModel):
     state: Optional[dict] = None
     files: dict[str, bool] = Field(default_factory=dict)
     phases: dict[str, dict] = Field(default_factory=dict)
+    git_info: Optional[GitInfo] = None
 
 
 class ProjectInitRequest(BaseModel):
@@ -144,6 +155,13 @@ class WorkflowStartResponse(BaseModel):
     message: Optional[str] = None
     error: Optional[str] = None
     results: Optional[dict] = None
+
+
+class ResumeRequest(BaseModel):
+    """Request to resume a paused workflow."""
+
+    autonomous: bool = False
+    human_response: Optional[dict] = None
 
 
 class WorkflowRollbackRequest(BaseModel):

@@ -529,7 +529,8 @@ class ConnectionPool:
 
 
 # Global connection pools per database
-_pools: dict[str, ConnectionPool] = {}
+# Key is (database_name, loop_id) to ensure pools are not shared across event loops
+_pools: dict[tuple[str, int], ConnectionPool] = {}
 _pools_lock = asyncio.Lock()
 
 
@@ -540,6 +541,7 @@ async def get_pool(
     """Get or create a connection pool for a project.
 
     Each project gets its own database for complete isolation.
+    Pools are scoped to the current event loop to avoid "Future attached to different loop" errors.
 
     Args:
         project_name: Project name (determines database)
@@ -552,13 +554,23 @@ async def get_pool(
     # Use standalone function for consistent database naming
     db_name = get_project_database(project_name)
 
+    # Get current loop ID to scope the pool
+    try:
+        loop = asyncio.get_running_loop()
+        loop_id = id(loop)
+    except RuntimeError:
+        # Should not happen in async context, but fallback safely
+        loop_id = 0
+
+    pool_key = (db_name, loop_id)
+
     async with _pools_lock:
-        if db_name not in _pools:
+        if pool_key not in _pools:
             pool = ConnectionPool(cfg, db_name)
             await pool.initialize()
-            _pools[db_name] = pool
+            _pools[pool_key] = pool
 
-        return _pools[db_name]
+        return _pools[pool_key]
 
 
 async def close_all_pools() -> None:

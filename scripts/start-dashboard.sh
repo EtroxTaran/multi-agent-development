@@ -28,7 +28,7 @@ cleanup() {
         kill $FRONTEND_PID 2>/dev/null || true
     fi
     # Kill any remaining processes on the ports
-    lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+    lsof -ti:8091 | xargs kill -9 2>/dev/null || true
     lsof -ti:3000 | xargs kill -9 2>/dev/null || true
     echo -e "${GREEN}Dashboard stopped.${NC}"
     exit 0
@@ -71,17 +71,40 @@ else
     echo "Node modules found."
 fi
 
+# Check Database
+echo -e "${YELLOW}[0/4] Checking database...${NC}"
+if ! curl -s http://localhost:8001/status > /dev/null; then
+    echo "Starting SurrealDB..."
+    # Try to start existing container, or run new one
+    docker start conductor-surrealdb 2>/dev/null || \
+    docker run -d --name conductor-surrealdb -p 8001:8000 -v conductor_surrealdb-data:/data --user 0:0 surrealdb/surrealdb:v2.1.4 start --user root --pass root rocksdb:/data/conductor.db
+
+    # Wait for DB
+    echo -n "Waiting for database"
+    for i in {1..10}; do
+        if curl -s http://localhost:8001/status > /dev/null; then
+            echo -e " ${GREEN}ready!${NC}"
+            break
+        fi
+        echo -n "."
+        sleep 1
+    done
+else
+    echo "Database is running."
+fi
+
 # Start backend
 echo -e "${YELLOW}[3/4] Starting backend server...${NC}"
+export PYTHONPATH=$ROOT_DIR:$PYTHONPATH
 cd "$BACKEND_DIR"
 source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload > /tmp/conductor-backend.log 2>&1 &
+uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload > /tmp/conductor-backend.log 2>&1 &
 BACKEND_PID=$!
 
 # Wait for backend to be ready
 echo -n "Waiting for backend"
 for i in {1..30}; do
-    if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+    if curl -s http://localhost:8091/health > /dev/null 2>&1; then
         echo -e " ${GREEN}ready!${NC}"
         break
     fi
@@ -111,8 +134,8 @@ echo -e "${GREEN}Dashboard is running!${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}➜${NC}  Dashboard:  ${BLUE}http://localhost:3000${NC}"
-echo -e "  ${GREEN}➜${NC}  API:        ${BLUE}http://localhost:8080${NC}"
-echo -e "  ${GREEN}➜${NC}  API Docs:   ${BLUE}http://localhost:8080/docs${NC}"
+echo -e "  ${GREEN}➜${NC}  API:        ${BLUE}http://localhost:8091${NC}"
+echo -e "  ${GREEN}➜${NC}  API Docs:   ${BLUE}http://localhost:8091/docs${NC}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop the dashboard${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

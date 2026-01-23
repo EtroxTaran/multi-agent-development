@@ -272,6 +272,9 @@ Pre-configured specialist agents with defined roles and file access boundaries.
 | A10 | Integration Tester | claude | E2E, BDD, Playwright | `tests/**/*`, `e2e/**/*` |
 | A11 | DevOps Engineer | cursor | CI/CD, deployment | `.github/**/*`, `*.yml` |
 | A12 | UI Designer | claude | UI components & styling | `src/components/**/*`, `*.css`, `*.tsx` |
+| A13 | Quality Gate | cursor | Code quality checks | Read-only |
+| A14 | Dependency Checker | claude | Dependency updates | `package.json`, `Dockerfile` |
+| A15 | Watchdog Agent | python | Runtime monitoring | Read-only |
 
 ### A01: Planner
 
@@ -486,6 +489,57 @@ Pre-configured specialist agents with defined roles and file access boundaries.
 - Ensure accessibility
 
 **File Access**: `src/components/**/*`, `*.css`, `*.tsx`
+
+---
+
+### A13: Quality Gate
+
+**Identifier**: `A13`
+**Name**: Quality Gate
+**CLI**: `cursor`
+
+**Description**: Enforces strict code quality standards, naming conventions, and structure.
+
+**Responsibilities**:
+- Enforce TypeScript strict mode
+- Check naming conventions
+- Validate project structure
+
+**File Access**: Read-only
+
+---
+
+### A14: Dependency Checker
+
+**Identifier**: `A14`
+**Name**: Dependency Checker
+**CLI**: `claude`
+
+**Description**: monitors and updates project dependencies.
+
+**Responsibilities**:
+- Check for outdated packages
+- Audit security vulnerabilities
+- Propose version upgrades
+
+**File Access**: `package.json`, `Dockerfile`
+
+---
+
+### A15: Watchdog Agent
+
+**Identifier**: `A15`
+**Name**: Watchdog Agent
+**CLI**: `python`
+
+**Description**: Proactive runtime error monitoring and self-healing.
+
+**Responsibilities**:
+- Monitor error logs
+- Trigger FixerAgent on new errors
+- Bridge runtime to self-healing
+
+**File Access**: Read-only (triggers FixerAgent)
 
 ---
 
@@ -771,11 +825,11 @@ Manager classes that support agent execution.
 | CLI Agent Wrappers | 4 (including BaseAgent) |
 | Specialized Agents | 2 |
 | Universal Adapters | 4 (including abstract) |
-| Specialist Registry | 12 (A01-A12) |
+| Specialist Registry | 15 (A01-A15) |
 | LangGraph Nodes | 8 |
 | Claude Code Skills | 14 |
 | Supporting Components | 5 |
-| **Total Agent Definitions** | **49** |
+| **Total Agent Definitions** | **52** |
 
 ---
 
