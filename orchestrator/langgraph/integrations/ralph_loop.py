@@ -213,6 +213,10 @@ class RalphLoopConfig:
     context_warning_threshold: float = CONTEXT_WARNING_THRESHOLD
     max_cost_usd: Optional[float] = None
 
+    # Fallback model support
+    model: Optional[str] = None  # Override model (e.g., 'haiku' for budget constraints)
+    budget_per_iteration: float = 0.50  # Budget per iteration in USD
+
 
 @dataclass
 class RalphLoopResult:
@@ -597,6 +601,14 @@ async def _run_single_iteration(
         "--max-turns",
         str(config.max_turns_per_iteration),
     ]
+
+    # Add model override if specified (for fallback model support)
+    if config.model:
+        cmd.extend(["--model", config.model])
+
+    # Add budget limit per iteration
+    if config.budget_per_iteration > 0:
+        cmd.extend(["--max-budget-usd", str(config.budget_per_iteration)])
 
     process = None
     try:

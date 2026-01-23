@@ -5,6 +5,7 @@ capturing the current state, recent actions, and next steps.
 """
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,8 @@ from typing import Optional, Any
 
 from .action_log import ActionEntry, ActionLog, get_action_log
 from .error_aggregator import AggregatedError, ErrorAggregator, get_error_aggregator
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -189,54 +192,60 @@ class HandoffGenerator:
         self.handoff_md_file = self.workflow_dir / "handoff_brief.md"
 
     def _load_state(self) -> Optional[dict]:
-        """Load workflow state.
+        """Load workflow state from database.
 
-        Uses StateProjector to get state from checkpoint if available,
-        falling back to state.json for backwards compatibility.
+        Reads state from SurrealDB via WorkflowStorageAdapter.
         """
         try:
-            from .state_projector import StateProjector
-            projector = StateProjector(self.project_dir)
-            state = projector.get_state()
-            if state is not None:
-                return state
-        except ImportError:
-            pass  # StateProjector not available
-        except Exception:
-            pass  # Log silently, fall back to direct read
+            from ..storage.workflow_adapter import get_workflow_storage
 
-        # Fallback: direct read from state.json
-        state_file = self.workflow_dir / "state.json"
-        if not state_file.exists():
-            return None
+            project_name = self.project_dir.name
+            storage = get_workflow_storage(self.project_dir, project_name)
+            state_data = storage.get_state()
 
-        try:
-            with open(state_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return None
+            if state_data is not None:
+                # Convert WorkflowStateData to dict for handoff generation
+                return {
+                    "project_name": state_data.project_name,
+                    "current_phase": state_data.current_phase,
+                    "phases": state_data.phases or {},
+                    "execution_mode": state_data.execution_mode,
+                    "iteration_count": state_data.iteration_count,
+                    "errors": state_data.errors or [],
+                    "created_at": state_data.created_at,
+                    "updated_at": state_data.updated_at,
+                }
+        except Exception as e:
+            logger.debug(f"Failed to load state from database: {e}, using default state")
+
+        return None
 
     def _load_tasks(self) -> tuple[list[dict], Optional[str]]:
-        """Load task information.
+        """Load task information from database.
 
         Returns:
             Tuple of (all_tasks, current_task_id)
         """
-        tasks_file = self.workflow_dir / "phases" / "planning" / "tasks.json"
-        if not tasks_file.exists():
-            return [], None
-
         try:
-            with open(tasks_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                tasks = data.get("tasks", [])
-                current = None
-                for task in tasks:
-                    if task.get("status") == "in_progress":
-                        current = task.get("id")
-                        break
-                return tasks, current
-        except (json.JSONDecodeError, IOError):
+            from ..db.repositories.phase_outputs import get_phase_output_repository
+            from ..storage.async_utils import run_async
+
+            project_name = self.project_dir.name
+            repo = get_phase_output_repository(project_name)
+            plan = run_async(repo.get_plan())
+
+            if not plan:
+                return [], None
+
+            tasks = plan.get("tasks", [])
+            current = None
+            for task in tasks:
+                if task.get("status") == "in_progress":
+                    current = task.get("id")
+                    break
+            return tasks, current
+        except Exception as e:
+            logger.debug(f"Failed to load tasks from database: {e}")
             return [], None
 
     def _determine_next_action(
@@ -326,30 +335,32 @@ class HandoffGenerator:
         return list(files)[:10]
 
     def _get_open_questions(self) -> list[str]:
-        """Get open questions requiring human input."""
+        """Get open questions requiring human input from database."""
         questions = []
 
-        # Check for clarification requests
-        clarification_file = self.workflow_dir / "clarification_answers.json"
-        if clarification_file.exists():
-            try:
-                with open(clarification_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    for q in data.get("pending_questions", []):
-                        questions.append(q.get("question", ""))
-            except (json.JSONDecodeError, IOError):
-                pass
+        try:
+            from ..db.repositories.logs import get_logs_repository
+            from ..storage.async_utils import run_async
 
-        # Check escalation file
-        escalation_file = self.workflow_dir / "escalation.json"
-        if escalation_file.exists():
-            try:
-                with open(escalation_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data.get("requires_human_input"):
-                        questions.append(data.get("question", "Human input required"))
-            except (json.JSONDecodeError, IOError):
-                pass
+            project_name = self.project_dir.name
+            repo = get_logs_repository(project_name)
+
+            # Check for pending clarification requests
+            clarification_logs = run_async(repo.get_by_type("clarification_request"))
+            for log in clarification_logs:
+                content = log.get("content", {})
+                for q in content.get("pending_questions", []):
+                    questions.append(q.get("question", ""))
+
+            # Check for escalations requiring human input
+            escalation_logs = run_async(repo.get_by_type("escalation"))
+            for log in escalation_logs:
+                content = log.get("content", {})
+                if content.get("requires_human_input"):
+                    questions.append(content.get("question", "Human input required"))
+
+        except Exception as e:
+            logger.debug(f"Failed to get open questions from database: {e}")
 
         return questions
 
@@ -471,7 +482,8 @@ class HandoffGenerator:
             with open(self.handoff_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return HandoffBrief.from_dict(data)
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load handoff brief: {e}")
             return None
 
 

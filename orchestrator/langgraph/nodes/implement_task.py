@@ -105,6 +105,11 @@ When complete, output a JSON object:
 # Default estimated cost per task implementation (conservative estimate)
 ESTIMATED_TASK_COST_USD = 0.50
 
+# Fallback model configuration for budget-constrained scenarios
+FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "haiku")
+FALLBACK_COST_RATIO = 0.1  # Haiku is ~10x cheaper than Sonnet
+ESTIMATED_FALLBACK_COST_USD = ESTIMATED_TASK_COST_USD * FALLBACK_COST_RATIO
+
 
 def _check_budget_before_task(
     project_dir: Path,
@@ -114,7 +119,8 @@ def _check_budget_before_task(
     """Check budget before starting task implementation.
 
     Returns None if budget is OK, or a state update dict if budget
-    is exceeded (either escalate or abort).
+    is exceeded (either escalate or abort). Implements graceful degradation
+    by suggesting a fallback (cheaper) model before escalating.
 
     Args:
         project_dir: Project directory
@@ -122,13 +128,13 @@ def _check_budget_before_task(
         estimated_cost: Estimated cost of implementation
 
     Returns:
-        None if OK, or dict with errors/escalation if budget exceeded
+        None if OK, or dict with errors/escalation/use_fallback if budget issue
     """
     try:
         budget_manager = get_budget_storage(project_dir)
 
         # Quick check if budgets are disabled
-        if not budget_manager.config.enabled:
+        if not hasattr(budget_manager, 'config') or not getattr(budget_manager.config, 'enabled', True):
             return None
 
         # Enforce budget with structured result
@@ -151,21 +157,46 @@ def _check_budget_before_task(
             }
 
         if not result.allowed:
-            # Budget exceeded but not completely exhausted - escalate
-            logger.warning(f"Budget exceeded, escalating: {result.message}")
-            return {
-                "errors": [{
-                    "type": "budget_limit_reached",
-                    "message": f"Budget limit reached: {result.message}",
-                    "exceeded_type": result.exceeded_type,
-                    "limit_usd": result.limit_usd,
-                    "current_usd": result.current_usd,
-                    "remaining_usd": result.remaining_usd,
-                    "timestamp": datetime.now().isoformat(),
-                }],
-                "next_decision": "escalate",
-                "budget_status": result.to_dict(),
-            }
+            # Budget exceeded for primary model - try fallback model
+            fallback_cost = estimated_cost * FALLBACK_COST_RATIO
+            fallback_result = budget_manager.enforce_budget(task_id, fallback_cost)
+
+            if fallback_result.allowed:
+                # Fallback model fits within budget - signal to use it
+                logger.info(
+                    f"Budget tight for task {task_id}, switching to fallback model "
+                    f"({FALLBACK_MODEL}). Primary cost: ${estimated_cost:.2f}, "
+                    f"Fallback cost: ${fallback_cost:.2f}, "
+                    f"Remaining: ${result.remaining_usd:.2f}"
+                )
+                return {
+                    "use_fallback_model": True,
+                    "fallback_model": FALLBACK_MODEL,
+                    "fallback_reason": "budget_constraint",
+                    "original_cost": estimated_cost,
+                    "fallback_cost": fallback_cost,
+                    "remaining_budget": result.remaining_usd,
+                }
+            else:
+                # Even fallback doesn't fit - escalate
+                logger.warning(
+                    f"Budget exceeded for task {task_id}, even fallback model "
+                    f"({FALLBACK_MODEL}) doesn't fit. Escalating."
+                )
+                return {
+                    "errors": [{
+                        "type": "budget_limit_reached",
+                        "message": f"Budget limit reached: {result.message}. Even fallback model exceeds budget.",
+                        "exceeded_type": result.exceeded_type,
+                        "limit_usd": result.limit_usd,
+                        "current_usd": result.current_usd,
+                        "remaining_usd": result.remaining_usd,
+                        "fallback_attempted": True,
+                        "timestamp": datetime.now().isoformat(),
+                    }],
+                    "next_decision": "escalate",
+                    "budget_status": result.to_dict(),
+                }
 
         if result.should_escalate:
             # Approaching limit - log warning but continue
@@ -173,6 +204,10 @@ def _check_budget_before_task(
 
         return None  # OK to proceed
 
+    except AttributeError as e:
+        # Budget manager doesn't have expected interface - continue without budget checks
+        logger.debug(f"Budget manager interface mismatch (continuing anyway): {e}")
+        return None
     except Exception as e:
         # Don't block on budget check failures - log and continue
         logger.warning(f"Budget check failed (continuing anyway): {e}")
@@ -225,8 +260,20 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
 
     # Check budget before implementation
     budget_result = _check_budget_before_task(project_dir, task_id)
+
+    # Handle budget check result
+    use_fallback_model = False
+    fallback_model = None
+
     if budget_result is not None:
-        return budget_result
+        if budget_result.get("use_fallback_model"):
+            # Budget tight but fallback model fits - use it
+            use_fallback_model = True
+            fallback_model = budget_result.get("fallback_model", FALLBACK_MODEL)
+            logger.info(f"Using fallback model '{fallback_model}' due to budget constraints")
+        else:
+            # Budget exceeded or other error - return the error state
+            return budget_result
 
     # Update task attempt count
     updated_task = dict(task)
@@ -247,6 +294,8 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
             task=task,
             updated_task=updated_task,
             project_dir=project_dir,
+            use_fallback_model=use_fallback_model,
+            fallback_model=fallback_model,
         )
     elif use_ralph:
         logger.info(f"Using Ralph Wiggum loop for task {task_id}")
@@ -255,6 +304,8 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
             task=task,
             updated_task=updated_task,
             project_dir=project_dir,
+            use_fallback_model=use_fallback_model,
+            fallback_model=fallback_model,
         )
     else:
         logger.info(f"Using standard implementation for task {task_id}")
@@ -263,6 +314,8 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
             task=task,
             updated_task=updated_task,
             project_dir=project_dir,
+            use_fallback_model=use_fallback_model,
+            fallback_model=fallback_model,
         )
 
 
@@ -550,12 +603,19 @@ def _should_use_unified_loop(task: Task, project_dir: Path) -> bool:
     return False
 
 
-def _get_unified_loop_config(task: Task, project_dir: Path) -> UnifiedLoopConfig:
+def _get_unified_loop_config(
+    task: Task,
+    project_dir: Path,
+    use_fallback_model: bool = False,
+    fallback_model: Optional[str] = None,
+) -> UnifiedLoopConfig:
     """Get unified loop configuration for a task.
 
     Args:
         task: Task to implement
         project_dir: Project directory
+        use_fallback_model: Whether to use fallback model due to budget constraints
+        fallback_model: Name of fallback model to use (e.g., 'haiku')
 
     Returns:
         Configured UnifiedLoopConfig
@@ -567,10 +627,14 @@ def _get_unified_loop_config(task: Task, project_dir: Path) -> UnifiedLoopConfig
     elif task.get("primary_cli"):
         agent_type = task.get("primary_cli")
 
-    # Determine model
-    model = LOOP_MODEL
-    if task.get("model"):
-        model = task.get("model")
+    # Determine model - use fallback if budget constrained
+    if use_fallback_model and fallback_model:
+        model = fallback_model
+        logger.info(f"Using fallback model '{model}' for unified loop due to budget constraints")
+    else:
+        model = LOOP_MODEL
+        if task.get("model"):
+            model = task.get("model")
 
     # Determine verification type
     verification = "tests"
@@ -578,6 +642,10 @@ def _get_unified_loop_config(task: Task, project_dir: Path) -> UnifiedLoopConfig
         verification = "tests"
     elif task.get("verification"):
         verification = task.get("verification")
+
+    # Adjust budget per iteration based on model
+    budget_per_iteration = 0.05 if use_fallback_model else 0.50
+    max_budget = 0.50 if use_fallback_model else 5.00
 
     return UnifiedLoopConfig(
         agent_type=agent_type,
@@ -588,8 +656,8 @@ def _get_unified_loop_config(task: Task, project_dir: Path) -> UnifiedLoopConfig
         enable_session=(agent_type.lower() == "claude"),
         enable_error_context=True,
         enable_budget=True,
-        budget_per_iteration=0.50,
-        max_budget=5.00,
+        budget_per_iteration=budget_per_iteration,
+        max_budget=max_budget,
         save_iteration_logs=True,
     )
 
@@ -599,6 +667,8 @@ async def _implement_with_ralph_loop(
     task: Task,
     updated_task: dict,
     project_dir: Path,
+    use_fallback_model: bool = False,
+    fallback_model: Optional[str] = None,
 ) -> dict[str, Any]:
     """Implement task using Ralph Wiggum iterative loop.
 
@@ -610,6 +680,8 @@ async def _implement_with_ralph_loop(
         task: Task definition
         updated_task: Task with updated attempt count
         project_dir: Project directory
+        use_fallback_model: Whether to use fallback model due to budget constraints
+        fallback_model: Name of fallback model to use (e.g., 'haiku')
 
     Returns:
         State updates
@@ -618,11 +690,17 @@ async def _implement_with_ralph_loop(
 
     # Configure Ralph loop
     test_command = detect_test_framework(project_dir)
+
+    # Adjust budget per iteration if using fallback model
+    budget_per_iteration = 0.50 if not use_fallback_model else 0.05
+
     config = RalphLoopConfig(
         max_iterations=10,
         iteration_timeout=300,  # 5 min per iteration
         test_command=test_command,
         save_iteration_logs=True,
+        model=fallback_model if use_fallback_model else None,
+        budget_per_iteration=budget_per_iteration,
     )
 
     try:
@@ -704,6 +782,8 @@ async def _implement_with_unified_loop(
     task: Task,
     updated_task: dict,
     project_dir: Path,
+    use_fallback_model: bool = False,
+    fallback_model: Optional[str] = None,
 ) -> dict[str, Any]:
     """Implement task using unified loop pattern (works with any agent).
 
@@ -716,14 +796,16 @@ async def _implement_with_unified_loop(
         task: Task definition
         updated_task: Task with updated attempt count
         project_dir: Project directory
+        use_fallback_model: Whether to use fallback model due to budget constraints
+        fallback_model: Name of fallback model to use (e.g., 'haiku')
 
     Returns:
         State updates
     """
     task_id = task["id"]
 
-    # Get unified loop configuration
-    config = _get_unified_loop_config(task, project_dir)
+    # Get unified loop configuration with fallback model support
+    config = _get_unified_loop_config(task, project_dir, use_fallback_model, fallback_model)
 
     # Build loop context
     context = LoopContext(
@@ -813,6 +895,8 @@ async def _implement_standard(
     task: Task,
     updated_task: dict,
     project_dir: Path,
+    use_fallback_model: bool = False,
+    fallback_model: Optional[str] = None,
 ) -> dict[str, Any]:
     """Implement task using standard single-invocation approach via Specialist Runner.
 
@@ -821,6 +905,8 @@ async def _implement_standard(
         task: Task definition
         updated_task: Task with updated attempt count
         project_dir: Project directory
+        use_fallback_model: Whether to use fallback model due to budget constraints
+        fallback_model: Name of fallback model to use (e.g., 'haiku')
 
     Returns:
         State updates
@@ -834,11 +920,14 @@ async def _implement_standard(
         # Use SpecialistRunner to execute A04-implementer
         # Running in thread to avoid blocking event loop
         runner = SpecialistRunner(project_dir)
-        
-        result = await asyncio.to_thread(
-            runner.create_agent("A04-implementer").run,
-            prompt
-        )
+
+        # Configure model override if using fallback
+        agent = runner.create_agent("A04-implementer")
+        if use_fallback_model and fallback_model:
+            logger.info(f"Using fallback model '{fallback_model}' for standard implementation")
+            agent.model = fallback_model
+
+        result = await asyncio.to_thread(agent.run, prompt)
 
         if not result.success:
             raise Exception(result.error or "Task implementation failed")
@@ -1036,8 +1125,9 @@ def build_task_prompt(
     if context_preferences:
         prompt += f"\n\n## Project Context (from CONTEXT.md)\n{context_preferences}"
 
-    # Include research findings if available
-    research_findings = _load_research_findings(project_dir)
+    # Include research findings if available (from DB)
+    project_name = state.get("project_name") if state else project_dir.name
+    research_findings = _load_research_findings(project_name)
     if research_findings:
         prompt += f"\n\n## Research Findings\n{research_findings}"
 
@@ -1045,7 +1135,7 @@ def build_task_prompt(
     if diff_context:
         prompt += f"\n\n## Diff Context\n```diff\n{diff_context}\n```"
 
-    clarification_answers = _load_task_clarification_answers(project_dir, task.get("id", "unknown"))
+    clarification_answers = _load_task_clarification_answers(project_name, task.get("id", "unknown"))
     if clarification_answers:
         prompt += f"\n\nCLARIFICATION ANSWERS:\n{json.dumps(clarification_answers, indent=2)}"
 
@@ -1101,21 +1191,28 @@ def _load_context_preferences(project_dir: Path) -> str:
     return ""
 
 
-def _load_research_findings(project_dir: Path) -> str:
-    """Load research findings from the research phase.
+def _load_research_findings(project_name: str) -> str:
+    """Load research findings from database.
 
     Args:
-        project_dir: Project directory
+        project_name: Project name for DB lookup
 
     Returns:
         Formatted research summary or empty string
     """
-    findings_file = project_dir / ".workflow" / "phases" / "research" / "findings.json"
-    if not findings_file.exists():
-        return ""
+    from ...db.repositories.logs import get_logs_repository
+    from ...storage.async_utils import run_async
 
     try:
-        findings = json.loads(findings_file.read_text())
+        repo = get_logs_repository(project_name)
+        logs = run_async(repo.get_by_type("research_aggregated"))
+
+        if not logs:
+            return ""
+
+        # Get most recent research
+        latest = logs[0]
+        findings = latest.get("content", {})
 
         parts = []
 
@@ -1224,14 +1321,31 @@ def _run_task_in_worktree(
     }
 
 
-def _load_task_clarification_answers(project_dir: Path, task_id: str) -> dict:
-    """Load clarification answers for a specific task."""
-    answers_file = project_dir / ".workflow" / "task_clarifications" / f"{task_id}_answers.json"
-    if answers_file.exists():
-        try:
-            return json.loads(answers_file.read_text())
-        except json.JSONDecodeError:
-            return {}
+def _load_task_clarification_answers(project_name: str, task_id: str) -> dict:
+    """Load clarification answers for a specific task from database.
+
+    Args:
+        project_name: Project name for DB lookup
+        task_id: Task ID to get answers for
+
+    Returns:
+        Clarification answers dict or empty dict
+    """
+    from ...db.repositories.logs import get_logs_repository
+    from ...storage.async_utils import run_async
+
+    try:
+        repo = get_logs_repository(project_name)
+        # Look for clarification answers stored as error type with task_id
+        logs = run_async(repo.get_by_task_id(task_id))
+
+        for log in logs:
+            content = log.get("content", {})
+            if content.get("type") == "clarification_answers":
+                return content.get("answers", {})
+    except Exception:
+        pass
+
     return {}
 
 

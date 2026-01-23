@@ -12,13 +12,14 @@ from typing import Any, Optional
 from .async_utils import run_async
 from .base import BudgetRecordData, BudgetStorageProtocol, BudgetSummaryData
 
+# Import budget constants from the canonical source to avoid duplication
+from orchestrator.agents.budget import (
+    DEFAULT_PROJECT_BUDGET_USD,
+    DEFAULT_TASK_BUDGET_USD,
+    DEFAULT_INVOCATION_BUDGET_USD,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# Default budget configuration (used since file backend is removed)
-DEFAULT_PROJECT_BUDGET_USD = 50.0
-DEFAULT_TASK_BUDGET_USD = 5.0
-DEFAULT_INVOCATION_BUDGET_USD = 1.0
 
 
 class BudgetStorageAdapter(BudgetStorageProtocol):

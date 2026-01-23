@@ -107,7 +107,8 @@ class CheckpointManager:
 
         try:
             return json.loads(self.index_file.read_text())
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load checkpoint index: {e}")
             return {}
 
     def _save_index(self, index: dict[str, dict]) -> None:
@@ -128,17 +129,17 @@ class CheckpointManager:
             if state is not None:
                 return state
         except ImportError:
-            pass  # StateProjector not available
-        except Exception:
-            pass  # Log silently, fall back to direct read
+            logger.debug("StateProjector not available, falling back to direct read")
+        except Exception as e:
+            logger.debug(f"StateProjector failed: {e}, falling back to direct read")
 
         # Fallback: direct read from state.json
         state_file = self.workflow_dir / "state.json"
         if state_file.exists():
             try:
                 return json.loads(state_file.read_text())
-            except (json.JSONDecodeError, IOError):
-                pass
+            except (json.JSONDecodeError, IOError) as e:
+                logger.warning(f"Failed to read state.json: {e}")
         return {}
 
     def _get_task_progress(self, state: dict) -> dict:
@@ -171,8 +172,8 @@ class CheckpointManager:
             )
             if result.returncode == 0:
                 return result.stdout.strip().split("\n")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to get tracked files: {e}")
 
         return []
 

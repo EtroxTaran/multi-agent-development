@@ -12,13 +12,54 @@ Usage:
 """
 
 import asyncio
+import atexit
+import concurrent.futures
 import functools
 import logging
-from typing import Any, Callable, Coroutine, TypeVar
+import threading
+from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+# Module-level ThreadPoolExecutor singleton for async-to-sync bridge
+# Reused across calls to avoid creating new threads per invocation
+_thread_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_thread_pool_lock = threading.Lock()
+
+
+def _get_thread_pool() -> concurrent.futures.ThreadPoolExecutor:
+    """Get or create the module-level ThreadPoolExecutor.
+
+    Thread-safe lazy initialization of the executor pool.
+
+    Returns:
+        The shared ThreadPoolExecutor instance
+    """
+    global _thread_pool
+    if _thread_pool is None:
+        with _thread_pool_lock:
+            # Double-check after acquiring lock
+            if _thread_pool is None:
+                _thread_pool = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=4,
+                    thread_name_prefix="async_bridge_"
+                )
+                logger.debug("Created async bridge ThreadPoolExecutor with 4 workers")
+    return _thread_pool
+
+
+def _shutdown_thread_pool() -> None:
+    """Shutdown the thread pool on interpreter exit."""
+    global _thread_pool
+    if _thread_pool is not None:
+        _thread_pool.shutdown(wait=False)
+        _thread_pool = None
+
+
+# Register cleanup on interpreter exit
+atexit.register(_shutdown_thread_pool)
 
 
 def run_async(coro: Coroutine[Any, Any, T]) -> T:
@@ -55,9 +96,8 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
     if loop is not None:
         # We're in an async context - this is trickier
         # We can't just run the coroutine directly as it would block
-        # Instead, we need to run it in a new thread with its own loop
-
-        import concurrent.futures
+        # Instead, we need to run it in a thread with its own loop
+        # Use the shared thread pool to avoid creating new threads per call
 
         def run_in_thread():
             new_loop = asyncio.new_event_loop()
@@ -67,9 +107,9 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
             finally:
                 new_loop.close()
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(run_in_thread)
-            return future.result()
+        executor = _get_thread_pool()
+        future = executor.submit(run_in_thread)
+        return future.result()
     else:
         # No running loop, we can use asyncio.run()
         return asyncio.run(coro)

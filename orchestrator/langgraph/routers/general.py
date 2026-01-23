@@ -33,17 +33,10 @@ def prerequisites_router(
     if decision == WorkflowDecision.ABORT or decision == "abort":
         return "__end__"
 
-    # Check phase status
-    phase_status = state.get("phase_status", {})
-    phase_0 = phase_status.get("0")
+    # Note: Prerequisites is not a numbered phase (phases are 1-5).
+    # Routing is handled by next_decision from prerequisites node.
 
-    if phase_0 and hasattr(phase_0, "status"):
-        if phase_0.status == PhaseStatus.COMPLETED:
-            return "planning"
-        elif phase_0.status == PhaseStatus.FAILED:
-            return "human_escalation"
-
-    # Default: check for errors
+    # Check for errors
     errors = state.get("errors", [])
     if errors:
         # Check if any errors are blocking
