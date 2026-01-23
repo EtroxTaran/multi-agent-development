@@ -1,9 +1,9 @@
 """Tests for workflow storage adapter."""
 
-import json
 import pytest
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from orchestrator.storage.workflow_adapter import (
     WorkflowStorageAdapter,
@@ -17,30 +17,54 @@ def temp_project():
     """Create a temporary project directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         project_dir = Path(tmpdir)
-        workflow_dir = project_dir / ".workflow"
-        workflow_dir.mkdir(parents=True)
         yield project_dir
 
 
 @pytest.fixture
-def temp_project_with_state(temp_project):
-    """Create a temporary project with workflow state."""
-    state_file = temp_project / ".workflow" / "state.json"
-    state_file.write_text(json.dumps({
-        "project_name": temp_project.name,
-        "current_phase": 1,
-        "iteration_count": 0,
-        "phases": {
-            "planning": {"status": "pending", "attempts": 0},
-            "validation": {"status": "pending", "attempts": 0},
-            "implementation": {"status": "pending", "attempts": 0},
-            "verification": {"status": "pending", "attempts": 0},
-            "completion": {"status": "pending", "attempts": 0},
-        },
-        "tasks": [],
-        "metadata": {},
-    }))
-    return temp_project
+def mock_workflow_repository():
+    """Create a mock workflow repository."""
+    mock_repo = MagicMock()
+    mock_state = MagicMock()
+    mock_state.project_dir = "/tmp/test"
+    mock_state.current_phase = 1
+    mock_state.phase_status = {
+        "planning": {"status": "pending", "attempts": 0},
+        "validation": {"status": "pending", "attempts": 0},
+        "implementation": {"status": "pending", "attempts": 0},
+        "verification": {"status": "pending", "attempts": 0},
+        "completion": {"status": "pending", "attempts": 0},
+    }
+    mock_state.iteration_count = 0
+    mock_state.plan = None
+    mock_state.validation_feedback = {}
+    mock_state.verification_feedback = {}
+    mock_state.implementation_result = None
+    mock_state.next_decision = None
+    mock_state.execution_mode = "afk"
+    mock_state.discussion_complete = False
+    mock_state.research_complete = False
+    mock_state.research_findings = {}
+    mock_state.token_usage = {}
+    mock_state.created_at = None
+    mock_state.updated_at = None
+
+    mock_repo.get_state = AsyncMock(return_value=mock_state)
+    mock_repo.initialize_state = AsyncMock(return_value=mock_state)
+    mock_repo.update_state = AsyncMock(return_value=mock_state)
+    mock_repo.set_phase = AsyncMock(return_value=mock_state)
+    mock_repo.reset_state = AsyncMock(return_value=mock_state)
+    mock_repo.get_summary = AsyncMock(
+        return_value={"current_phase": 1, "project": "test"}
+    )
+    mock_repo.increment_iteration = AsyncMock(return_value=mock_state)
+    mock_repo.set_plan = AsyncMock(return_value=mock_state)
+    mock_repo.set_validation_feedback = AsyncMock(return_value=mock_state)
+    mock_repo.set_verification_feedback = AsyncMock(return_value=mock_state)
+    mock_repo.set_implementation_result = AsyncMock(return_value=mock_state)
+    mock_repo.record_git_commit = AsyncMock(return_value={})
+    mock_repo.get_git_commits = AsyncMock(return_value=[])
+    mock_repo.reset_to_phase = AsyncMock(return_value=mock_state)
+    return mock_repo
 
 
 class TestWorkflowStorageAdapter:
@@ -54,153 +78,272 @@ class TestWorkflowStorageAdapter:
 
     def test_get_state_none(self, temp_project):
         """Test get_state returns None when no state exists."""
-        adapter = WorkflowStorageAdapter(temp_project)
-        state = adapter.get_state()
-        assert state is None
+        mock_repo = MagicMock()
+        mock_repo.get_state = AsyncMock(return_value=None)
 
-    def test_get_state_exists(self, temp_project_with_state):
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_repo,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+            state = adapter.get_state()
+            assert state is None
+
+    def test_get_state_exists(self, temp_project, mock_workflow_repository):
         """Test get_state returns state when exists."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
-        state = adapter.get_state()
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+            state = adapter.get_state()
 
-        assert state is not None
-        assert isinstance(state, WorkflowStateData)
-        assert state.current_phase == 1
+            assert state is not None
+            assert isinstance(state, WorkflowStateData)
+            assert state.current_phase == 1
 
-    def test_initialize_state(self, temp_project):
+    def test_initialize_state(self, temp_project, mock_workflow_repository):
         """Test initializing workflow state."""
-        adapter = WorkflowStorageAdapter(temp_project)
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-        state = adapter.initialize_state(
-            project_dir=str(temp_project),
-            execution_mode="hitl",
-        )
+            state = adapter.initialize_state(
+                project_dir=str(temp_project),
+                execution_mode="hitl",
+            )
 
-        assert state is not None
-        assert state.execution_mode == "hitl"
+            assert state is not None
+            mock_workflow_repository.initialize_state.assert_called_once()
 
-    def test_update_state(self, temp_project_with_state):
+    def test_update_state(self, temp_project, mock_workflow_repository):
         """Test updating workflow state."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+        # Create updated state mock
+        updated_state = MagicMock()
+        updated_state.project_dir = str(temp_project)
+        updated_state.current_phase = 2
+        updated_state.iteration_count = 1
+        updated_state.phase_status = {}
+        updated_state.plan = None
+        updated_state.validation_feedback = {}
+        updated_state.verification_feedback = {}
+        updated_state.implementation_result = None
+        updated_state.next_decision = None
+        updated_state.execution_mode = "afk"
+        updated_state.discussion_complete = False
+        updated_state.research_complete = False
+        updated_state.research_findings = {}
+        updated_state.token_usage = {}
+        updated_state.created_at = None
+        updated_state.updated_at = None
 
-        state = adapter.update_state(
-            current_phase=2,
-            iteration_count=1,
+        mock_workflow_repository.update_state = AsyncMock(return_value=updated_state)
+
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+
+            state = adapter.update_state(
+                current_phase=2,
+                iteration_count=1,
+            )
+
+            assert state is not None
+            assert state.current_phase == 2
+            assert state.iteration_count == 1
+
+    def test_set_phase_in_progress(self, temp_project, mock_workflow_repository):
+        """Test setting phase to in_progress."""
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+
+            state = adapter.set_phase(1, status="in_progress")
+
+            assert state is not None
+            mock_workflow_repository.set_phase.assert_called_once_with(1, "in_progress")
+
+    def test_set_phase_completed(self, temp_project, mock_workflow_repository):
+        """Test setting phase to completed."""
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+
+            # Complete it
+            state = adapter.set_phase(1, status="completed")
+            assert state is not None
+
+    def test_reset_state(self, temp_project, mock_workflow_repository):
+        """Test resetting workflow state."""
+        # Create reset state mock
+        reset_state = MagicMock()
+        reset_state.project_dir = str(temp_project)
+        reset_state.current_phase = 1
+        reset_state.iteration_count = 0
+        reset_state.phase_status = {}
+        reset_state.plan = None
+        reset_state.validation_feedback = {}
+        reset_state.verification_feedback = {}
+        reset_state.implementation_result = None
+        reset_state.next_decision = None
+        reset_state.execution_mode = "afk"
+        reset_state.discussion_complete = False
+        reset_state.research_complete = False
+        reset_state.research_findings = {}
+        reset_state.token_usage = {}
+        reset_state.created_at = None
+        reset_state.updated_at = None
+
+        mock_workflow_repository.reset_state = AsyncMock(return_value=reset_state)
+
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+
+            state = adapter.reset_state()
+
+            assert state is not None
+            assert state.current_phase == 1
+            assert state.iteration_count == 0
+
+    def test_get_summary(self, temp_project, mock_workflow_repository):
+        """Test getting workflow summary."""
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
+
+            summary = adapter.get_summary()
+
+            assert isinstance(summary, dict)
+            assert "current_phase" in summary
+
+    def test_increment_iteration(self, temp_project, mock_workflow_repository):
+        """Test incrementing iteration counter."""
+        # Create updated state mocks
+        state_count_1 = MagicMock()
+        state_count_1.iteration_count = 1
+
+        state_count_2 = MagicMock()
+        state_count_2.iteration_count = 2
+
+        mock_workflow_repository.increment_iteration = AsyncMock(
+            side_effect=[state_count_1, state_count_2]
         )
 
-        assert state is not None
-        assert state.current_phase == 2
-        assert state.iteration_count == 1
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-    def test_set_phase_in_progress(self, temp_project_with_state):
-        """Test setting phase to in_progress."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+            count = adapter.increment_iteration()
+            assert count == 1
 
-        state = adapter.set_phase(1, status="in_progress")
+            count = adapter.increment_iteration()
+            assert count == 2
 
-        assert state is not None
-
-    def test_set_phase_completed(self, temp_project_with_state):
-        """Test setting phase to completed."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
-
-        # Start phase first
-        adapter.set_phase(1, status="in_progress")
-
-        # Complete it
-        state = adapter.set_phase(1, status="completed")
-        assert state is not None
-
-    def test_reset_state(self, temp_project_with_state):
-        """Test resetting workflow state."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
-
-        # Update state first
-        adapter.update_state(current_phase=3, iteration_count=5)
-
-        # Reset
-        state = adapter.reset_state()
-
-        assert state is not None
-        assert state.current_phase == 1
-        assert state.iteration_count == 0
-
-    def test_get_summary(self, temp_project_with_state):
-        """Test getting workflow summary."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
-
-        summary = adapter.get_summary()
-
-        assert isinstance(summary, dict)
-        assert "current_phase" in summary
-
-    def test_increment_iteration(self, temp_project_with_state):
-        """Test incrementing iteration counter."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
-
-        count = adapter.increment_iteration()
-        assert count == 1
-
-        count = adapter.increment_iteration()
-        assert count == 2
-
-    def test_set_plan(self, temp_project_with_state):
+    def test_set_plan(self, temp_project, mock_workflow_repository):
         """Test setting implementation plan."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-        plan = {
-            "name": "Test Plan",
-            "tasks": [{"id": "T1", "title": "Task 1"}],
-        }
+            plan = {
+                "name": "Test Plan",
+                "tasks": [{"id": "T1", "title": "Task 1"}],
+            }
 
-        state = adapter.set_plan(plan)
-        assert state is not None
+            state = adapter.set_plan(plan)
+            assert state is not None
+            mock_workflow_repository.set_plan.assert_called_once_with(plan)
 
-    def test_set_validation_feedback(self, temp_project_with_state):
+    def test_set_validation_feedback(self, temp_project, mock_workflow_repository):
         """Test setting validation feedback."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-        feedback = {
-            "score": 8,
-            "approved": True,
-            "comments": "Looks good",
-        }
+            feedback = {
+                "score": 8,
+                "approved": True,
+                "comments": "Looks good",
+            }
 
-        state = adapter.set_validation_feedback("cursor", feedback)
-        assert state is not None
+            state = adapter.set_validation_feedback("cursor", feedback)
+            assert state is not None
+            mock_workflow_repository.set_validation_feedback.assert_called_once_with(
+                "cursor", feedback
+            )
 
-    def test_set_verification_feedback(self, temp_project_with_state):
+    def test_set_verification_feedback(self, temp_project, mock_workflow_repository):
         """Test setting verification feedback."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-        feedback = {
-            "score": 9,
-            "approved": True,
-            "comments": "Code is solid",
-        }
+            feedback = {
+                "score": 9,
+                "approved": True,
+                "comments": "Code is solid",
+            }
 
-        state = adapter.set_verification_feedback("gemini", feedback)
-        assert state is not None
+            state = adapter.set_verification_feedback("gemini", feedback)
+            assert state is not None
+            mock_workflow_repository.set_verification_feedback.assert_called_once_with(
+                "gemini", feedback
+            )
 
-    def test_set_implementation_result(self, temp_project_with_state):
+    def test_set_implementation_result(self, temp_project, mock_workflow_repository):
         """Test setting implementation result."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-        result = {
-            "success": True,
-            "files_created": ["src/main.py"],
-            "tests_passed": True,
-        }
+            result = {
+                "success": True,
+                "files_created": ["src/main.py"],
+                "tests_passed": True,
+            }
 
-        state = adapter.set_implementation_result(result)
-        assert state is not None
+            state = adapter.set_implementation_result(result)
+            assert state is not None
+            mock_workflow_repository.set_implementation_result.assert_called_once_with(
+                result
+            )
 
-    def test_set_decision(self, temp_project_with_state):
+    def test_set_decision(self, temp_project, mock_workflow_repository):
         """Test setting next routing decision."""
-        adapter = WorkflowStorageAdapter(temp_project_with_state)
+        with patch(
+            "orchestrator.db.repositories.workflow.get_workflow_repository",
+            return_value=mock_workflow_repository,
+        ):
+            adapter = WorkflowStorageAdapter(temp_project)
 
-        state = adapter.set_decision("continue")
-        assert state is not None
+            state = adapter.set_decision("continue")
+            assert state is not None
+            mock_workflow_repository.update_state.assert_called_once_with(
+                next_decision="continue"
+            )
 
 
 class TestGetWorkflowStorage:

@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2.1.4
+    container_name: conductor-surrealdb
+    user: "0:0"  # Run as root inside container
+    command: start --user root --pass root rocksdb:/data/conductor.db
+    ports:
+      - "8001:8000"
+    volumes:
+      - surrealdb-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  surrealdb-data:

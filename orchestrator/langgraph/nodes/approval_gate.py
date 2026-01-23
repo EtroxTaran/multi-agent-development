@@ -67,7 +67,7 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
         from ...storage.async_utils import run_async
 
         repo = get_logs_repository(state["project_name"])
-        run_async(repo.save(log_type="approval_response", content={
+        run_async(repo.create_log(log_type="approval_response", content={
             "phase": current_phase,
             "timestamp": datetime.now().isoformat(),
             "action": "approve",
@@ -88,7 +88,7 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
     from ...storage.async_utils import run_async
 
     repo = get_logs_repository(state["project_name"])
-    run_async(repo.save(log_type="approval_context", content={
+    run_async(repo.create_log(log_type="approval_context", content={
         "phase": current_phase,
         "context": approval_context,
     }))
@@ -113,7 +113,7 @@ async def approval_gate_node(state: WorkflowState) -> dict[str, Any]:
     logger.info(f"Received approval response: action={action}")
 
     # Save response to database
-    run_async(repo.save(log_type="approval_response", content={
+    run_async(repo.create_log(log_type="approval_response", content={
         "phase": current_phase,
         "timestamp": datetime.now().isoformat(),
         "action": action,

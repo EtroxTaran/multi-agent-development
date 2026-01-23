@@ -6,7 +6,7 @@ within LangGraph workflow nodes.
 
 from .approval import LangGraphApprovalAdapter
 from .conflict import LangGraphConflictAdapter
-from .state import LangGraphStateAdapter
+# LangGraphStateAdapter deprecated - use WorkflowStorageAdapter instead
 from .resilience import AsyncCircuitBreaker, async_retry_with_backoff
 from .linear import (
     LinearAdapter,
@@ -70,7 +70,7 @@ from .action_logging import (
 __all__ = [
     "LangGraphApprovalAdapter",
     "LangGraphConflictAdapter",
-    "LangGraphStateAdapter",
+    # LangGraphStateAdapter deprecated - use WorkflowStorageAdapter
     "AsyncCircuitBreaker",
     "async_retry_with_backoff",
     # Linear integration

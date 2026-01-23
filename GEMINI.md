@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-23 08:20:44 -->
+<!-- Last synced: 2026-01-23 10:24:25 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Gemini as architecture reviewer.

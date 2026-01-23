@@ -1,8 +1,13 @@
-"""Tests for state management."""
+"""Tests for state management.
+
+NOTE: These tests test both the legacy StateManager (file-based) and the
+WorkflowStorageAdapter (DB-based) interfaces.
+"""
 
 import json
 import pytest
 from pathlib import Path
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from orchestrator.utils.state import (
     StateManager,
@@ -103,11 +108,29 @@ class TestWorkflowState:
 
 
 class TestStateManager:
-    """Tests for StateManager class."""
+    """Tests for StateManager class (legacy file-based state).
 
-    def test_ensure_workflow_dir(self, temp_project_dir):
+    NOTE: These tests use the file-based StateManager directly,
+    not the WorkflowStorageAdapter.
+    """
+
+    @pytest.fixture
+    def temp_project(self, tmp_path):
+        """Create a temporary project directory."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        return project_dir
+
+    @pytest.fixture
+    def manager(self, temp_project):
+        """Create a StateManager for the temp project."""
+        manager = StateManager(temp_project)
+        manager.load()
+        return manager
+
+    def test_ensure_workflow_dir(self, temp_project):
         """Test workflow directory creation."""
-        manager = StateManager(temp_project_dir)
+        manager = StateManager(temp_project)
         workflow_dir = manager.ensure_workflow_dir()
 
         assert workflow_dir.exists()
@@ -115,18 +138,18 @@ class TestStateManager:
         assert (workflow_dir / "phases" / "planning").exists()
         assert (workflow_dir / "phases" / "completion").exists()
 
-    def test_load_creates_new_state(self, temp_project_dir):
+    def test_load_creates_new_state(self, temp_project):
         """Test that loading creates new state if none exists."""
-        manager = StateManager(temp_project_dir)
+        manager = StateManager(temp_project)
         state = manager.load()
 
         assert state is not None
-        assert state.project_name == temp_project_dir.name
+        assert state.project_name == temp_project.name
         assert state.current_phase == 1
 
-    def test_save_and_load(self, temp_project_dir):
+    def test_save_and_load(self, temp_project):
         """Test saving and loading state."""
-        manager = StateManager(temp_project_dir)
+        manager = StateManager(temp_project)
         manager.load()
 
         # Modify state
@@ -135,54 +158,54 @@ class TestStateManager:
         manager.save()
 
         # Load again
-        manager2 = StateManager(temp_project_dir)
+        manager2 = StateManager(temp_project)
         state = manager2.load()
 
         assert state.current_phase == 3
         assert state.phases["planning"].status == PhaseStatus.COMPLETED
 
-    def test_start_phase(self, state_manager):
+    def test_start_phase(self, manager):
         """Test starting a phase."""
-        phase = state_manager.start_phase(1)
+        phase = manager.start_phase(1)
 
         assert phase.status == PhaseStatus.IN_PROGRESS
         assert phase.started_at is not None
         assert phase.attempts == 1
-        assert state_manager.state.current_phase == 1
+        assert manager.state.current_phase == 1
 
-    def test_complete_phase(self, state_manager):
+    def test_complete_phase(self, manager):
         """Test completing a phase."""
-        state_manager.start_phase(1)
-        phase = state_manager.complete_phase(1, {"result": "success"})
+        manager.start_phase(1)
+        phase = manager.complete_phase(1, {"result": "success"})
 
         assert phase.status == PhaseStatus.COMPLETED
         assert phase.completed_at is not None
         assert phase.outputs["result"] == "success"
 
-    def test_fail_phase(self, state_manager):
+    def test_fail_phase(self, manager):
         """Test failing a phase."""
-        state_manager.start_phase(1)
-        phase = state_manager.fail_phase(1, "Something went wrong")
+        manager.start_phase(1)
+        phase = manager.fail_phase(1, "Something went wrong")
 
         assert phase.status == PhaseStatus.FAILED
         assert phase.error == "Something went wrong"
 
-    def test_can_retry(self, state_manager):
+    def test_can_retry(self, manager):
         """Test retry checking."""
-        assert state_manager.can_retry(1) is True
+        assert manager.can_retry(1) is True
 
         # Exhaust retries
         for _ in range(3):
-            state_manager.start_phase(1)
+            manager.start_phase(1)
 
-        assert state_manager.can_retry(1) is False
+        assert manager.can_retry(1) is False
 
-    def test_reset_phase(self, state_manager):
+    def test_reset_phase(self, manager):
         """Test resetting a phase."""
-        state_manager.start_phase(1)
-        state_manager.fail_phase(1, "error")
+        manager.start_phase(1)
+        manager.fail_phase(1, "error")
 
-        phase = state_manager.reset_phase(1)
+        phase = manager.reset_phase(1)
 
         assert phase.status == PhaseStatus.PENDING
         assert phase.error is None
@@ -190,17 +213,17 @@ class TestStateManager:
         # Attempts should be preserved
         assert phase.attempts == 1
 
-    def test_record_commit(self, state_manager):
+    def test_record_commit(self, manager):
         """Test recording git commits."""
-        state_manager.record_commit(1, "abc123", "Test commit")
+        manager.record_commit(1, "abc123", "Test commit")
 
-        assert len(state_manager.state.git_commits) == 1
-        assert state_manager.state.git_commits[0]["hash"] == "abc123"
-        assert state_manager.state.git_commits[0]["phase"] == 1
+        assert len(manager.state.git_commits) == 1
+        assert manager.state.git_commits[0]["hash"] == "abc123"
+        assert manager.state.git_commits[0]["phase"] == 1
 
-    def test_get_summary(self, state_manager):
+    def test_get_summary(self, manager):
         """Test getting workflow summary."""
-        summary = state_manager.get_summary()
+        summary = manager.get_summary()
 
         assert "project" in summary
         assert "current_phase" in summary

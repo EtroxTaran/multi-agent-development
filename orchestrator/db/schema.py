@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 # Schema version for migrations
 # v2.0.0 - Per-project database isolation (removed project_name columns)
 # v2.1.0 - Added phase_outputs and logs tables for DB-only storage
-SCHEMA_VERSION = "2.1.0"
+# v2.2.0 - Use FLEXIBLE TYPE object for nested objects (fixes SurrealDB v2.x issue)
+SCHEMA_VERSION = "2.2.0"
 
 
 SCHEMA_DEFINITIONS = """
@@ -38,18 +39,18 @@ DEFINE FIELD IF NOT EXISTS applied_at ON TABLE schema_version TYPE datetime DEFA
 DEFINE TABLE IF NOT EXISTS workflow_state SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS project_dir ON TABLE workflow_state TYPE string;
 DEFINE FIELD IF NOT EXISTS current_phase ON TABLE workflow_state TYPE int DEFAULT 1;
-DEFINE FIELD IF NOT EXISTS phase_status ON TABLE workflow_state TYPE object;
+DEFINE FIELD IF NOT EXISTS phase_status ON TABLE workflow_state FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS iteration_count ON TABLE workflow_state TYPE int DEFAULT 0;
-DEFINE FIELD IF NOT EXISTS plan ON TABLE workflow_state TYPE option<object>;
-DEFINE FIELD IF NOT EXISTS validation_feedback ON TABLE workflow_state TYPE option<object>;
-DEFINE FIELD IF NOT EXISTS verification_feedback ON TABLE workflow_state TYPE option<object>;
-DEFINE FIELD IF NOT EXISTS implementation_result ON TABLE workflow_state TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS plan ON TABLE workflow_state FLEXIBLE TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS validation_feedback ON TABLE workflow_state FLEXIBLE TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS verification_feedback ON TABLE workflow_state FLEXIBLE TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS implementation_result ON TABLE workflow_state FLEXIBLE TYPE option<object>;
 DEFINE FIELD IF NOT EXISTS next_decision ON TABLE workflow_state TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS execution_mode ON TABLE workflow_state TYPE string DEFAULT "afk";
 DEFINE FIELD IF NOT EXISTS discussion_complete ON TABLE workflow_state TYPE bool DEFAULT false;
 DEFINE FIELD IF NOT EXISTS research_complete ON TABLE workflow_state TYPE bool DEFAULT false;
-DEFINE FIELD IF NOT EXISTS research_findings ON TABLE workflow_state TYPE option<object>;
-DEFINE FIELD IF NOT EXISTS token_usage ON TABLE workflow_state TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS research_findings ON TABLE workflow_state FLEXIBLE TYPE option<object>;
+DEFINE FIELD IF NOT EXISTS token_usage ON TABLE workflow_state FLEXIBLE TYPE option<object>;
 DEFINE FIELD IF NOT EXISTS created_at ON TABLE workflow_state TYPE datetime DEFAULT time::now();
 DEFINE FIELD IF NOT EXISTS updated_at ON TABLE workflow_state TYPE datetime DEFAULT time::now();
 
@@ -116,7 +117,7 @@ DEFINE FIELD IF NOT EXISTS error_length ON TABLE audit_entries TYPE int DEFAULT 
 DEFINE FIELD IF NOT EXISTS parsed_output_type ON TABLE audit_entries TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS cost_usd ON TABLE audit_entries TYPE option<float>;
 DEFINE FIELD IF NOT EXISTS model ON TABLE audit_entries TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS metadata ON TABLE audit_entries TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS metadata ON TABLE audit_entries FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS timestamp ON TABLE audit_entries TYPE datetime DEFAULT time::now();
 
 DEFINE INDEX IF NOT EXISTS idx_audit_entry ON TABLE audit_entries COLUMNS entry_id UNIQUE;
@@ -133,7 +134,7 @@ DEFINE TABLE IF NOT EXISTS error_patterns SCHEMALESS;
 DEFINE FIELD IF NOT EXISTS task_id ON TABLE error_patterns TYPE string;
 DEFINE FIELD IF NOT EXISTS error_type ON TABLE error_patterns TYPE string;
 DEFINE FIELD IF NOT EXISTS error_message ON TABLE error_patterns TYPE string;
-DEFINE FIELD IF NOT EXISTS error_context ON TABLE error_patterns TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS error_context ON TABLE error_patterns FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS solution ON TABLE error_patterns TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS embedding ON TABLE error_patterns TYPE option<array<float>>;
 DEFINE FIELD IF NOT EXISTS created_at ON TABLE error_patterns TYPE datetime DEFAULT time::now();
@@ -154,8 +155,8 @@ DEFINE FIELD IF NOT EXISTS checkpoint_id ON TABLE checkpoints TYPE string ASSERT
 DEFINE FIELD IF NOT EXISTS name ON TABLE checkpoints TYPE string;
 DEFINE FIELD IF NOT EXISTS notes ON TABLE checkpoints TYPE string DEFAULT "";
 DEFINE FIELD IF NOT EXISTS phase ON TABLE checkpoints TYPE int;
-DEFINE FIELD IF NOT EXISTS task_progress ON TABLE checkpoints TYPE object DEFAULT {};
-DEFINE FIELD IF NOT EXISTS state_snapshot ON TABLE checkpoints TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS task_progress ON TABLE checkpoints FLEXIBLE TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS state_snapshot ON TABLE checkpoints FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS files_snapshot ON TABLE checkpoints TYPE array<string> DEFAULT [];
 DEFINE FIELD IF NOT EXISTS created_at ON TABLE checkpoints TYPE datetime DEFAULT time::now();
 
@@ -218,7 +219,7 @@ DEFINE INDEX IF NOT EXISTS idx_budget_agent ON TABLE budget_records COLUMNS agen
 
 DEFINE TABLE IF NOT EXISTS workflow_events SCHEMALESS;
 DEFINE FIELD IF NOT EXISTS event_type ON TABLE workflow_events TYPE string;
-DEFINE FIELD IF NOT EXISTS event_data ON TABLE workflow_events TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS event_data ON TABLE workflow_events FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS created_at ON TABLE workflow_events TYPE datetime DEFAULT time::now();
 
 DEFINE INDEX IF NOT EXISTS idx_events_type ON TABLE workflow_events COLUMNS event_type;
@@ -240,7 +241,7 @@ DEFINE INDEX IF NOT EXISTS idx_events_time ON TABLE workflow_events COLUMNS crea
 DEFINE TABLE IF NOT EXISTS phase_outputs SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS phase ON TABLE phase_outputs TYPE int ASSERT $value >= 1 AND $value <= 5;
 DEFINE FIELD IF NOT EXISTS output_type ON TABLE phase_outputs TYPE string ASSERT $value != NONE;
-DEFINE FIELD IF NOT EXISTS content ON TABLE phase_outputs TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS content ON TABLE phase_outputs FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS task_id ON TABLE phase_outputs TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS created_at ON TABLE phase_outputs TYPE datetime DEFAULT time::now();
 DEFINE FIELD IF NOT EXISTS updated_at ON TABLE phase_outputs TYPE datetime DEFAULT time::now();
@@ -260,8 +261,8 @@ DEFINE INDEX IF NOT EXISTS idx_phase_output_task ON TABLE phase_outputs COLUMNS 
 DEFINE TABLE IF NOT EXISTS logs SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS log_type ON TABLE logs TYPE string ASSERT $value != NONE;
 DEFINE FIELD IF NOT EXISTS task_id ON TABLE logs TYPE option<string>;
-DEFINE FIELD IF NOT EXISTS content ON TABLE logs TYPE object DEFAULT {};
-DEFINE FIELD IF NOT EXISTS metadata ON TABLE logs TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS content ON TABLE logs FLEXIBLE TYPE object DEFAULT {};
+DEFINE FIELD IF NOT EXISTS metadata ON TABLE logs FLEXIBLE TYPE object DEFAULT {};
 DEFINE FIELD IF NOT EXISTS created_at ON TABLE logs TYPE datetime DEFAULT time::now();
 
 DEFINE INDEX IF NOT EXISTS idx_logs_type ON TABLE logs COLUMNS log_type;
@@ -269,6 +270,54 @@ DEFINE INDEX IF NOT EXISTS idx_logs_task ON TABLE logs COLUMNS task_id;
 DEFINE INDEX IF NOT EXISTS idx_logs_time ON TABLE logs COLUMNS created_at;
 
 """
+
+
+async def _migrate_to_flexible_types(conn: Connection) -> None:
+    """Migrate object fields to FLEXIBLE TYPE for nested object support.
+
+    SurrealDB v2.x requires FLEXIBLE TYPE for nested objects in SCHEMAFULL tables.
+    Regular TYPE object strips nested data.
+    """
+    # Fields that need FLEXIBLE TYPE for nested objects
+    flexible_fields = {
+        "workflow_state": [
+            ("phase_status", "FLEXIBLE TYPE object DEFAULT {}"),
+            ("plan", "FLEXIBLE TYPE option<object>"),
+            ("validation_feedback", "FLEXIBLE TYPE option<object>"),
+            ("verification_feedback", "FLEXIBLE TYPE option<object>"),
+            ("implementation_result", "FLEXIBLE TYPE option<object>"),
+            ("research_findings", "FLEXIBLE TYPE option<object>"),
+            ("token_usage", "FLEXIBLE TYPE option<object>"),
+        ],
+        "audit_entries": [
+            ("metadata", "FLEXIBLE TYPE object DEFAULT {}"),
+        ],
+        "error_patterns": [
+            ("error_context", "FLEXIBLE TYPE object DEFAULT {}"),
+        ],
+        "checkpoints": [
+            ("task_progress", "FLEXIBLE TYPE object DEFAULT {}"),
+            ("state_snapshot", "FLEXIBLE TYPE object DEFAULT {}"),
+        ],
+        "workflow_events": [
+            ("event_data", "FLEXIBLE TYPE object DEFAULT {}"),
+        ],
+        "phase_outputs": [
+            ("content", "FLEXIBLE TYPE object DEFAULT {}"),
+        ],
+        "logs": [
+            ("content", "FLEXIBLE TYPE object DEFAULT {}"),
+            ("metadata", "FLEXIBLE TYPE object DEFAULT {}"),
+        ],
+    }
+
+    for table, fields in flexible_fields.items():
+        for field_name, field_def in fields:
+            try:
+                await conn.query(f"REMOVE FIELD IF EXISTS {field_name} ON TABLE {table}")
+                await conn.query(f"DEFINE FIELD {field_name} ON TABLE {table} {field_def}")
+            except Exception as e:
+                logger.warning(f"Failed to migrate {table}.{field_name}: {e}")
 
 
 async def apply_schema(conn: Connection) -> bool:
@@ -286,14 +335,22 @@ async def apply_schema(conn: Connection) -> bool:
             "SELECT * FROM schema_version ORDER BY applied_at DESC LIMIT 1"
         )
 
-        if existing and existing[0].get("version") == SCHEMA_VERSION:
+        current_version = existing[0].get("version") if existing else None
+
+        if current_version == SCHEMA_VERSION:
             logger.debug(f"Schema already at version {SCHEMA_VERSION}")
             return True
 
-        # Apply schema definitions
+        # Apply base schema definitions (creates tables with IF NOT EXISTS)
         await conn.query(SCHEMA_DEFINITIONS)
 
-        # Record schema version
+        # Run migrations based on current version
+        if current_version is None or current_version < "2.2.0":
+            # Migration to v2.2.0: FLEXIBLE TYPE for nested objects
+            logger.info("Migrating to FLEXIBLE TYPE fields for nested object support...")
+            await _migrate_to_flexible_types(conn)
+
+        # Record new schema version
         await conn.create("schema_version", {
             "version": SCHEMA_VERSION,
         })
@@ -329,8 +386,9 @@ async def get_schema_version(project_name: Optional[str] = None) -> Optional[str
         Schema version string or None
     """
     async with get_connection(project_name) as conn:
+        # Note: SurrealDB v2 requires ORDER BY fields to be in SELECT
         result = await conn.query(
-            "SELECT version FROM schema_version ORDER BY applied_at DESC LIMIT 1"
+            "SELECT * FROM schema_version ORDER BY applied_at DESC LIMIT 1"
         )
         if result:
             return result[0].get("version")

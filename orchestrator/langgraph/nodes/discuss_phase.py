@@ -558,5 +558,5 @@ def _write_context_md(context_file: Path, preferences: dict[str, list[str]], pro
     from ...storage.async_utils import run_async
 
     repo = get_logs_repository(project_name)
-    run_async(repo.save(log_type="discussion", content={"preferences": preferences, "formatted": content}))
+    run_async(repo.create_log(log_type="discussion", content={"preferences": preferences, "formatted": content}))
     logger.info(f"Discussion preferences saved to database")

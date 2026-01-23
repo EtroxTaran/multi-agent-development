@@ -483,7 +483,7 @@ async def validation_fan_in_node(state: WorkflowState) -> dict[str, Any]:
     from ...db.repositories.phase_outputs import get_phase_output_repository
     from ...storage.async_utils import run_async
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=2, output_type="consolidated", content=consolidated))
+    run_async(repo.save_output(phase=2, output_type="consolidated", content=consolidated))
 
     if approved:
         phase_2.status = PhaseStatus.COMPLETED

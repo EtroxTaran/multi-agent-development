@@ -37,7 +37,7 @@ class SurrealConfig:
     """
 
     url: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_URL", "ws://localhost:8000/rpc"
+        "SURREAL_URL", "ws://localhost:8001/rpc"
     ))
     namespace: str = field(default_factory=lambda: os.getenv(
         "SURREAL_NAMESPACE", "orchestrator"
@@ -46,7 +46,7 @@ class SurrealConfig:
         "SURREAL_USER", "root"
     ))
     password: str = field(default_factory=lambda: os.getenv(
-        "SURREAL_PASS", ""
+        "SURREAL_PASS", "root"  # Default for local development
     ))
     default_database: str = field(default_factory=lambda: os.getenv(
         "SURREAL_DATABASE", "default"
@@ -157,11 +157,17 @@ def set_config(config: SurrealConfig) -> None:
 def is_surrealdb_enabled() -> bool:
     """Check if SurrealDB integration is enabled.
 
+    For local development, SurrealDB is always enabled (uses localhost:8000).
+    Set SURREAL_DISABLED=true to explicitly disable.
+
     Returns:
-        True if SURREAL_URL is set and not empty
+        True if SurrealDB should be used
     """
-    url = os.getenv("SURREAL_URL", "")
-    return bool(url.strip())
+    # Explicit disable flag
+    if os.getenv("SURREAL_DISABLED", "").lower() == "true":
+        return False
+    # Default: enabled (local or remote)
+    return True
 
 
 class DatabaseRequiredError(Exception):
@@ -174,17 +180,17 @@ def require_db() -> None:
     """Ensure SurrealDB is configured. Raises if not.
 
     Raises:
-        DatabaseRequiredError: If SURREAL_URL is not set
+        DatabaseRequiredError: If SurrealDB is explicitly disabled
 
     Usage:
         from orchestrator.db.config import require_db
-        require_db()  # Raises if DB not configured
+        require_db()  # Raises if DB disabled
     """
     if not is_surrealdb_enabled():
         raise DatabaseRequiredError(
-            "SurrealDB is required but SURREAL_URL environment variable is not set.\n"
-            "Set SURREAL_URL to your SurrealDB WebSocket endpoint (e.g., wss://db.example.com/rpc).\n"
-            "If there's no internet, AI agents can't work anyway - SurrealDB is required."
+            "SurrealDB is required but explicitly disabled (SURREAL_DISABLED=true).\n"
+            "Remove SURREAL_DISABLED or set it to 'false' to enable SurrealDB.\n"
+            "For local development, run: docker-compose up -d"
         )
 
 

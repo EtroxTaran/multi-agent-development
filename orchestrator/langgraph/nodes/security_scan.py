@@ -59,7 +59,7 @@ async def security_scan_node(state: WorkflowState) -> dict[str, Any]:
     from ...storage.async_utils import run_async
 
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=4, output_type="security_scan", content=result.to_dict()))
+    run_async(repo.save_output(phase=4, output_type="security_scan", content=result.to_dict()))
 
     logger.info(
         f"Security scan complete: {result.total_findings} findings, "

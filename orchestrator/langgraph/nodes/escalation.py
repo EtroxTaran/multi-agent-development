@@ -263,7 +263,7 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
     from ...storage.async_utils import run_async
 
     repo = get_logs_repository(state["project_name"])
-    run_async(repo.save(log_type="escalation", content=escalation))
+    run_async(repo.create_log(log_type="escalation", content=escalation))
 
     # Also save blocker entry
     blocker_entry = {
@@ -273,7 +273,7 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         "recent_errors": errors[-3:] if errors else [],
         "suggested_actions": suggested_actions,
     }
-    run_async(repo.save(log_type="blocker", content=blocker_entry))
+    run_async(repo.create_log(log_type="blocker", content=blocker_entry))
 
     logger.info(f"Escalation saved to database")
 
@@ -356,7 +356,7 @@ async def human_escalation_node(state: WorkflowState) -> dict[str, Any]:
         answers = human_response.get("answers", {})
         if answers:
             # Save clarification answers to database
-            run_async(repo.save(log_type="clarification_answers", content={
+            run_async(repo.create_log(log_type="clarification_answers", content={
                 "answers": answers,
                 "timestamp": datetime.now().isoformat(),
             }))

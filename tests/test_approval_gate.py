@@ -376,8 +376,13 @@ class TestApprovalResponseHandling:
         assert "unknown" in result["errors"][0]["type"].lower()
 
 
+@pytest.mark.skip(reason="File persistence removed in DB migration - approvals saved to DB now")
 class TestApprovalFilePersistence:
-    """Tests for file persistence of context and response."""
+    """Tests for file persistence of context and response.
+
+    NOTE: Skipped because approval context/response are now saved to
+    the logs table in SurrealDB, not to local files.
+    """
 
     @pytest.fixture
     def project_dir(self, tmp_path):

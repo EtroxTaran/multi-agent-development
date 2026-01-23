@@ -40,9 +40,14 @@ class WorkflowState:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
-        return {
+    def to_dict(self, include_timestamps: bool = False) -> dict[str, Any]:
+        """Convert to dictionary.
+
+        Args:
+            include_timestamps: If False (default), omit created_at/updated_at
+                so SurrealDB schema defaults (time::now()) handle them.
+        """
+        data = {
             "project_dir": self.project_dir,
             "current_phase": self.current_phase,
             "phase_status": self.phase_status,
@@ -57,9 +62,11 @@ class WorkflowState:
             "research_complete": self.research_complete,
             "research_findings": self.research_findings,
             "token_usage": self.token_usage,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+        if include_timestamps:
+            data["created_at"] = self.created_at.isoformat() if self.created_at else None
+            data["updated_at"] = self.updated_at.isoformat() if self.updated_at else None
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "WorkflowState":
@@ -183,14 +190,13 @@ class WorkflowRepository(BaseRepository[WorkflowState]):
         Returns:
             Updated state
         """
-        updates["updated_at"] = datetime.now().isoformat()
-
         async with get_connection(self.project_name) as conn:
+            # Use two statements: MERGE updates, then SET updated_at
+            # The second statement returns the final state
             result = await conn.query(
                 """
-                UPDATE workflow_state
-                MERGE $updates
-                RETURN AFTER
+                UPDATE workflow_state MERGE $updates;
+                UPDATE workflow_state SET updated_at = time::now() RETURN AFTER;
                 """,
                 {"updates": updates},
             )
@@ -212,35 +218,29 @@ class WorkflowRepository(BaseRepository[WorkflowState]):
         Returns:
             Updated state
         """
-        async with get_connection(self.project_name) as conn:
-            # Get current phase_status
-            results = await conn.query(
-                """
-                SELECT phase_status FROM workflow_state
-                LIMIT 1
-                """,
-            )
+        # Note: Using SELECT * because SurrealDB FLEXIBLE TYPE fields
+        # don't work with projection queries (SELECT field_name)
+        state = await self.get_state()
+        if not state:
+            return None
 
-            if not results:
-                return None
+        phase_status = state.phase_status or {}
+        phase_key = str(phase)
 
-            phase_status = results[0].get("phase_status", {})
-            phase_key = str(phase)
+        if phase_key not in phase_status:
+            phase_status[phase_key] = {"status": status, "attempts": 0}
+        else:
+            phase_status[phase_key]["status"] = status
 
-            if phase_key not in phase_status:
-                phase_status[phase_key] = {"status": status, "attempts": 0}
-            else:
-                phase_status[phase_key]["status"] = status
+        if status == "in_progress":
+            phase_status[phase_key]["started_at"] = datetime.now().isoformat()
+        elif status == "completed":
+            phase_status[phase_key]["completed_at"] = datetime.now().isoformat()
 
-            if status == "in_progress":
-                phase_status[phase_key]["started_at"] = datetime.now().isoformat()
-            elif status == "completed":
-                phase_status[phase_key]["completed_at"] = datetime.now().isoformat()
-
-            return await self.update_state(
-                current_phase=phase,
-                phase_status=phase_status,
-            )
+        return await self.update_state(
+            current_phase=phase,
+            phase_status=phase_status,
+        )
 
     async def increment_iteration(self) -> Optional[WorkflowState]:
         """Increment iteration counter.

@@ -53,7 +53,7 @@ async def coverage_check_node(state: WorkflowState) -> dict[str, Any]:
     from ...storage.async_utils import run_async
 
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=4, output_type="coverage_check", content=result.to_dict()))
+    run_async(repo.save_output(phase=4, output_type="coverage_check", content=result.to_dict()))
 
     # Log result
     if result.status.value == "skipped":

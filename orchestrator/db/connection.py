@@ -142,17 +142,17 @@ class Connection:
             raise ConnectionError(f"HTTP signin request failed: {e}")
 
     async def connect(self) -> None:
-        """Establish connection to SurrealDB using HTTP token auth."""
+        """Establish connection to SurrealDB.
+
+        Uses direct WebSocket signin for local development (ws://)
+        and HTTP token auth for remote/production (wss://).
+        """
         async with self._lock:
             if self._connected:
                 return
 
             try:
-                # Step 1: Get token via HTTP (works through Traefik)
-                token = self._get_auth_token()
-                logger.debug("Got auth token via HTTP signin")
-
-                # Step 2: Connect WebSocket
+                # Step 1: Connect WebSocket
                 if self.config.skip_ssl_verify and self.config.url.startswith("wss://"):
                     self._client = InsecureAsyncWsSurrealConnection(self.config.url)
                     logger.warning("SSL verification disabled - not recommended for production")
@@ -164,10 +164,22 @@ class Connection:
                     timeout=self.config.connect_timeout,
                 )
 
-                # Step 3: Authenticate with token
-                await self._client.authenticate(token)
+                # Step 2: Authenticate
+                if self.config.url.startswith("wss://"):
+                    # Remote/production: Use HTTP token auth (works through Traefik)
+                    token = self._get_auth_token()
+                    logger.debug("Got auth token via HTTP signin")
+                    await self._client.authenticate(token)
+                else:
+                    # Local development: Use direct WebSocket signin
+                    # SurrealDB v2 uses username/password format
+                    await self._client.signin({
+                        "username": self.config.user,
+                        "password": self.config.password,
+                    })
+                    logger.debug("Signed in via WebSocket")
 
-                # Step 4: Select namespace/database
+                # Step 3: Select namespace/database
                 await self._client.use(self.config.namespace, self.database)
 
                 self._connected = True

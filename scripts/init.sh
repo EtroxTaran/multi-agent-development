@@ -238,12 +238,75 @@ show_status() {
 }
 
 # Show help
+# Database management
+db_start() {
+    echo -e "\n${YELLOW}Starting SurrealDB...${NC}"
+
+    if ! command -v docker &> /dev/null; then
+        echo -e "${RED}Error: Docker not found. Please install Docker first.${NC}"
+        exit 1
+    fi
+
+    cd "$ROOT_DIR"
+
+    if docker ps --format '{{.Names}}' | grep -q "conductor-surrealdb"; then
+        echo -e "${GREEN}SurrealDB is already running${NC}"
+    else
+        docker-compose up -d
+        echo -e "${GREEN}SurrealDB started${NC}"
+    fi
+
+    # Wait for health
+    echo -e "${YELLOW}Waiting for SurrealDB to be ready...${NC}"
+    for i in {1..30}; do
+        if curl -s http://localhost:8001/health > /dev/null 2>&1; then
+            echo -e "${GREEN}SurrealDB is ready!${NC}"
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo -e "${RED}SurrealDB failed to start. Check: docker logs conductor-surrealdb${NC}"
+    exit 1
+}
+
+db_stop() {
+    echo -e "\n${YELLOW}Stopping SurrealDB...${NC}"
+    cd "$ROOT_DIR"
+    docker-compose down
+    echo -e "${GREEN}SurrealDB stopped${NC}"
+}
+
+db_status() {
+    echo -e "\n${YELLOW}SurrealDB Status:${NC}"
+
+    if docker ps --format '{{.Names}}' | grep -q "conductor-surrealdb"; then
+        echo -e "  ${GREEN}+${NC} Container: running"
+
+        if curl -s http://localhost:8001/health > /dev/null 2>&1; then
+            echo -e "  ${GREEN}+${NC} Health: healthy"
+        else
+            echo -e "  ${RED}x${NC} Health: unhealthy"
+        fi
+
+        # Show data directory size
+        local data_size=$(du -sh "$ROOT_DIR/data/surrealdb" 2>/dev/null | cut -f1)
+        echo -e "  ${BLUE}i${NC} Data size: ${data_size:-N/A}"
+    else
+        echo -e "  ${RED}x${NC} Container: not running"
+        echo -e "  ${BLUE}>${NC} Start with: ./scripts/init.sh db start"
+    fi
+}
+
 show_help() {
     echo "
 Usage: ./scripts/init.sh [command] [options]
 
 Commands:
   check           Check prerequisites only
+  db start        Start local SurrealDB (Docker)
+  db stop         Stop local SurrealDB
+  db status       Show SurrealDB status
   init <name>     Initialize a new project directory
   list            List all projects
   run <name>      Run workflow for a project
@@ -258,14 +321,15 @@ Options:
   --autonomous      Run fully autonomously without pausing for human input
                     (default: interactive mode with human consultation)
 
-Workflow:
-  1. Initialize a project:    ./scripts/init.sh init my-project
-  2. Add your documents:      Place files in projects/my-project/Documents/
-  3. Add context files:       Add CLAUDE.md, GEMINI.md, .cursor/rules
+Quick Start:
+  1. Start the database:      ./scripts/init.sh db start
+  2. Initialize a project:    ./scripts/init.sh init my-project
+  3. Add your documents:      Place files in projects/my-project/Docs/
   4. Create PRODUCT.md:       Define your feature specification
   5. Run the workflow:        ./scripts/init.sh run my-project
 
 Examples:
+  ./scripts/init.sh db start
   ./scripts/init.sh check
   ./scripts/init.sh init my-api
   ./scripts/init.sh list
@@ -284,6 +348,26 @@ COMMAND="${1:-help}"
 case "$COMMAND" in
     check)
         check_prereqs
+        ;;
+    db)
+        shift
+        DB_CMD="${1:-status}"
+        case "$DB_CMD" in
+            start)
+                db_start
+                ;;
+            stop)
+                db_stop
+                ;;
+            status)
+                db_status
+                ;;
+            *)
+                echo -e "${RED}Unknown db command: $DB_CMD${NC}"
+                echo "Usage: ./scripts/init.sh db [start|stop|status]"
+                exit 1
+                ;;
+        esac
         ;;
     init)
         shift

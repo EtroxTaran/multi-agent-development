@@ -517,7 +517,7 @@ def _save_verification_result(project_dir: Path, task_id: str, result: dict, pro
     from ...storage.async_utils import run_async
 
     repo = get_phase_output_repository(project_name)
-    run_async(repo.save(phase=4, output_type="task_verification", content=result, task_id=task_id))
+    run_async(repo.save_output(phase=4, output_type="task_verification", content=result, task_id=task_id))
 
 
 def _handle_verification_failure(
@@ -664,7 +664,7 @@ def _generate_task_uat(
 
         task_id = task.get("id", "unknown")
         repo = get_logs_repository(project_name or project_dir.name)
-        run_async(repo.save(log_type="uat_document", task_id=task_id, content=uat.to_dict() if hasattr(uat, "to_dict") else uat))
+        run_async(repo.create_log(log_type="uat_document", task_id=task_id, content=uat.to_dict() if hasattr(uat, "to_dict") else uat))
 
         logger.info(f"Generated UAT document for task {task_id} saved to database")
 

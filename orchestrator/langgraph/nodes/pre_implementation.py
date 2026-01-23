@@ -64,7 +64,7 @@ async def pre_implementation_node(state: WorkflowState) -> dict[str, Any]:
         "test_command": result.test_command,
     }
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=3, output_type="pre_implementation_check", content=check_result))
+    run_async(repo.save_output(phase=3, output_type="pre_implementation_check", content=check_result))
 
     if not result.ready:
         # Format failed checks

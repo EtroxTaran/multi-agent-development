@@ -763,3 +763,16 @@ Error: Project 'my-app' not found
 ```
 ConnectionPoolExhausted: No available connections in pool
 ```
+
+---
+
+## User Preferences
+
+**Shell**: Fish shell
+- Use `source .venv/bin/activate.fish` (not `.venv/bin/activate`)
+- Use Fish-compatible syntax (e.g., `set -x VAR value` instead of `export VAR=value`)
+
+**Python Environment**:
+- Virtual env: `.venv/`
+- Run tests: `.venv/bin/python -m pytest tests/ -v`
+- Run scripts: `.venv/bin/python script.py`

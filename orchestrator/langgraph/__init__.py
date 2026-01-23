@@ -45,7 +45,7 @@ from .routers import (
 from .integrations import (
     LangGraphApprovalAdapter,
     LangGraphConflictAdapter,
-    LangGraphStateAdapter,
+    # LangGraphStateAdapter deprecated - use WorkflowStorageAdapter
     AsyncCircuitBreaker,
     async_retry_with_backoff,
 )
@@ -79,7 +79,7 @@ __all__ = [
     # Integrations
     "LangGraphApprovalAdapter",
     "LangGraphConflictAdapter",
-    "LangGraphStateAdapter",
+    # LangGraphStateAdapter deprecated
     "AsyncCircuitBreaker",
     "async_retry_with_backoff",
 ]

@@ -110,7 +110,7 @@ async def build_verification_node(state: WorkflowState) -> dict[str, Any]:
     from ...storage.async_utils import run_async
 
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=4, output_type="build_verification", content=results))
+    run_async(repo.save_output(phase=4, output_type="build_verification", content=results))
 
     if not results["passed"]:
         # Format error message

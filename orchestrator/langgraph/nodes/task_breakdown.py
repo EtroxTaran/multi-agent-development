@@ -166,7 +166,7 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
         "source": "task_breakdown_node",
     }
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=1, output_type="task_breakdown", content=tasks_output))
+    run_async(repo.save_output(phase=1, output_type="task_breakdown", content=tasks_output))
 
     # Create Linear issues (if configured)
     linear_adapter = create_linear_adapter(project_dir)

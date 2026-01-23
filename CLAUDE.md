@@ -2,7 +2,7 @@
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-23 08:20:44 -->
+<!-- Last synced: 2026-01-23 10:24:25 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Claude Code as lead orchestrator.
@@ -773,6 +773,19 @@ Error: Project 'my-app' not found
 ```
 ConnectionPoolExhausted: No available connections in pool
 ```
+
+---
+
+## User Preferences
+
+**Shell**: Fish shell
+- Use `source .venv/bin/activate.fish` (not `.venv/bin/activate`)
+- Use Fish-compatible syntax (e.g., `set -x VAR value` instead of `export VAR=value`)
+
+**Python Environment**:
+- Virtual env: `.venv/`
+- Run tests: `.venv/bin/python -m pytest tests/ -v`
+- Run scripts: `.venv/bin/python script.py`
 
 
 ---

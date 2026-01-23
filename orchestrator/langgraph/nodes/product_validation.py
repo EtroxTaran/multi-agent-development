@@ -63,7 +63,7 @@ async def product_validation_node(state: WorkflowState) -> dict[str, Any]:
         "placeholder_count": result.placeholder_count,
     }
     repo = get_phase_output_repository(state["project_name"])
-    run_async(repo.save(phase=0, output_type="product_validation", content=validation_result))
+    run_async(repo.save_output(phase=0, output_type="product_validation", content=validation_result))
 
     if not result.valid:
         logger.warning(f"PRODUCT.md validation failed: score={result.score}, issues={len(result.issues)}")

@@ -252,7 +252,7 @@ async def _run_research_agent(
         from ...storage.async_utils import run_async
 
         repo = get_logs_repository(project_name)
-        run_async(repo.save(log_type="research", content={"agent_id": agent.id, "findings": parsed}))
+        run_async(repo.create_log(log_type="research", content={"agent_id": agent.id, "findings": parsed}))
         logger.info(f"Research agent {agent.id} saved results to database")
 
         return parsed
@@ -463,7 +463,7 @@ def _save_aggregated_findings(findings: ResearchFindings, project_name: str) -> 
     from ...storage.async_utils import run_async
 
     repo = get_logs_repository(project_name)
-    run_async(repo.save(log_type="research_aggregated", content=findings.to_dict()))
+    run_async(repo.create_log(log_type="research_aggregated", content=findings.to_dict()))
 
 
 async def quick_research(project_dir: Path) -> ResearchFindings:

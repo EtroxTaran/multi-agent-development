@@ -146,10 +146,16 @@ class TestBuildCommand:
         assert "Write" in tools
 
     def test_session_resume_with_existing_session(self, claude_agent: ClaudeAgent):
-        """Test session resume when session exists."""
-        # Create a session first
+        """Test session resume when session exists.
+
+        NOTE: With DB migration, we need to mock get_resume_args to return
+        the expected session ID since the DB is mocked globally.
+        """
         if claude_agent.session_manager:
-            claude_agent.session_manager.create_session("T1", session_id="existing-session")
+            # Mock get_resume_args to return the expected session
+            claude_agent.session_manager.get_resume_args = MagicMock(
+                return_value=["--resume", "existing-session"]
+            )
 
         command = claude_agent.build_command(
             "Test prompt",
