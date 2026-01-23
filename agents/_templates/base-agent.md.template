@@ -1,0 +1,49 @@
+# {{AGENT_ID}} {{AGENT_NAME}} Agent
+
+<!-- AUTO-GENERATED: Do not edit directly -->
+<!-- Template: {{TEMPLATE_TYPE}} -->
+<!-- Last compiled: {{COMPILE_DATE}} -->
+
+---
+
+{{IDENTITY_SECTION}}
+
+---
+
+{{WORKFLOW_CONTEXT_SECTION}}
+
+---
+
+{{INPUT_SPECIFICATION}}
+
+---
+
+{{TASK_INSTRUCTIONS}}
+
+---
+
+{{OUTPUT_SPECIFICATION}}
+
+---
+
+{{COMPLETION_SIGNALING_SECTION}}
+
+---
+
+{{ERROR_HANDLING_SECTION}}
+
+---
+
+{{ANTI_PATTERNS}}
+
+---
+
+{{BOUNDARIES_SECTION}}
+
+---
+
+{{QUALITY_CHECKLIST_SECTION}}
+
+---
+
+{{FEW_SHOT_EXAMPLES}}

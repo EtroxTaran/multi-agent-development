@@ -1,0 +1,106 @@
+# Writer Agent Template
+
+This template is for agents that write code/files: A03, A04, A05, A06, A09, A10, A11, A12.
+
+## Input Specification (Writer)
+
+You receive a task with:
+
+```json
+{
+  "task_id": "T001",
+  "title": "Implement user authentication",
+  "type": "implementation",
+  "acceptance_criteria": [
+    "User can register with email/password",
+    "Passwords are hashed with bcrypt",
+    "JWT tokens are issued on login"
+  ],
+  "files_to_create": ["src/auth/service.py", "src/auth/models.py"],
+  "files_to_modify": ["src/main.py"],
+  "test_files": ["tests/test_auth.py"],
+  "context": {
+    "project_type": "python",
+    "framework": "fastapi",
+    "existing_patterns": ["Repository pattern", "Dependency injection"]
+  }
+}
+```
+
+## Task Instructions (Writer)
+
+### General Process
+
+1. **Read First**: Read ALL files listed in `files_to_modify` and `test_files` before writing anything
+2. **Understand Context**: Check existing patterns in the codebase
+3. **Plan Changes**: Mentally outline what changes are needed
+4. **Make Changes**: Write code to meet acceptance criteria
+5. **Verify**: Run tests if applicable
+6. **Output**: Produce the required JSON output
+
+### TDD Workflow (when test_files provided)
+
+1. Read the failing tests
+2. Understand what behavior they expect
+3. Write minimal code to make tests pass
+4. Run tests to verify
+5. Refactor if needed (keeping tests green)
+
+### Code Quality Standards
+
+- Follow existing patterns in the codebase
+- Keep functions small and focused
+- Use meaningful variable/function names
+- Add type hints (Python) or types (TypeScript)
+- Handle errors gracefully
+- No magic numbers - use constants
+
+## Output Specification (Writer)
+
+```json
+{
+  "agent": "{{AGENT_ID}}",
+  "task_id": "T001",
+  "status": "completed",
+  "files_created": ["src/auth/service.py", "src/auth/models.py"],
+  "files_modified": ["src/main.py"],
+  "tests_passing": true,
+  "test_results": {
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+  },
+  "summary": "Implemented user authentication with bcrypt hashing and JWT tokens"
+}
+```
+
+### Status Values
+
+- `completed`: All acceptance criteria met, tests passing
+- `partial`: Some progress made, but blocked
+- `error`: Unrecoverable error occurred
+- `escalation_needed`: Human input required
+
+## Anti-Patterns (Writer)
+
+**DO NOT**:
+
+1. **Over-engineer**: Don't add features not in acceptance criteria
+2. **Copy-paste code**: Reuse existing patterns via imports/inheritance
+3. **Leave debug code**: Remove all console.log, print, debugger statements
+4. **Modify tests**: NEVER change test files unless you're A03 (Test Writer)
+5. **Ignore errors**: Handle exceptions, don't let them propagate silently
+6. **Use global state**: Prefer dependency injection and explicit parameters
+7. **Skip type hints**: Add types to function signatures
+8. **Hardcode values**: Use constants or configuration
+9. **Create unnecessary files**: Only create files listed in the task
+10. **Change unrelated code**: Stay focused on the task's file list
+
+## Writer-Specific Quality Checks
+
+Before completion:
+- [ ] Code compiles/parses without errors
+- [ ] All acceptance criteria addressed
+- [ ] Tests pass (if test_files provided)
+- [ ] No debugging artifacts left
+- [ ] Changes are minimal and focused

@@ -46,6 +46,8 @@ class AgentConfig:
     completion_patterns: List[str] = field(default_factory=list)  # Patterns that signal completion
     available_models: List[str] = field(default_factory=list)  # Available model options
     default_model: Optional[str] = None  # Default model to use
+    # Prompt template metadata
+    prompt_template_type: str = "writer"  # "planner" | "writer" | "reviewer"
 
 
 # Complete Agent Registry
@@ -70,6 +72,7 @@ AGENT_REGISTRY: Dict[str, AgentConfig] = {
         output_schema="schemas/planner_output.json",
         max_iterations=3,
         timeout_seconds=600,
+        prompt_template_type="planner",
     ),
     "A02": AgentConfig(
         id="A02",
@@ -91,6 +94,7 @@ AGENT_REGISTRY: Dict[str, AgentConfig] = {
         is_reviewer=True,
         review_specialization="architecture",
         weight_in_conflicts=0.7,
+        prompt_template_type="reviewer",
     ),
     # =========================================================================
     # TESTING AGENTS
@@ -231,6 +235,7 @@ AGENT_REGISTRY: Dict[str, AgentConfig] = {
         is_reviewer=True,
         review_specialization="security",
         weight_in_conflicts=0.8,  # High weight for security
+        prompt_template_type="reviewer",
     ),
     "A08": AgentConfig(
         id="A08",
@@ -251,6 +256,7 @@ AGENT_REGISTRY: Dict[str, AgentConfig] = {
         is_reviewer=True,
         review_specialization="code_quality",
         weight_in_conflicts=0.6,
+        prompt_template_type="reviewer",
     ),
     # =========================================================================
     # DOCUMENTATION AGENTS
