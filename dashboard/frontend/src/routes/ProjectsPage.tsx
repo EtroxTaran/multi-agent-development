@@ -14,7 +14,7 @@ import {
   Folder,
 } from "lucide-react";
 import {
-  useProjects,
+  useProjectsWithStatus,
   useInitProject,
   useDeleteProject,
   useWorkspaceFolders,
@@ -53,7 +53,7 @@ import {
 import { cn, formatDate, getStatusColor, getPhaseName } from "@/lib/utils";
 
 export function ProjectsPage() {
-  const { data: projects, isLoading, error, refetch } = useProjects();
+  const { data: projects, isLoading, error, refetch } = useProjectsWithStatus();
   const { data: workspaceFolders } = useWorkspaceFolders();
   const initProject = useInitProject();
   const deleteProject = useDeleteProject();
@@ -215,7 +215,7 @@ export function ProjectsPage() {
                             ? `${project.current_phase}/5: ${getPhaseName(
                                 project.current_phase,
                               )}`
-                            : "Ready to start"}
+                            : "Not Started"}
                         </span>
                       </div>
 

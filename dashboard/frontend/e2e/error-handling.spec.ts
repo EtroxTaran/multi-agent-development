@@ -10,6 +10,7 @@ import {
   failApiMock,
   timeoutApiMock,
   mockProjects,
+  mockWorkflowStatus,
 } from "./fixtures";
 
 test.describe("Error Handling", () => {
@@ -121,5 +122,35 @@ test.describe("Error Handling", () => {
 
     // Should show error message
     await expect(page.getByText(/Failed|exists/i)).toBeVisible();
+  });
+
+  test("should handle workflow start failure", async ({ page }) => {
+    await setupApiMocks(page, {
+      projects: mockProjects.single,
+      workflowStatus: mockWorkflowStatus.notStarted,
+    });
+
+    // Mock start failure
+    await failApiMock(
+      page,
+      "/api/projects/*/start",
+      400,
+      "Prerequisites not met: No documentation found",
+    );
+
+    const dashboardPage = new ProjectDashboardPage(page);
+    await dashboardPage.goto("test-project");
+
+    // Click start
+    await dashboardPage.clickStartWorkflow();
+
+    // Check that we are in the dialog
+    await expect(page.getByRole("dialog")).toBeVisible();
+
+    // Click confirm start
+    await page.getByRole("button", { name: "Start" }).click();
+
+    // Should show error message in the dialog
+    await expect(page.getByText(/Prerequisites not met/i)).toBeVisible();
   });
 });

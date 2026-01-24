@@ -1,7 +1,9 @@
 """Planning node for Phase 1.
 
-Generates implementation plan from PRODUCT.md specification
-using Claude CLI via Specialist Runner (A01-planner).
+Generates implementation plan from project documentation using Claude CLI
+via Specialist Runner (A01-planner).
+
+Documentation is read from the docs/ folder via the documentation discovery system.
 """
 
 import asyncio
@@ -175,17 +177,23 @@ async def planning_node(state: WorkflowState) -> dict[str, Any]:
     phase_1.attempts += 1
     phase_status["1"] = phase_1
 
-    # Read PRODUCT.md
-    product_file = project_dir / "PRODUCT.md"
-    if not product_file.exists():
-        action_logger.log_error("PRODUCT.md not found", phase=1)
+    # Load documentation from discovery system (docs/ folder)
+    from ..utils.context_builder import build_agent_context, generate_context_index_file
+
+    agent_context = build_agent_context(project_dir, state["project_name"])
+    if agent_context.document_count == 0:
+        action_logger.log_error("No documentation found in docs/ folder", phase=1)
         return {
             "phase_status": phase_status,
             "errors": [
                 {
-                    "type": "missing_file",
-                    "file": "PRODUCT.md",
-                    "message": "PRODUCT.md not found",
+                    "type": "no_documentation",
+                    "message": (
+                        "No documentation found. Please create a docs/ folder with:\n"
+                        "- Product vision and requirements\n"
+                        "- Architecture documentation\n"
+                        "- User stories or acceptance criteria"
+                    ),
                     "phase": 1,
                     "timestamp": datetime.now().isoformat(),
                 }
@@ -193,7 +201,15 @@ async def planning_node(state: WorkflowState) -> dict[str, Any]:
             "next_decision": "abort",
         }
 
-    product_spec = product_file.read_text()
+    # Generate context index for reference
+    generate_context_index_file(project_dir, state["project_name"])
+
+    # Get full structured context for planning (never loses information)
+    product_spec = agent_context.for_planning()
+    logger.info(
+        f"Loaded documentation: {agent_context.document_count} docs, "
+        f"{agent_context.total_content_size:,} chars, categories: {agent_context.categories_found}"
+    )
 
     # Build prompt with task granularity reminder (detailed instructions are in A01-planner/CLAUDE.md)
     prompt = f"""PRODUCT SPECIFICATION:

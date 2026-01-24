@@ -2,6 +2,7 @@
  * Project dashboard page
  */
 
+import { useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { RefreshCw, Pause, GitBranch, GitCommit, Activity } from "lucide-react";
 import {
@@ -36,6 +37,8 @@ import { AgentFeed } from "@/components/agents/AgentFeed";
 import { BudgetOverview } from "@/components/budget/BudgetOverview";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { ErrorPanel } from "@/components/errors/ErrorPanel";
+import { JourneyPanel } from "@/components/workflow/JourneyPanel";
+import { ViewRequestDialog } from "@/components/workflow/ViewRequestDialog";
 import { cn, getStatusColor, getPhaseName } from "@/lib/utils";
 
 export function ProjectDashboard() {
@@ -54,6 +57,9 @@ export function ProjectDashboard() {
 
   // Connect to WebSocket for real-time updates
   const { isConnected } = useWebSocket(name);
+
+  // State for View Request dialog
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
 
   if (projectLoading || statusLoading) {
     return (
@@ -146,7 +152,7 @@ export function ProjectDashboard() {
             {status?.status === "paused" && (
               <Button
                 variant="default"
-                onClick={() => resumeWorkflow.mutate(false)}
+                onClick={() => resumeWorkflow.mutate({ autonomous: false })}
                 disabled={resumeWorkflow.isPending}
                 className="shadow-lg shadow-primary/20"
               >
@@ -187,15 +193,33 @@ export function ProjectDashboard() {
             variant="warning"
             title="Action Required"
             action={
-              <Button size="sm" variant="outline" className="bg-background">
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-background"
+                onClick={() => setShowRequestDialog(true)}
+              >
                 View Request
               </Button>
             }
           >
-            The workflow has paused for human validaton. Please review the
+            The workflow has paused for human validation. Please review the
             pending request.
           </AlertBanner>
         )}
+
+        {/* View Request Dialog */}
+        <ViewRequestDialog
+          open={showRequestDialog}
+          onOpenChange={setShowRequestDialog}
+          pendingInterrupt={status?.pending_interrupt}
+          currentPhase={status?.current_phase}
+          onResume={() => {
+            resumeWorkflow.mutate({});
+            setShowRequestDialog(false);
+          }}
+          isResuming={resumeWorkflow.isPending}
+        />
       </div>
 
       {/* Metrics Grid */}
@@ -222,7 +246,7 @@ export function ProjectDashboard() {
             <div className="text-xs text-muted-foreground mt-1 truncate">
               {status?.current_phase
                 ? getPhaseName(status.current_phase)
-                : "Not started"}
+                : "Not Started"}
             </div>
           </CardContent>
         </Card>
@@ -329,7 +353,25 @@ export function ProjectDashboard() {
 
         <div className="min-h-[500px] border rounded-lg bg-card/50 backdrop-blur-sm p-1">
           <TabsContent value="graph" className="m-0 h-full p-4">
-            <WorkflowGraph projectName={name} />
+            <div className="flex gap-4 h-[600px]">
+              {/* Main Graph Area */}
+              <div className="flex-1">
+                <WorkflowGraph projectName={name} />
+              </div>
+              {/* Journey Panel Sidebar */}
+              <div className="w-[320px] shrink-0">
+                <JourneyPanel
+                  currentPhase={status?.current_phase || 0}
+                  phaseName={getPhaseName(status?.current_phase || 0)}
+                  activeNode={undefined}
+                  completedNodes={[]}
+                  upcomingNodes={[]}
+                  totalSteps={totalTasks}
+                  completedSteps={completedTasks}
+                  isRunning={status?.status === "in_progress"}
+                />
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="tasks" className="m-0 h-full p-4">

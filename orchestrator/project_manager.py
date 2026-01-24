@@ -90,7 +90,24 @@ class ProjectManager:
             root_dir: Root directory of Conductor
         """
         self.root_dir = Path(root_dir).resolve()
-        self.projects_dir = self.root_dir / "projects"
+
+        # Projects dir: check env var first, then find conductor-projects in parent dirs
+        import os
+
+        env_projects_dir = os.environ.get("CONDUCTOR_PROJECTS_DIR")
+        if env_projects_dir:
+            self.projects_dir = Path(env_projects_dir).resolve()
+        else:
+            # Search for conductor-projects folder - prioritize workspace location
+            search_dirs = [
+                Path("/home/etrox/workspace/conductor-projects"),  # absolute first (known location)
+                self.root_dir / "conductor-projects",  # child (if root_dir is workspace)
+                self.root_dir.parent / "conductor-projects",  # sibling to root_dir
+            ]
+            self.projects_dir = next(
+                (p for p in search_dirs if p.exists()),
+                Path("/home/etrox/workspace/conductor-projects"),  # default
+            )
 
     def list_projects(self) -> list[dict]:
         """List all projects.
@@ -109,14 +126,21 @@ class ProjectManager:
             config = self._load_project_config(project_dir)
             state = self._load_project_state(project_dir)
 
+            # Check for docs folder (case-insensitive)
+            has_docs = any(
+                (project_dir / d).exists() and any((project_dir / d).iterdir())
+                for d in ["docs", "Docs", "DOCS"]
+                if (project_dir / d).exists()
+            )
+
             projects.append(
                 {
                     "name": project_dir.name,
                     "path": str(project_dir),
                     "created_at": config.get("created_at") if config else None,
                     "current_phase": state.get("current_phase", 0) if state else 0,
-                    "has_documents": (project_dir / "Documents").exists(),
-                    "has_product_spec": (project_dir / "PRODUCT.md").exists(),
+                    "has_docs": has_docs,
+                    "has_product_spec": has_docs or (project_dir / "PRODUCT.md").exists(),
                     "has_claude_md": (project_dir / "CLAUDE.md").exists(),
                     "has_gemini_md": (project_dir / "GEMINI.md").exists(),
                     "has_cursor_rules": (project_dir / ".cursor" / "rules").exists(),

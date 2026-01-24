@@ -4,6 +4,7 @@ Provides persistence for LangGraph state using SurrealDB.
 """
 
 import base64
+import json
 import logging
 from collections.abc import AsyncIterator, Sequence
 from typing import Any, Optional
@@ -77,8 +78,15 @@ class SurrealDBSaver(BaseCheckpointSaver):
             row = result[0]
 
             # Deserialize checkpoint and metadata
-            checkpoint = self.serde.loads(base64.b64decode(row["checkpoint"]))
-            metadata = self.serde.loads(base64.b64decode(row["metadata"]))
+            # Note: We stored {"type": type, "data": base64(bytes)} so we reconstruct the tuple
+            checkpoint_stored = json.loads(row["checkpoint"])
+            metadata_stored = json.loads(row["metadata"])
+            checkpoint = self.serde.loads_typed(
+                (checkpoint_stored["type"], base64.b64decode(checkpoint_stored["data"]))
+            )
+            metadata = self.serde.loads_typed(
+                (metadata_stored["type"], base64.b64decode(metadata_stored["data"]))
+            )
             parent_id = row.get("parent_checkpoint_id")
 
             # Load pending writes
@@ -98,10 +106,13 @@ class SurrealDBSaver(BaseCheckpointSaver):
                 },
             )
 
-            pending_writes = [
-                (w["task_id"], w["channel"], self.serde.loads(base64.b64decode(w["value"])))
-                for w in writes_result
-            ]
+            pending_writes = []
+            for w in writes_result:
+                value_stored = json.loads(w["value"])
+                deserialized = self.serde.loads_typed(
+                    (value_stored["type"], base64.b64decode(value_stored["data"]))
+                )
+                pending_writes.append((w["task_id"], w["channel"], deserialized))
 
             return CheckpointTuple(
                 config=config,
@@ -146,8 +157,14 @@ class SurrealDBSaver(BaseCheckpointSaver):
             results = await conn.query(query, params)
 
             for row in results:
-                checkpoint = self.serde.loads(base64.b64decode(row["checkpoint"]))
-                metadata = self.serde.loads(base64.b64decode(row["metadata"]))
+                checkpoint_stored = json.loads(row["checkpoint"])
+                metadata_stored = json.loads(row["metadata"])
+                checkpoint = self.serde.loads_typed(
+                    (checkpoint_stored["type"], base64.b64decode(checkpoint_stored["data"]))
+                )
+                metadata = self.serde.loads_typed(
+                    (metadata_stored["type"], base64.b64decode(metadata_stored["data"]))
+                )
                 parent_id = row.get("parent_checkpoint_id")
 
                 yield CheckpointTuple(
@@ -184,23 +201,53 @@ class SurrealDBSaver(BaseCheckpointSaver):
         checkpoint_id = checkpoint["id"]
         parent_id = config["configurable"].get("checkpoint_id")
 
-        # Serialize
-        checkpoint_blob = base64.b64encode(self.serde.dumps(checkpoint)).decode("utf-8")
-        metadata_blob = base64.b64encode(self.serde.dumps(metadata)).decode("utf-8")
+        logger.info(f"Saving checkpoint: thread={thread_id}, cp_id={checkpoint_id[:20]}...")
 
-        async with get_connection(self.project_name) as conn:
-            await conn.create(
-                "graph_checkpoints",
-                {
-                    "thread_id": thread_id,
-                    "checkpoint_ns": checkpoint_ns,
-                    "checkpoint_id": checkpoint_id,
-                    "parent_checkpoint_id": parent_id,
-                    "checkpoint": checkpoint_blob,
-                    "metadata": metadata_blob,
-                    "created_at": "time::now()",
-                },
+        # Serialize
+        try:
+            logger.debug(f"Serializing checkpoint {checkpoint_id[:20]}...")
+            # Use dumps_typed which returns (type, bytes) - store both as JSON
+            cp_type, cp_bytes = self.serde.dumps_typed(checkpoint)
+            meta_type, meta_bytes = self.serde.dumps_typed(metadata)
+            # Store as JSON with type and base64-encoded data
+            checkpoint_blob = json.dumps(
+                {"type": cp_type, "data": base64.b64encode(cp_bytes).decode("utf-8")}
             )
+            metadata_blob = json.dumps(
+                {"type": meta_type, "data": base64.b64encode(meta_bytes).decode("utf-8")}
+            )
+            logger.debug(
+                f"Serialization complete: checkpoint={len(checkpoint_blob)} bytes, metadata={len(metadata_blob)} bytes"
+            )
+        except Exception as e:
+            logger.error(f"Serialization failed for {checkpoint_id[:20]}: {e}")
+            raise
+
+        try:
+            logger.debug(f"Acquiring connection for {self.project_name}...")
+            async with get_connection(self.project_name) as conn:
+                logger.debug("Connection acquired, creating record...")
+                # Don't set created_at - let SurrealDB's DEFAULT time::now() handle it
+                result = await conn.create(
+                    "graph_checkpoints",
+                    {
+                        "thread_id": thread_id,
+                        "checkpoint_ns": checkpoint_ns,
+                        "checkpoint_id": checkpoint_id,
+                        "parent_checkpoint_id": parent_id,
+                        "checkpoint": checkpoint_blob,
+                        "metadata": metadata_blob,
+                    },
+                )
+                logger.info(
+                    f"Checkpoint saved successfully: {checkpoint_id[:20]}... result_id={result.get('id') if isinstance(result, dict) else result}"
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to save checkpoint {checkpoint_id[:20]}: {type(e).__name__}: {e}",
+                exc_info=True,
+            )
+            raise
 
         return {
             "configurable": {
@@ -223,8 +270,11 @@ class SurrealDBSaver(BaseCheckpointSaver):
 
         async with get_connection(self.project_name) as conn:
             for idx, (channel, value) in enumerate(writes):
-                # Serialize value
-                value_blob = base64.b64encode(self.serde.dumps(value)).decode("utf-8")
+                # Serialize value using dumps_typed (returns tuple of type, bytes)
+                val_type, val_bytes = self.serde.dumps_typed(value)
+                value_blob = json.dumps(
+                    {"type": val_type, "data": base64.b64encode(val_bytes).decode("utf-8")}
+                )
 
                 await conn.create(
                     "graph_writes",

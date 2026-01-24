@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play } from "lucide-react";
+import { Play, CheckCircle2 } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  AlertBanner,
 } from "@/components/ui";
 import { useStartWorkflow } from "@/hooks";
 
@@ -22,10 +23,14 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
   const [endPhase, setEndPhase] = useState(5);
   const [skipValidation, setSkipValidation] = useState(false);
   const [autonomous, setAutonomous] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const startWorkflow = useStartWorkflow(projectName);
 
   const handleStart = async () => {
+    setError(null);
+    setSuccess(false);
     try {
       await startWorkflow.mutateAsync({
         start_phase: startPhase,
@@ -33,9 +38,15 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
         skip_validation: skipValidation,
         autonomous: autonomous,
       });
-      setOpen(false);
-    } catch (error) {
-      console.error("Failed to start workflow", error);
+      // Show success state briefly before closing
+      setSuccess(true);
+      setTimeout(() => {
+        setOpen(false);
+        setSuccess(false);
+      }, 1200);
+    } catch (err: any) {
+      console.error("Failed to start workflow", err);
+      setError(err.message || "Failed to start workflow");
     }
   };
 
@@ -55,6 +66,15 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          {error && (
+            <AlertBanner
+              variant="destructive"
+              title="Failed to start"
+              className="mb-4"
+            >
+              {error}
+            </AlertBanner>
+          )}
           <div className="grid grid-cols-4 items-center gap-4">
             <label
               htmlFor="startPhase"
@@ -137,12 +157,25 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleStart} disabled={startWorkflow.isPending}>
-            {startWorkflow.isPending ? "Starting..." : "Start"}
-          </Button>
+          {success ? (
+            <div className="flex items-center gap-2 text-green-600 font-medium animate-fade-in-up">
+              <CheckCircle2 className="h-5 w-5" />
+              Started! Launching workflow...
+            </div>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={startWorkflow.isPending}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleStart} disabled={startWorkflow.isPending}>
+                {startWorkflow.isPending ? "Starting..." : "Start"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

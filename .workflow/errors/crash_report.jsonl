@@ -1,0 +1,1 @@
+{"level": "ERROR", "timestamp": "2026-01-24T00:57:43.298854", "error_type": "RuntimeError", "message": "Simulated Startup Crash for Watchdog Verification", "stack_trace": "  File \"/home/etrox/workspace/conductor/tests/repro_crash.py\", line 13, in <module>\n    raise RuntimeError(\"Simulated Startup Crash for Watchdog Verification\")\n", "source": "global_exception_handler"}

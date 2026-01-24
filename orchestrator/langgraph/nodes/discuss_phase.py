@@ -425,14 +425,16 @@ async def _infer_preferences_from_project(project_dir: Path) -> dict[str, list[s
 
 
 def _extract_product_preferences(project_dir: Path) -> dict[str, list[str]]:
-    """Extract technical constraints from PRODUCT.md.
+    """Extract technical constraints from discovered documentation.
 
     Args:
         project_dir: Project directory
 
     Returns:
-        Preferences from PRODUCT.md
+        Preferences from documentation
     """
+    import json
+
     preferences: dict[str, list[str]] = {
         "libraries": [],
         "architecture": [],
@@ -441,13 +443,24 @@ def _extract_product_preferences(project_dir: Path) -> dict[str, list[str]]:
         "error_handling": [],
     }
 
-    product_md = project_dir / "PRODUCT.md"
-    if not product_md.exists():
+    content = ""
+
+    # Try discovery cache first
+    discovery_file = project_dir / ".workflow" / "phases" / "0" / "discovered_context.json"
+    if discovery_file.exists():
+        try:
+            context = json.loads(discovery_file.read_text())
+            for doc in context.get("documents", []):
+                doc_content = doc.get("content", "")
+                if doc_content:
+                    content += doc_content + "\n"
+        except Exception as e:
+            logger.warning(f"Failed to read discovery cache: {e}")
+
+    if not content:
         return preferences
 
     try:
-        content = product_md.read_text()
-
         # Look for Technical Constraints section
         if "## Technical Constraints" in content:
             section_start = content.find("## Technical Constraints")
@@ -476,7 +489,7 @@ def _extract_product_preferences(project_dir: Path) -> dict[str, list[str]]:
                     preferences["error_handling"].append(line)
 
     except Exception as e:
-        logger.warning(f"Failed to extract preferences from PRODUCT.md: {e}")
+        logger.warning(f"Failed to extract preferences from documentation: {e}")
 
     return preferences
 

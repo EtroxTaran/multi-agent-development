@@ -23,7 +23,15 @@ export function useWorkflowStatus(projectName: string) {
     queryKey: workflowKeys.status(projectName),
     queryFn: () => workflowApi.getStatus(projectName),
     enabled: !!projectName,
-    refetchInterval: 30000, // Poll every 30 seconds (rely on WebSocket for real-time)
+    // Poll faster when workflow is active, slower when idle
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "in_progress" ||
+        status === "starting" ||
+        status === "paused"
+        ? 5000 // 5 seconds when active
+        : 30000; // 30 seconds when idle
+    },
   });
 }
 
@@ -52,7 +60,42 @@ export function useStartWorkflow(projectName: string) {
       skip_validation?: boolean;
       autonomous?: boolean;
     }) => workflowApi.start(projectName, options),
+    onMutate: async () => {
+      // Cancel any outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
+
+      // Snapshot the previous value
+      const previousStatus = queryClient.getQueryData<WorkflowStatusResponse>(
+        workflowKeys.status(projectName),
+      );
+
+      // Optimistically update to "starting" status
+      queryClient.setQueryData<WorkflowStatusResponse>(
+        workflowKeys.status(projectName),
+        (old) => ({
+          ...old,
+          mode: old?.mode || "langgraph",
+          phase_status: old?.phase_status || {},
+          status: "starting" as const,
+        }),
+      );
+
+      // Return context with the snapshotted value
+      return { previousStatus };
+    },
+    onError: (_err, _variables, context) => {
+      // If mutation fails, roll back to the previous value
+      if (context?.previousStatus) {
+        queryClient.setQueryData(
+          workflowKeys.status(projectName),
+          context.previousStatus,
+        );
+      }
+    },
     onSuccess: () => {
+      // Immediately refetch to get actual status
       queryClient.invalidateQueries({
         queryKey: workflowKeys.status(projectName),
       });
@@ -75,6 +118,41 @@ export function useResumeWorkflow(projectName: string) {
         autonomous: false,
         humanResponse,
       }),
+    onMutate: async () => {
+      // Cancel any outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({
+        queryKey: workflowKeys.status(projectName),
+      });
+
+      // Snapshot the previous value
+      const previousStatus = queryClient.getQueryData<WorkflowStatusResponse>(
+        workflowKeys.status(projectName),
+      );
+
+      // Optimistically update to "in_progress" status
+      queryClient.setQueryData<WorkflowStatusResponse>(
+        workflowKeys.status(projectName),
+        (old) => ({
+          ...old,
+          mode: old?.mode || "langgraph",
+          phase_status: old?.phase_status || {},
+          status: "in_progress" as const,
+          pending_interrupt: undefined, // Clear interrupt on resume
+        }),
+      );
+
+      // Return context with the snapshotted value
+      return { previousStatus };
+    },
+    onError: (_err, _variables, context) => {
+      // If mutation fails, roll back to the previous value
+      if (context?.previousStatus) {
+        queryClient.setQueryData(
+          workflowKeys.status(projectName),
+          context.previousStatus,
+        );
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: workflowKeys.status(projectName),

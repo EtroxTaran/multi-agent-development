@@ -94,7 +94,7 @@ export function PhaseProgress({
               )}
               {hasStarted && !isRunning && (
                 <Button
-                  onClick={() => resumeWorkflow.mutate(false)}
+                  onClick={() => resumeWorkflow.mutate({ autonomous: false })}
                   disabled={resumeWorkflow.isPending}
                 >
                   Resume

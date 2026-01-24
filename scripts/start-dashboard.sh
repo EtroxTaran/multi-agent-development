@@ -51,6 +51,17 @@ if [ ! -d "$FRONTEND_DIR" ]; then
     exit 1
 fi
 
+# Kill any old dashboard instances
+echo -e "\n${YELLOW}[0/5] Killing old dashboard instances...${NC}"
+# Kill old backend processes
+pkill -f "uvicorn.*app.main:app.*8091" 2>/dev/null && echo "Killed old backend" || echo "No old backend running"
+pkill -f "uvicorn.*app.main:app.*8080" 2>/dev/null && echo "Killed old backend (port 8080)" || true
+# Kill processes on the ports
+lsof -ti:8091 | xargs kill -9 2>/dev/null || true
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+# Small delay to ensure ports are freed
+sleep 1
+
 # Install backend dependencies if needed
 echo -e "\n${YELLOW}[1/4] Checking backend dependencies...${NC}"
 cd "$BACKEND_DIR"

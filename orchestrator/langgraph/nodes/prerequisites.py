@@ -18,7 +18,7 @@ async def prerequisites_node(state: WorkflowState) -> dict[str, Any]:
     """Check prerequisites before starting workflow.
 
     Validates:
-    - PRODUCT.md exists
+    - docs/ folder exists with documentation
     - Required CLI tools are available (or SDK keys are set)
     - Project directory structure is valid
 
@@ -33,14 +33,30 @@ async def prerequisites_node(state: WorkflowState) -> dict[str, Any]:
     project_dir = Path(state["project_dir"])
     errors = []
 
-    # Check PRODUCT.md
-    product_file = project_dir / "PRODUCT.md"
-    if not product_file.exists():
+    # Check for docs/ folder with documentation
+    doc_dirs = ["docs", "Docs", "DOCS"]
+    has_docs_folder = False
+
+    for d in doc_dirs:
+        folder = project_dir / d
+        if folder.exists() and folder.is_dir():
+            # Check if folder has any markdown files (recursively)
+            md_files = list(folder.rglob("*.md"))
+            if md_files:
+                has_docs_folder = True
+                logger.info(f"Found docs folder with {len(md_files)} markdown files")
+                break
+
+    if not has_docs_folder:
         errors.append(
             {
-                "type": "missing_file",
-                "file": "PRODUCT.md",
-                "message": "PRODUCT.md not found. Create it with your feature specification.",
+                "type": "missing_documentation",
+                "file": "docs/",
+                "message": (
+                    "No docs/ folder found. Please create a docs/ folder with:\n"
+                    "- Product vision and requirements (e.g., docs/product/overview.md)\n"
+                    "- Architecture documentation (e.g., docs/design/architecture.md)"
+                ),
                 "timestamp": datetime.now().isoformat(),
             }
         )

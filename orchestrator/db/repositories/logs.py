@@ -53,8 +53,23 @@ class LogsRepository(BaseRepository[LogEntry]):
 
     table_name = "logs"
 
-    def _to_record(self, data: dict[str, Any]) -> LogEntry:
-        """Convert database record to LogEntry."""
+    def _to_record(self, data: dict[str, Any] | str) -> LogEntry:
+        """Convert database record to LogEntry.
+
+        Handles both full record dicts and string IDs (when SurrealDB
+        returns just the ID instead of full record).
+        """
+        # Handle case where SurrealDB returns just a string ID
+        if isinstance(data, str):
+            return LogEntry(
+                id=data,
+                log_type="",
+                content={},
+                task_id=None,
+                metadata={},
+                created_at=None,
+            )
+
         return LogEntry(
             id=str(data.get("id", "")),
             log_type=data.get("log_type", ""),

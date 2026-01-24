@@ -4,12 +4,92 @@ import asyncio
 import json
 import logging
 from datetime import datetime
+from enum import Enum
 from typing import Any, Optional
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_for_websocket(obj: Any) -> Any:
+    """Recursively serialize objects for WebSocket transmission.
+
+    Handles nested dataclasses, enums, and custom objects with to_dict methods.
+    """
+    if obj is None:
+        return None
+
+    # Handle Enum types
+    if isinstance(obj, Enum):
+        return obj.value
+
+    # Handle objects with to_dict method (e.g., PhaseState, AgentFeedback)
+    if hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")):
+        return _serialize_for_websocket(obj.to_dict())
+
+    # Handle datetime
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+
+    # Handle dictionaries - recursively serialize values
+    if isinstance(obj, dict):
+        return {k: _serialize_for_websocket(v) for k, v in obj.items()}
+
+    # Handle lists - recursively serialize items
+    if isinstance(obj, (list, tuple)):
+        return [_serialize_for_websocket(item) for item in obj]
+
+    # Handle dataclasses
+    if hasattr(obj, "__dataclass_fields__"):
+        return _serialize_for_websocket(
+            {k: getattr(obj, k) for k in obj.__dataclass_fields__.keys() if not k.startswith("_")}
+        )
+
+    # Handle objects with __dict__ (but not built-in types)
+    if hasattr(obj, "__dict__") and not isinstance(obj, (str, bytes, int, float, bool)):
+        return _serialize_for_websocket(
+            {k: v for k, v in obj.__dict__.items() if not k.startswith("_")}
+        )
+
+    # Primitive types pass through
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+
+    # Fallback to string representation
+    try:
+        return str(obj)
+    except Exception:
+        return f"<unserializable: {type(obj).__name__}>"
+
+
+class WebSocketJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles workflow objects."""
+
+    def default(self, obj: Any) -> Any:
+        # Handle Enum types
+        if isinstance(obj, Enum):
+            return obj.value
+        # Handle objects with to_dict method
+        if hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")):
+            return obj.to_dict()
+        # Handle dataclasses
+        if hasattr(obj, "__dataclass_fields__"):
+            return {
+                k: getattr(obj, k) for k in obj.__dataclass_fields__.keys() if not k.startswith("_")
+            }
+        # Handle objects with __dict__
+        if hasattr(obj, "__dict__"):
+            return {k: v for k, v in obj.__dict__.items() if not k.startswith("_")}
+        # Handle datetime
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        # Fallback to string representation
+        try:
+            return str(obj)
+        except Exception:
+            return super().default(obj)
 
 
 class ConnectionManager:
@@ -106,12 +186,16 @@ class ConnectionManager:
             event_type: Event type (action, state_change, escalation, etc.)
             data: Event data
         """
+        # Pre-serialize data to handle nested dataclasses (e.g., PhaseState)
+        serialized_data = _serialize_for_websocket(data)
+
         message = json.dumps(
             {
                 "type": event_type,
-                "data": data,
+                "data": serialized_data,
                 "timestamp": datetime.now().isoformat(),
-            }
+            },
+            cls=WebSocketJSONEncoder,
         )
 
         async with self._lock:
@@ -143,12 +227,16 @@ class ConnectionManager:
             event_type: Event type
             data: Event data
         """
+        # Pre-serialize data to handle nested dataclasses
+        serialized_data = _serialize_for_websocket(data)
+
         message = json.dumps(
             {
                 "type": event_type,
-                "data": data,
+                "data": serialized_data,
                 "timestamp": datetime.now().isoformat(),
-            }
+            },
+            cls=WebSocketJSONEncoder,
         )
 
         async with self._lock:
@@ -185,12 +273,16 @@ class ConnectionManager:
         Returns:
             True if sent successfully
         """
+        # Pre-serialize data to handle nested dataclasses
+        serialized_data = _serialize_for_websocket(data)
+
         message = json.dumps(
             {
                 "type": event_type,
-                "data": data,
+                "data": serialized_data,
                 "timestamp": datetime.now().isoformat(),
-            }
+            },
+            cls=WebSocketJSONEncoder,
         )
         return await self._send_safe(websocket, message)
 
@@ -232,7 +324,8 @@ class ConnectionManager:
                         "type": "heartbeat",
                         "data": {},
                         "timestamp": datetime.now().isoformat(),
-                    }
+                    },
+                    cls=WebSocketJSONEncoder,
                 )
 
                 for websocket in all_connections:

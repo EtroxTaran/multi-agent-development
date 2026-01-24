@@ -25,6 +25,7 @@ from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes;
     cursor_validate_node,
     dependency_check_node,
     discuss_phase_node,
+    documentation_discovery_node,
     error_dispatch_node,
     fixer_apply_node,
     fixer_research_node,
@@ -38,7 +39,6 @@ from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes;
     planning_node,
     pre_implementation_node,
     prerequisites_node,
-    product_validation_node,
     quality_gate_node,
     research_phase_node,
     review_gate_node,
@@ -149,7 +149,9 @@ def create_workflow_graph(
     graph.add_node("discuss", discuss_phase_node)
     graph.add_node("research", research_phase_node)
 
-    graph.add_node("product_validation", product_validation_node)
+    graph.add_node(
+        "product_validation", documentation_discovery_node
+    )  # Renamed: uses documentation_discovery
     graph.add_node("planning", planning_node, retry=agent_retry_policy)
     graph.add_node("cursor_validate", cursor_validate_node, retry=agent_retry_policy)
     graph.add_node("gemini_validate", gemini_validate_node, retry=agent_retry_policy)

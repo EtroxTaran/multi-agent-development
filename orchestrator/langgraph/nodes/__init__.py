@@ -12,6 +12,9 @@ from .dependency_check import dependency_check_node
 
 # Discussion and Research nodes (GSD pattern)
 from .discuss_phase import discuss_phase_node
+
+# Risk mitigation nodes
+from .documentation_discovery import documentation_discovery_node
 from .error_dispatch import error_dispatch_node
 from .escalation import human_escalation_node
 
@@ -34,8 +37,6 @@ from .implementation import implementation_node
 from .planning import planning_node
 from .pre_implementation import pre_implementation_node
 from .prerequisites import prerequisites_node
-
-# Risk mitigation nodes
 from .product_validation import product_validation_node
 
 # Quality infrastructure nodes
@@ -70,6 +71,7 @@ __all__ = [
     "completion_node",
     "human_escalation_node",
     # Risk mitigation nodes
+    "documentation_discovery_node",
     "product_validation_node",
     "pre_implementation_node",
     "build_verification_node",

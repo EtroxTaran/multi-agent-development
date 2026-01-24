@@ -248,6 +248,38 @@ def product_validation_router(
     return "planning"
 
 
+def documentation_discovery_router(
+    state: WorkflowState,
+) -> Literal["planning", "human_escalation", "__end__"]:
+    """Route after documentation discovery.
+
+    This is the new router replacing product_validation_router.
+    Routes based on documentation discovery results.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "planning": Documentation found, proceed to planning
+        - "human_escalation": No documentation found, need human help
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "planning"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Default to planning if no issues
+    return "planning"
+
+
 def pre_implementation_router(
     state: WorkflowState,
 ) -> Literal["implementation", "human_escalation", "__end__"]:

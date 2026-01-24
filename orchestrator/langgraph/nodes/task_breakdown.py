@@ -1,7 +1,9 @@
 """Task breakdown node.
 
-Parses PRODUCT.md acceptance criteria into individual tasks
+Parses acceptance criteria from project documentation into individual tasks
 with dependencies, priorities, and milestones for incremental execution.
+
+Documentation is read from the docs/ folder via the documentation discovery system.
 
 Task granularity is enforced via multi-dimensional complexity assessment:
 - Complexity score (0-13 scale) as primary decision factor
@@ -50,9 +52,9 @@ COMPLEXITY_INDICATORS = {
 
 
 async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
-    """Break down PRODUCT.md into individual tasks.
+    """Break down project documentation into individual tasks.
 
-    Parses the implementation plan and PRODUCT.md to create:
+    Parses the implementation plan and documentation to create:
     - Individual tasks with user stories
     - Task dependencies based on file relationships
     - Milestones for grouping related tasks
@@ -81,21 +83,21 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
             "next_decision": "escalate",
         }
 
-    # Load PRODUCT.md for acceptance criteria
-    product_md = _load_product_md(project_dir)
+    # Load documentation for acceptance criteria
+    product_md = _load_product_md(project_dir, state.get("project_name", ""))
     if not product_md:
         return {
             "errors": [
                 {
                     "type": "task_breakdown_error",
-                    "message": "PRODUCT.md not found",
+                    "message": "No documentation found in docs/ folder",
                     "timestamp": datetime.now().isoformat(),
                 }
             ],
             "next_decision": "escalate",
         }
 
-    # Parse acceptance criteria from PRODUCT.md
+    # Parse acceptance criteria from documentation
     acceptance_criteria = _parse_acceptance_criteria(product_md)
 
     # Extract tasks from plan phases
@@ -192,23 +194,33 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
     }
 
 
-def _load_product_md(project_dir: Path) -> Optional[str]:
-    """Load PRODUCT.md content.
+def _load_product_md(project_dir: Path, project_name: str = "") -> Optional[str]:
+    """Load documentation content from discovery system.
+
+    Priority:
+    1. Discovery cache (.workflow/phases/0/discovered_context.json)
+    2. Direct discovery (docs/ folder)
+    3. Error if no documentation found
 
     Args:
         project_dir: Project directory path
+        project_name: Project name for logging
 
     Returns:
-        PRODUCT.md content or None if not found
+        Documentation content or None if not found
     """
-    product_md_path = project_dir / "PRODUCT.md"
-    if product_md_path.exists():
-        return product_md_path.read_text()
+    from ..utils.doc_context import load_documentation_context
+
+    doc_context = load_documentation_context(project_dir, project_name)
+    content = doc_context.get("content")
+    if content:
+        logger.info(f"Loaded documentation from: {doc_context['source']}")
+        return content
     return None
 
 
 def _parse_acceptance_criteria(product_md: str) -> list[str]:
-    """Parse acceptance criteria from PRODUCT.md.
+    """Parse acceptance criteria from documentation.
 
     Looks for:
     - Checklist items (- [ ] or - [x])
@@ -216,7 +228,7 @@ def _parse_acceptance_criteria(product_md: str) -> list[str]:
     - Bullet points after criteria heading
 
     Args:
-        product_md: PRODUCT.md content
+        product_md: Documentation content
 
     Returns:
         List of acceptance criteria strings
@@ -267,7 +279,7 @@ def _extract_tasks_from_plan(
     Args:
         plan: Implementation plan from Phase 1
         acceptance_criteria: Parsed acceptance criteria
-        product_md: Raw PRODUCT.md content
+        product_md: Raw documentation content
 
     Returns:
         Tuple of (tasks, milestones)
@@ -392,7 +404,7 @@ def _generate_user_story(description: str, product_md: str) -> str:
 
     Args:
         description: Task description
-        product_md: PRODUCT.md content for context
+        product_md: Documentation content for context
 
     Returns:
         User story in "As a... I want... So that..." format
@@ -423,7 +435,7 @@ def _match_criteria_to_task(description: str, all_criteria: list[str]) -> list[s
 
     Args:
         description: Task description
-        all_criteria: All acceptance criteria from PRODUCT.md
+        all_criteria: All acceptance criteria from documentation
 
     Returns:
         List of criteria relevant to this task

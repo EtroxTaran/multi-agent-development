@@ -2,9 +2,15 @@
  * TanStack Query hooks for project operations
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { projectsApi } from "@/lib/api";
+import {
+  useMutation,
+  useQuery,
+  useQueries,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { projectsApi, workflowApi } from "@/lib/api";
 import type { FolderInfo, ProjectStatus, ProjectSummary } from "@/types";
+import { workflowKeys } from "./useWorkflow";
 
 // Query keys
 export const projectKeys = {
@@ -25,6 +31,47 @@ export function useProjects() {
     queryFn: projectsApi.list,
     staleTime: 1000 * 30, // 30 seconds
   });
+}
+
+/**
+ * Hook to fetch all projects with real-time workflow status
+ * This enriches the project list with live status from LangGraph checkpoints
+ */
+export function useProjectsWithStatus() {
+  const projectsQuery = useProjects();
+  const projects = projectsQuery.data ?? [];
+
+  // Fetch real-time status for each project
+  const statusQueries = useQueries({
+    queries: projects.map((project) => ({
+      queryKey: workflowKeys.status(project.name),
+      queryFn: () => workflowApi.getStatus(project.name),
+      staleTime: 5000, // 5 seconds for active status
+      enabled: !!project.name,
+    })),
+  });
+
+  // Merge projects with their real-time status
+  const enrichedProjects = projects.map((project, index) => {
+    const statusData = statusQueries[index]?.data;
+    return {
+      ...project,
+      // Override stale workflow_status with real-time status
+      workflow_status:
+        statusData?.status ?? project.workflow_status ?? "not_started",
+      // Add current phase from real-time data if available
+      current_phase: statusData?.current_phase ?? project.current_phase,
+    };
+  });
+
+  // Determine overall loading state
+  const isLoadingStatuses = statusQueries.some((q) => q.isLoading);
+
+  return {
+    ...projectsQuery,
+    data: enrichedProjects,
+    isLoadingStatuses,
+  };
 }
 
 /**

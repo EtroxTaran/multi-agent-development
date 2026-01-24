@@ -3,6 +3,8 @@ import {
   ReactFlow,
   Controls,
   Background,
+  MiniMap,
+  Handle,
   useNodesState,
   useEdgesState,
   Node,
@@ -12,80 +14,208 @@ import {
   useReactFlow,
   ReactFlowProvider,
 } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 import { useQuery } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks";
-import { Loader2 } from "lucide-react";
-import "@xyflow/react/dist/style.css";
-
-// Node Types
+import {
+  BrainCircuit,
+  Code,
+  CheckCircle,
+  Flag,
+  ShieldCheck,
+  Loader2,
+  GitBranch,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, Guidance } from "@/components/ui";
+
+// Icons for phases
+const PhaseIcons: Record<string, React.ReactNode> = {
+  planning: <BrainCircuit className="h-5 w-5" />,
+  validation: <ShieldCheck className="h-5 w-5" />,
+  implementation: <Code className="h-5 w-5" />,
+  verification: <CheckCircle className="h-5 w-5" />,
+  completion: <Flag className="h-5 w-5" />,
+  default: <BrainCircuit className="h-5 w-5" />,
+};
+
+// Explanations for each phase ("explain it to a kid" style)
+const PhaseDescriptions: Record<string, string> = {
+  planning: "We create a blueprint for what to build.",
+  validation: "We check if the plan makes sense.",
+  implementation: "We write the code to build it.",
+  verification: "We test it to make sure it works.",
+  completion: "We finish up and show you the result.",
+  default: "Working on your project...",
+};
 
 interface GraphDefinition {
   nodes: Array<{ id: string; type?: string; data: any }>;
   edges: Array<{ source: string; target: string; type?: string; data?: any }>;
 }
 
-// Custom Node Component
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "completed":
+      return "border-blue-500 bg-blue-50/50 dark:bg-blue-900/10";
+    case "active":
+      return "border-green-500 bg-green-50/50 dark:bg-green-900/10 shadow-[0_0_15px_-3px_rgba(34,197,94,0.4)]";
+    case "failed":
+      return "border-red-500 bg-red-50/50 dark:bg-red-900/10";
+    case "paused":
+      return "border-orange-500 bg-orange-50/50 dark:bg-orange-900/10";
+    default:
+      return "border-border/50 bg-card/50"; // idle
+  }
+};
+
 const WorkflowNode = ({ data }: any) => {
-  const isActive = data.status === "active";
-  const isCompleted = data.status === "completed";
-  const isError = data.status === "error";
+  const status = data.status || "idle";
+  const label = data.label.toLowerCase();
 
-  let borderColor = "border-border";
-  let bgColor = "bg-card";
+  // Determine icon based on label content
+  let icon = PhaseIcons.default;
+  let description = PhaseDescriptions.default;
 
-  if (isActive) {
-    borderColor = "border-green-500 animate-pulse";
-    bgColor = "bg-green-50/10";
-  } else if (isCompleted) {
-    borderColor = "border-blue-500";
-  } else if (isError) {
-    borderColor = "border-red-500";
+  if (label.includes("plan")) {
+    icon = PhaseIcons.planning;
+    description = PhaseDescriptions.planning;
+  } else if (label.includes("valid") || label.includes("check")) {
+    icon = PhaseIcons.validation;
+    description = PhaseDescriptions.validation;
+  } else if (label.includes("implement") || label.includes("exec")) {
+    icon = PhaseIcons.implementation;
+    description = PhaseDescriptions.implementation;
+  } else if (label.includes("verif") || label.includes("test")) {
+    icon = PhaseIcons.verification;
+    description = PhaseDescriptions.verification;
+  } else if (label.includes("complete") || label.includes("finish")) {
+    icon = PhaseIcons.completion;
+    description = PhaseDescriptions.completion;
   }
 
+  const isActive = status === "active" || status === "in_progress";
+  const colors = getStatusColor(status);
+
   return (
-    <Card
-      className={`w-[250px] ${borderColor} ${bgColor} transition-colors duration-300`}
-    >
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="font-semibold capitalize">{data.label}</div>
-        {isActive && (
-          <Loader2 className="h-4 w-4 animate-spin text-green-500" />
+    <div className="relative">
+      {/* Target Handle - receives incoming edges */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!w-3 !h-3 !bg-slate-400 !border-2 !border-background"
+      />
+
+      <Card
+        className={cn(
+          "w-[280px] transition-all duration-300 backdrop-blur-sm",
+          colors,
+          isActive && "scale-105 ring-2 ring-green-500/20",
         )}
-        {isCompleted && <div className="h-2 w-2 rounded-full bg-blue-500" />}
-      </CardContent>
-    </Card>
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div
+              className={cn(
+                "p-2 rounded-lg bg-background/80 shadow-sm shrink-0",
+                isActive && "text-green-600 dark:text-green-400",
+                status === "completed" && "text-blue-600 dark:text-blue-400",
+              )}
+            >
+              {icon}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold tracking-tight text-sm capitalize truncate mb-1">
+                {data.label}
+              </h3>
+              <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2 mb-2">
+                {description}
+              </p>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={status === "active" ? "default" : "secondary"}
+                  className="text-[10px] uppercase px-1.5 h-5"
+                >
+                  {status.replace("_", " ")}
+                </Badge>
+                {isActive && (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Source Handle - sends outgoing edges */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!w-3 !h-3 !bg-slate-400 !border-2 !border-background"
+      />
+    </div>
   );
 };
 
 const RouterNode = ({ data }: any) => {
-  const isActive = data.status === "active";
-
-  let borderColor = "border-yellow-500";
-  let bgColor = "bg-yellow-500/10";
-
-  if (isActive) {
-    borderColor = "border-yellow-400 animate-pulse";
-    bgColor = "bg-yellow-400/20";
-  }
+  const status = data.status;
+  const isActive = status === "active" || status === "visiting";
 
   return (
-    <div className="relative flex items-center justify-center w-16 h-16">
-      <div
-        className={`absolute w-12 h-12 rotate-45 border-2 ${borderColor} ${bgColor} transition-colors duration-300 z-0`}
+    <div className="relative flex items-center justify-center w-20 h-20 group">
+      {/* Target Handle - receives incoming edges */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!w-3 !h-3 !bg-yellow-500 !border-2 !border-background"
       />
-      {/* Label (if any) or icon */}
-      <div className="z-10 text-[10px] font-mono text-muted-foreground">
-        {data.label}
+
+      {/* Outer Glow */}
+      <div
+        className={cn(
+          "absolute inset-0 bg-yellow-500/20 rounded-lg rotate-45 transition-all duration-500",
+          isActive
+            ? "opacity-100 scale-110 blur-md"
+            : "opacity-0 group-hover:opacity-50",
+        )}
+      />
+
+      {/* Main Diamond */}
+      <div
+        className={cn(
+          "absolute w-14 h-14 rotate-45 border-2 bg-background shadow-lg transition-all duration-300 flex items-center justify-center",
+          isActive
+            ? "border-yellow-500 scale-110"
+            : "border-muted-foreground/30 hover:border-yellow-500/50",
+        )}
+      >
+        <div className="-rotate-45 text-yellow-500">
+          <GitBranch className="h-6 w-6" />
+        </div>
       </div>
+
+      {/* Label */}
+      <div className="absolute -bottom-8 whitespace-nowrap z-10">
+        <span className="text-[10px] font-mono font-medium text-muted-foreground bg-background/90 px-2 py-0.5 rounded border shadow-sm">
+          {data.label || "Router"}
+        </span>
+      </div>
+
+      {/* Source Handle - sends outgoing edges */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!w-3 !h-3 !bg-yellow-500 !border-2 !border-background"
+      />
     </div>
   );
 };
 
 const nodeTypes = {
   default: WorkflowNode,
-  input: WorkflowNode, // Reuse same style
+  input: WorkflowNode,
   output: WorkflowNode,
   router: RouterNode,
 };
@@ -162,14 +292,14 @@ const WorkflowGraphInner = React.memo(function WorkflowGraphInner({
   // Initialize graph
   useEffect(() => {
     if (graphData) {
-      const initialNodes: Node[] = graphData.nodes.map((n) => ({
+      const initialNodes: Node[] = graphData.nodes.map((n: any) => ({
         id: n.id,
         type: n.type || "default", // Helper for router types
-        data: { label: n.data.label || n.id, status: "idle" },
+        data: { label: n.data.label || n.id, status: n.data.status || "idle" },
         position: { x: 0, y: 0 },
       }));
 
-      const initialEdges: Edge[] = graphData.edges.map((e, i) => ({
+      const initialEdges: Edge[] = graphData.edges.map((e: any, i: number) => ({
         id: `e-${e.source}-${e.target}-${i}`,
         source: e.source,
         target: e.target,
@@ -305,11 +435,34 @@ const WorkflowGraphInner = React.memo(function WorkflowGraphInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={{
+          type: "smoothstep",
+          markerEnd: { type: MarkerType.ArrowClosed, color: "#64748b" },
+          style: { strokeWidth: 2, stroke: "#64748b" },
+        }}
         fitView
-        attributionPosition="bottom-right"
+        fitViewOptions={{ padding: 0.2, maxZoom: 1.5 }}
+        minZoom={0.1}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
+        panOnScroll
+        zoomOnScroll
+        zoomOnPinch
+        panOnDrag
       >
-        <Controls />
-        <Background color="#94a3b8" gap={16} size={1} />
+        <Controls showInteractive={false} />
+        <MiniMap
+          nodeColor={(node) => {
+            if (node.type === "router") return "#eab308";
+            if (node.data?.status === "completed") return "#3b82f6";
+            if (node.data?.status === "active") return "#22c55e";
+            if (node.data?.status === "error") return "#ef4444";
+            return "#94a3b8";
+          }}
+          maskColor="rgba(0, 0, 0, 0.3)"
+          className="!bg-background/80 border rounded-lg"
+        />
+        <Background color="#64748b" gap={20} size={1} />
       </ReactFlow>
     </div>
   );

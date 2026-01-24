@@ -5,6 +5,7 @@
 // Enums
 export type WorkflowStatus =
   | "not_started"
+  | "starting"
   | "in_progress"
   | "paused"
   | "completed"

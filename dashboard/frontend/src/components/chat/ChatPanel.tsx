@@ -124,15 +124,46 @@ export function ChatPanel({ projectName }: ChatPanelProps) {
               />
             )}
 
-            {/* System Message for Pause */}
+            {/* System Message for Pause with Interrupt Context */}
             {isPaused && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-yellow-50 border border-yellow-200 text-yellow-800">
-                  <p className="font-semibold text-sm mb-1">Workflow Paused</p>
-                  <p className="text-sm">
-                    The workflow requires your input to continue. Please provide
-                    your response below.
-                  </p>
+                <div className="max-w-[90%] rounded-lg px-4 py-3 bg-yellow-50 border border-yellow-200 text-yellow-800">
+                  <p className="font-semibold text-sm mb-2">Workflow Paused</p>
+                  {status?.pending_interrupt?.question ? (
+                    <>
+                      <p className="text-sm mb-3">
+                        {String(status.pending_interrupt.question)}
+                      </p>
+                      {Array.isArray(status.pending_interrupt.options) &&
+                        status.pending_interrupt.options.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {status.pending_interrupt.options.map(
+                              (opt: string) => (
+                                <Button
+                                  key={opt}
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-yellow-400 hover:bg-yellow-100"
+                                  onClick={() => {
+                                    resumeWorkflow.mutate({
+                                      action: opt.toLowerCase(),
+                                      response: opt,
+                                    });
+                                  }}
+                                >
+                                  {opt}
+                                </Button>
+                              ),
+                            )}
+                          </div>
+                        )}
+                    </>
+                  ) : (
+                    <p className="text-sm">
+                      The workflow requires your input to continue. Please
+                      provide your response below.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

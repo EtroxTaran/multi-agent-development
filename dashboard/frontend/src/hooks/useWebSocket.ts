@@ -47,6 +47,10 @@ export function useWebSocket(
       ws.onopen = () => {
         setIsConnected(true);
         reconnectAttemptsRef.current = 0;
+        // Immediately fetch latest status on reconnect to catch any missed HITL state
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.status(projectName),
+        });
       };
 
       ws.onmessage = (event) => {
@@ -58,19 +62,29 @@ export function useWebSocket(
           // Invalidate relevant queries based on event type
           switch (data.type) {
             case "state_change":
-            case "workflow_complete":
-            case "workflow_error":
+            case "escalation":
+            case "node_start":
+            case "node_end":
+            case "phase_change":
+              // Refresh status for state changes, phase transitions, and HITL escalation events
               queryClient.invalidateQueries({
                 queryKey: workflowKeys.status(projectName),
+              });
+              break;
+            case "workflow_complete":
+            case "workflow_error":
+              // Invalidate both status and graph cache on completion/error
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.status(projectName),
+              });
+              queryClient.invalidateQueries({
+                queryKey: ["workflow", "graph", projectName],
               });
               break;
             case "action":
               queryClient.invalidateQueries({
                 queryKey: taskKeys.lists(projectName),
               });
-              break;
-            case "escalation":
-              // Could trigger a notification
               break;
           }
         } catch (e) {

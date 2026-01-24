@@ -105,8 +105,12 @@ class RuntimeWatchdog:
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
-            # Not a JSONL line, ignore or log warning
-            return
+            # Not a JSONL line, treat as raw log line
+            # Check for common error patterns
+            if "Traceback" in line or "Error:" in line or "Exception" in line:
+                entry = {"level": "ERROR", "message": line.strip(), "error_type": "RawLogError"}
+            else:
+                return
 
         # We expect specific fields.
         # Check if it looks like an error we define or just a generic log

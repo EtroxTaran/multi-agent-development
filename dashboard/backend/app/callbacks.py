@@ -109,3 +109,19 @@ class WebSocketProgressCallback:
                 "timestamp": asyncio.get_running_loop().time(),
             },
         )
+
+    def on_hitl_interrupt(
+        self,
+        question: str,
+        options: Optional[list[str]] = None,
+        context: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Called when workflow hits HITL interrupt requiring user input."""
+        self._broadcast(
+            "escalation",
+            {
+                "question": question,
+                "options": options or [],
+                "context": context or {},
+            },
+        )

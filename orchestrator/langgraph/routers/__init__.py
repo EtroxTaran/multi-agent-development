@@ -28,6 +28,7 @@ from .general import (  # Risk mitigation routers; Discussion and Research route
     coverage_check_router,
     dependency_check_router,
     discuss_router,
+    documentation_discovery_router,
     human_escalation_router,
     implementation_router,
     planning_router,
@@ -59,6 +60,7 @@ __all__ = [
     "completion_router",
     "human_escalation_router",
     # Risk mitigation routers
+    "documentation_discovery_router",
     "product_validation_router",
     "pre_implementation_router",
     "build_verification_router",

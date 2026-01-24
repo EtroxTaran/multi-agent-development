@@ -52,10 +52,14 @@ class Settings(BaseSettings):
 
     @property
     def projects_path(self) -> Path:
-        """Get projects directory path."""
+        """Get projects directory path.
+
+        Priority: PROJECTS_DIR env var > conductor-projects sibling folder
+        """
         if self.projects_dir:
             return self.projects_dir
-        return self.conductor_root / "projects"
+        # Default: sibling folder to conductor called conductor-projects
+        return self.conductor_root.parent / "conductor-projects"
 
     # AI settings
     openai_api_key: Optional[str] = Field(default=None, description="OpenAI API Key")

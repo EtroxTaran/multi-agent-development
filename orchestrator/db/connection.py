@@ -279,12 +279,30 @@ class Connection:
             await self.connect()
 
         try:
-            thing = f"{table}:{record_id}" if record_id else table
+            if record_id:
+                # Escape record IDs containing special characters (hyphens, etc.)
+                # SurrealDB requires backticks for IDs with special chars
+                if any(c in record_id for c in ["-", " ", ".", "/", "@"]):
+                    thing = f"{table}:`{record_id}`"
+                else:
+                    thing = f"{table}:{record_id}"
+            else:
+                thing = table
             result = await self._client.create(thing, data)
 
+            # Handle various SurrealDB return formats
             if isinstance(result, list):
-                return result[0] if result else {}
-            return result or {}
+                first = result[0] if result else {}
+                # If list contains a string ID, wrap it with the original data
+                if isinstance(first, str):
+                    return {"id": first, **data}
+                return first if isinstance(first, dict) else {}
+            elif isinstance(result, str):
+                # SurrealDB sometimes returns just the record ID
+                return {"id": result, **data}
+            elif isinstance(result, dict):
+                return result
+            return {}
 
         except Exception as e:
             raise QueryError(f"Create failed: {e}")

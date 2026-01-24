@@ -147,7 +147,8 @@ class DependencyConfig:
 class WorkflowFeatures:
     """Feature flags for workflow nodes."""
 
-    product_validation: bool = True
+    documentation_discovery: bool = True  # New: replaces product_validation
+    product_validation: bool = True  # Deprecated: use documentation_discovery instead
     environment_check: bool = True
     build_verification: bool = True
     coverage_check: bool = True

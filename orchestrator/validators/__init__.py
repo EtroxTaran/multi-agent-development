@@ -11,11 +11,23 @@ from .dependency_checker import (
     DependencyFinding,
     DependencySeverity,
 )
+from .documentation_discovery import (
+    DiscoveredDocument,
+    DiscoveredDocumentation,
+    DocumentationScanner,
+    DocumentCategory,
+    discover_documentation,
+)
 from .environment_checker import EnvironmentChecker, EnvironmentCheckResult
 from .product_validator import ProductValidationResult, ProductValidator
 from .security_scanner import SecurityScanner, SecurityScanResult, Severity
 
 __all__ = [
+    "DocumentationScanner",
+    "DiscoveredDocumentation",
+    "DiscoveredDocument",
+    "DocumentCategory",
+    "discover_documentation",
     "ProductValidator",
     "ProductValidationResult",
     "EnvironmentChecker",

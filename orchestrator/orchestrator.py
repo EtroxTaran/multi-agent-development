@@ -50,7 +50,7 @@ async def validate_db_connection(project_name: str) -> None:
 
         # Test connection with a simple query
         async with get_connection(project_name) as conn:
-            await conn.query("SELECT 1")
+            await conn.query("RETURN 1")
 
         # Ensure schema is applied
         await ensure_schema(project_name)
@@ -155,10 +155,9 @@ class Orchestrator:
         errors = []
 
         # Check PRODUCT.md exists
-        # Check for documentation in various locations
-        # We accept PRODUCT.md, README.md, or content in standard documentation folders
+        # Check for documentation in docs/ folder (case-insensitive)
         doc_files = ["PRODUCT.md", "README.md", "product.md", "readme.md"]
-        doc_dirs = ["Documents", "documents", "Docs", "docs", "Documentation", "documentation"]
+        doc_dirs = ["docs", "Docs", "DOCS"]  # Only docs folder, case variations
 
         has_doc_file = any((self.project_dir / f).exists() for f in doc_files)
 
@@ -537,7 +536,6 @@ class Orchestrator:
 
         try:
             async with WorkflowRunner(self.project_dir) as runner:
-                self.logger.info(f"Checkpoint directory: {runner.checkpoint_dir}")
                 self.logger.separator()
 
                 if display:
@@ -827,11 +825,16 @@ class Orchestrator:
                 "pending_interrupt": pending,
             }
 
-    def get_workflow_definition(self) -> dict:
+    async def get_workflow_definition(self, status_dict: Optional[dict] = None) -> dict:
         """Get the workflow graph definition for visualization.
 
+        Args:
+            status_dict: Optional dictionary with current phase statuses
+
         Returns:
-            Dictionary with nodes and edges
+            Dictionary with nodes and edges including rich metadata:
+            - nodes: List of {id, type, phase, subgraph, agent, description, data}
+            - edges: List of {source, target, type, data} with labels
         """
         from .langgraph import create_workflow_graph
 
@@ -844,32 +847,197 @@ class Orchestrator:
         nodes = []
         edges = []
 
-        # Track which nodes have conditional outputs (routers)
+        # Node metadata mappings
+        # Phase assignments: which workflow phase does this node belong to?
+        phase_map = {
+            # Phase 1: Planning
+            "prerequisites": 1,
+            "product_validation": 1,
+            "research_phase": 1,
+            "discuss_phase": 1,
+            "planning": 1,
+            "task_breakdown": 1,
+            # Phase 2: Validation
+            "cursor_validate": 2,
+            "gemini_validate": 2,
+            "validation_fan_in": 2,
+            "approval_gate": 2,
+            # Phase 3: Implementation
+            "pre_implementation": 3,
+            "implementation": 3,
+            "implement_task": 3,
+            "select_task": 3,
+            "write_tests": 3,
+            "quality_gate": 3,
+            "coverage_check": 3,
+            "build_verification": 3,
+            "security_scan": 3,
+            # Phase 4: Verification
+            "cursor_verify": 4,
+            "gemini_verify": 4,
+            "verification_fan_in": 4,
+            "verify_task": 4,
+            "review_gate": 4,
+            "evaluate_agent": 4,
+            # Phase 5: Completion
+            "completion": 5,
+            "generate_handoff": 5,
+            # Error handling (cross-phase)
+            "escalation": 0,
+            "error_dispatch": 0,
+            "fixer_triage": 0,
+            "fixer_diagnose": 0,
+            "fixer_research": 0,
+            "fixer_apply": 0,
+            "fixer_validate": 0,
+            "fixer_verify": 0,
+            "fix_bug": 0,
+        }
+
+        # Subgraph groupings: which logical group does this node belong to?
+        subgraph_map = {
+            "cursor_validate": "validation",
+            "gemini_validate": "validation",
+            "validation_fan_in": "validation",
+            "cursor_verify": "verification",
+            "gemini_verify": "verification",
+            "verification_fan_in": "verification",
+            "fixer_triage": "fixer",
+            "fixer_diagnose": "fixer",
+            "fixer_research": "fixer",
+            "fixer_apply": "fixer",
+            "fixer_validate": "fixer",
+            "fixer_verify": "fixer",
+            "quality_gate": "quality",
+            "coverage_check": "quality",
+            "build_verification": "quality",
+            "security_scan": "quality",
+            "research_phase": "research",
+            "discuss_phase": "research",
+        }
+
+        # Agent assignments
+        agent_map = {
+            "cursor_validate": "cursor",
+            "cursor_verify": "cursor",
+            "gemini_validate": "gemini",
+            "gemini_verify": "gemini",
+            "planning": "claude",
+            "implementation": "claude",
+            "task_breakdown": "claude",
+            "research_phase": "claude",
+            "discuss_phase": "claude",
+            "review_gate": "claude",
+            "fixer_diagnose": "claude",
+            "fixer_apply": "claude",
+            "pre_implementation": "claude",
+            "quality_gate": "claude",
+        }
+
+        # Human-readable descriptions (storytelling)
+        description_map = {
+            "prerequisites": "Checking if your project is ready to start.",
+            "product_validation": "Validating your PRODUCT.md requirements.",
+            "research_phase": "Researching best practices for your project.",
+            "discuss_phase": "Analyzing the implementation approach.",
+            "planning": "Creating a blueprint for what to build.",
+            "task_breakdown": "Breaking features into implementation tasks.",
+            "cursor_validate": "Cursor reviews for patterns and practices.",
+            "gemini_validate": "Gemini reviews for architecture.",
+            "validation_fan_in": "Combining validation feedback.",
+            "approval_gate": "Checking plan approval status.",
+            "pre_implementation": "Preparing the workspace.",
+            "implementation": "Writing the code to build it.",
+            "implement_task": "Implementing a specific task.",
+            "select_task": "Picking the next task to work on.",
+            "write_tests": "Writing tests for the code.",
+            "quality_gate": "Running code quality checks.",
+            "coverage_check": "Verifying test coverage.",
+            "build_verification": "Verifying the build.",
+            "security_scan": "Scanning for vulnerabilities.",
+            "cursor_verify": "Cursor verifies implementation.",
+            "gemini_verify": "Gemini verifies architecture.",
+            "verification_fan_in": "Combining verification feedback.",
+            "verify_task": "Verifying task implementation.",
+            "review_gate": "Checking code review status.",
+            "evaluate_agent": "Evaluating agent performance.",
+            "completion": "Finishing up and showing results.",
+            "generate_handoff": "Creating build summary.",
+            "escalation": "Needs human input.",
+            "error_dispatch": "Routing error to handler.",
+            "fixer_triage": "Categorizing the error.",
+            "fixer_diagnose": "Diagnosing root cause.",
+            "fixer_research": "Researching solutions.",
+            "fixer_apply": "Applying the fix.",
+            "fixer_validate": "Validating the fix.",
+            "fixer_verify": "Verifying no regressions.",
+        }
+
+        # Track conditional edge sources (routers)
         router_sources = set()
         for edge in drawable.edges:
             if hasattr(edge, "conditional") and edge.conditional:
                 router_sources.add(edge.source)
 
-        # 1. Add standard nodes
+        def get_node_status(node_id: str) -> str:
+            if not status_dict or not status_dict.get("phase_status"):
+                return "idle"
+            node_key = node_id.lower().replace("_node", "").replace("node_", "")
+            for key, phase in phase_map.items():
+                if key in node_key and phase != 0:
+                    ps = status_dict["phase_status"].get(str(phase))
+                    if hasattr(ps, "value"):
+                        return ps.value
+                    return str(ps) if ps else "idle"
+            return "idle"
+
+        def get_node_metadata(node_id: str) -> dict:
+            nk = node_id.lower().replace("_node", "").replace("node_", "")
+            phase = next((p for k, p in phase_map.items() if k in nk), 0)
+            subgraph = next((s for k, s in subgraph_map.items() if k in nk), None)
+            agent = next((a for k, a in agent_map.items() if k in nk), None)
+            desc = next((d for k, d in description_map.items() if k in nk), "Working...")
+            return {"phase": phase, "subgraph": subgraph, "agent": agent, "description": desc}
+
+        # Add standard nodes
         for node_id, node in drawable.nodes.items():
             if node_id in ["__start__", "__end__"]:
                 continue
-
+            status = get_node_status(node_id)
+            meta = get_node_metadata(node_id)
             nodes.append(
-                {"id": node_id, "type": "default", "data": {"label": node_id, "status": "idle"}}
+                {
+                    "id": node_id,
+                    "type": "default",
+                    "phase": meta["phase"],
+                    "subgraph": meta["subgraph"],
+                    "agent": meta["agent"],
+                    "data": {
+                        "label": node_id,
+                        "status": status,
+                        "description": meta["description"],
+                    },
+                }
             )
 
-        # 2. Add synthetic router nodes
+        # Add synthetic router nodes
         for source in router_sources:
             router_id = f"{source}_router"
+            smeta = get_node_metadata(source)
             nodes.append(
                 {
                     "id": router_id,
-                    "type": "router",  # Special type for diamond shape
-                    "data": {"label": "", "status": "idle"},
+                    "type": "router",
+                    "phase": smeta["phase"],
+                    "subgraph": smeta["subgraph"],
+                    "agent": None,
+                    "data": {
+                        "label": "",
+                        "status": "idle",
+                        "description": f"Decision after {source}",
+                    },
                 }
             )
-            # Add edge from source to router
             edges.append(
                 {
                     "source": source,
@@ -879,63 +1047,54 @@ class Orchestrator:
                 }
             )
 
-        # 3. Add edges (handling routers)
+        # Add edges
         for edge in drawable.edges:
-            source = edge.source
-            target = edge.target
-
-            # Skip start/end artifacts if not needed, but __start__ is useful
-            if source == "__start__":
-                edges.append({"source": source, "target": target, "type": "default", "data": None})
+            src, tgt = edge.source, edge.target
+            if src == "__start__":
+                edges.append({"source": src, "target": tgt, "type": "default", "data": None})
                 continue
-            if target == "__end__":
-                # Make sure we route through router if source is a router source
-                if source in router_sources:
-                    router_id = f"{source}_router"
-                    # Label for end transition
-                    label = "end"
-                    if hasattr(edge, "data") and edge.data:
-                        label = str(edge.data)
-                    elif hasattr(edge, "conditional") and edge.conditional:
-                        # Fallback if specific label logic is needed
-                        pass
-
+            if tgt == "__end__":
+                if src in router_sources:
+                    lbl = str(edge.data) if hasattr(edge, "data") and edge.data else "end"
                     edges.append(
                         {
-                            "source": router_id,
-                            "target": "end_node",  # Virtual end node for viz? Or just ignore
+                            "source": f"{src}_router",
+                            "target": "end_node",
                             "type": "default",
-                            "data": {"label": label, "condition": label},
+                            "data": {"label": lbl, "condition": lbl},
                         }
                     )
                 continue
-
-            is_conditional = hasattr(edge, "conditional") and edge.conditional
-
-            if is_conditional:
-                # Route through the synthetic router
-                router_id = f"{source}_router"
-
-                # Determine label
-                # In LangGraph, edge.data often holds the condition key (e.g. "approved")
-                # If None, it often implies Key == TargetName
-                label = target
-                if hasattr(edge, "data") and edge.data is not None:
-                    label = str(edge.data)
-
+            is_cond = hasattr(edge, "conditional") and edge.conditional
+            if is_cond:
+                lbl = str(edge.data) if hasattr(edge, "data") and edge.data else tgt
                 edges.append(
                     {
-                        "source": router_id,
-                        "target": target,
+                        "source": f"{src}_router",
+                        "target": tgt,
                         "type": "default",
-                        "data": {"label": label, "condition": label},
+                        "data": {"label": lbl, "condition": lbl},
                     }
                 )
             else:
-                # Standard sequential edge
-                edges.append({"source": source, "target": target, "type": "default", "data": None})
+                edges.append({"source": src, "target": tgt, "type": "default", "data": None})
 
-        return {"nodes": nodes, "edges": edges}
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "total_nodes": len(nodes),
+                "phases": {
+                    1: "Planning",
+                    2: "Validation",
+                    3: "Implementation",
+                    4: "Verification",
+                    5: "Completion",
+                    0: "Error Handling",
+                },
+                "subgroups": list(set(subgraph_map.values())),
+            },
+        }
 
     def _print_progress(self, phase_num: int, phase_name: str, status: str) -> None:
         """Print progress indicator.
@@ -1101,11 +1260,6 @@ Examples:
         action="store_true",
         help="Reduce output verbosity",
     )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug output",
-    )
 
     # LangGraph mode options
     parser.add_argument(
@@ -1196,7 +1350,7 @@ Examples:
         print("-" * 60)
         for p in projects:
             phase_str = f"Phase {p['current_phase']}" if p["current_phase"] else "Not started"
-            docs_str = "Has docs" if p["has_documents"] else "No docs"
+            docs_str = "Has docs" if p.get("has_docs") or p.get("has_product_spec") else "No docs"
             context_str = []
             if p["has_claude_md"]:
                 context_str.append("CLAUDE")
@@ -1373,9 +1527,8 @@ Examples:
             print(f"  Project: {status.get('project', 'N/A')}")
             print(f"  Current Phase: {status.get('current_phase', 'N/A')}")
             if status.get("pending_interrupt"):
-                print(
-                    f"  Warning: Paused for human intervention at: {status['pending_interrupt']['paused_at']}"
-                )
+                paused_at = status.get("pending_interrupt", {}).get("paused_at", "Unknown")
+                print(f"  Warning: Paused for human intervention at: {paused_at}")
             if "phase_status" in status:
                 print("\nPhase Statuses:")
                 for phase, state in status["phase_status"].items():
@@ -1384,28 +1537,29 @@ Examples:
         else:
             status = orchestrator.status()
             print("\nWorkflow Status:")
-            print(f"  Project: {status['project']}")
-            print(f"  Current Phase: {status['current_phase']}")
-            print(f"  Total Commits: {status['total_commits']}")
+            print(f"  Project: {status.get('project_name', status.get('project', 'Unknown'))}")
+            print(f"  Current Phase: {status.get('current_phase', 'N/A')}")
+            print(f"  Total Commits: {status.get('total_commits', 0)}")
             print("\nPhase Statuses:")
-            for phase, state in status["phase_statuses"].items():
+            for phase, state in status.get("phase_statuses", {}).items():
                 emoji = "+" if state == "completed" else "x" if state == "failed" else "."
                 print(f"  [{emoji}] {phase}: {state}")
         return
 
     if args.health:
         health = orchestrator.health_check()
+        health_status = health.get("status", "unknown")
         status_emoji = (
-            "+" if health["status"] == "healthy" else "?" if health["status"] == "degraded" else "x"
+            "+" if health_status == "healthy" else "?" if health_status == "degraded" else "x"
         )
-        print(f"\nHealth Check: [{status_emoji}] {health['status'].upper()}")
-        print(f"\n  Project: {health['project']}")
-        print(f"  Current Phase: {health['current_phase']}")
-        print(f"  Phase Status: {health['phase_status'] or 'N/A'}")
-        print(f"  Iteration Count: {health['iteration_count']}")
-        print(f"  Last Updated: {health['last_updated']}")
+        print(f"\nHealth Check: [{status_emoji}] {health_status.upper()}")
+        print(f"\n  Project: {health.get('project', 'Unknown')}")
+        print(f"  Current Phase: {health.get('current_phase', 'N/A')}")
+        print(f"  Phase Status: {health.get('phase_status') or 'N/A'}")
+        print(f"  Iteration Count: {health.get('iteration_count', 0)}")
+        print(f"  Last Updated: {health.get('last_updated', 'N/A')}")
         print("\nAgent Availability (CLI):")
-        for agent, available in health["agents"].items():
+        for agent, available in health.get("agents", {}).items():
             emoji = "+" if available else "x"
             print(f"  [{emoji}] {agent}: {'Available' if available else 'Unavailable'}")
         print(f"\nLangGraph Mode: {'Enabled' if health.get('langgraph_enabled') else 'Disabled'}")
@@ -1413,12 +1567,13 @@ Examples:
 
     if args.rollback:
         result = orchestrator.rollback_to_phase(args.rollback)
-        if result["success"]:
+        if result.get("success"):
             print("\nRollback successful!")
-            print(f"  Rolled back to commit: {result['rolled_back_to'][:8]}")
-            print(f"  Current phase: {result['current_phase']}")
+            rolled_back = result.get("rolled_back_to", "")
+            print(f"  Rolled back to commit: {rolled_back[:8] if rolled_back else 'N/A'}")
+            print(f"  Current phase: {result.get('current_phase', 'N/A')}")
         else:
-            print(f"\nRollback failed: {result['error']}")
+            print(f"\nRollback failed: {result.get('error', 'Unknown error')}")
             sys.exit(1)
         return
 
@@ -1454,5 +1609,57 @@ Examples:
     sys.exit(0 if result.get("success", False) else 1)
 
 
+def setup_global_exception_handler():
+    """Setup global exception handler to log unhandled exceptions."""
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+
+        import json
+        import traceback
+        from datetime import datetime
+        from pathlib import Path
+
+        # Print to stderr as usual
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+        try:
+            # Try to write to errors directory
+            project_dir = Path.cwd()
+            workflow_dir = project_dir / ".workflow"
+            errors_dir = workflow_dir / "errors"
+
+            # If we are in the root orchestrator dir, we might need to find the project
+            # But usually we run from root. Let's try to be safe.
+            if not errors_dir.exists():
+                # Try to create it if we can determine a valid project path
+                # But if we crashed this early, maybe we can't.
+                return
+
+            errors_dir.mkdir(parents=True, exist_ok=True)
+            log_file = errors_dir / "crash_report.jsonl"
+
+            error_data = {
+                "level": "ERROR",
+                "timestamp": datetime.now().isoformat(),
+                "error_type": exc_type.__name__,
+                "message": str(exc_value),
+                "stack_trace": "".join(traceback.format_tb(exc_traceback)),
+                "source": "global_exception_handler",
+            }
+
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(error_data) + "\n")
+
+        except Exception:
+            # Last resort - don't crash the crash handler
+            pass
+
+    sys.excepthook = handle_exception
+
+
 if __name__ == "__main__":
+    setup_global_exception_handler()
     main()

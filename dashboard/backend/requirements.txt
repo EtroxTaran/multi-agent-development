@@ -21,5 +21,18 @@ httpx>=0.26.0
 # JSON handling
 orjson>=3.9.10
 
-# Date handling
-python-dateutil>=2.8.2
+# Orchestrator dependencies (must be synced with root pyproject.toml)
+anthropic>=0.40.0
+google-genai>=1.0.0
+aiohttp>=3.9.0
+aiofiles>=24.1.0
+requests>=2.31.0
+langgraph>=0.2.0
+langchain-core>=0.1.0
+langgraph-checkpoint-sqlite>=1.0.0
+pydantic>=2.0.0
+mcp>=1.0.0
+tenacity>=9.0.0
+rich>=13.0.0
+python-dotenv>=1.0.0
+surrealdb>=0.3.0
