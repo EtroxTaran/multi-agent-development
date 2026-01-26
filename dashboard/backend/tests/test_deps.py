@@ -17,14 +17,14 @@ class TestGetProjectManager:
         # Clear the lru_cache first since the function may have been called already
         deps.get_project_manager.cache_clear()
 
-        with patch("app.deps.ProjectManager") as MockPM:
+        with patch("app.deps.ProjectManager") as mock_pm_cls:
             mock_pm = MagicMock()
-            MockPM.return_value = mock_pm
+            mock_pm_cls.return_value = mock_pm
 
             result = deps.get_project_manager()
 
             assert result == mock_pm
-            MockPM.assert_called_once()
+            mock_pm_cls.assert_called_once()
 
         # Clear cache after test to not affect other tests
         deps.get_project_manager.cache_clear()
@@ -44,7 +44,7 @@ class TestGetProjectDir:
             # Use the dependency in a test route
             client = TestClient(app)
             # The dependency is tested indirectly through routes
-            response = client.get("/api/projects/my-project")
+            _response = client.get("/api/projects/my-project")  # noqa: F841
             # If project manager returns a path, the dependency works
             mock_project_manager.get_project_status.return_value = {"name": "my-project"}
         finally:
@@ -70,16 +70,16 @@ class TestGetOrchestrator:
 
     def test_get_orchestrator_creates_instance(self, temp_project_dir: Path):
         """Test that get_orchestrator creates an Orchestrator."""
-        with patch("app.deps.Orchestrator") as MockOrch:
+        with patch("app.deps.Orchestrator") as mock_orch_cls:
             mock_orch = MagicMock()
-            MockOrch.return_value = mock_orch
+            mock_orch_cls.return_value = mock_orch
 
             result = deps.get_orchestrator(temp_project_dir)
 
             assert result == mock_orch
             # Verify it was called with project_dir (may have additional kwargs)
-            assert MockOrch.call_count == 1
-            call_args = MockOrch.call_args
+            assert mock_orch_cls.call_count == 1
+            call_args = mock_orch_cls.call_args
             assert call_args[0][0] == temp_project_dir
 
 

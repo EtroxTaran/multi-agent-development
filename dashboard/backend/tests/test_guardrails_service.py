@@ -169,9 +169,9 @@ class TestGuardrailsService:
             make_mock_connection(mock_conn),
         ):
             # Mock the CollectionService
-            with patch("orchestrator.collection.service.CollectionService") as MockCS:
+            with patch("orchestrator.collection.service.CollectionService") as mock_cs_cls:
                 mock_cs = AsyncMock()
-                MockCS.return_value = mock_cs
+                mock_cs_cls.return_value = mock_cs
 
                 result = await service.promote_to_global("test-project", project_dir, "rule-1")
 

@@ -312,8 +312,8 @@ async def promote_guardrail(
     try:
         from orchestrator.collection.service import CollectionService
 
-        service = CollectionService()
-        # Use service to register the item in global collection
+        _service = CollectionService()  # noqa: F841
+        # TODO: Use service to register the item in global collection
         # This is a simplified version - full implementation would parse the file
 
         return {

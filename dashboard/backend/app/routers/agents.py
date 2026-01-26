@@ -45,8 +45,8 @@ async def get_agents_status(
     audit_adapter: AuditStorageAdapter = Depends(get_audit_adapter),
 ) -> AgentStatusResponse:
     """Get status for all agents."""
-    # Get statistics from audit
-    stats = audit_adapter.get_statistics()
+    # Get statistics from audit (kept for future use)
+    _stats = audit_adapter.get_statistics()
 
     # FIX N+1: Single query, then group in memory
     all_entries = audit_adapter.query(limit=SafetyLimits.MAX_AUDIT_ENTRIES)

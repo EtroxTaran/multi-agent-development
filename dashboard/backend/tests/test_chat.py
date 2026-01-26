@@ -33,7 +33,7 @@ class TestSendChatMessage:
         app.dependency_overrides[deps.get_project_manager] = lambda: mock_project_manager
 
         try:
-            with patch("subprocess.run", return_value=mock_result) as mock_run:
+            with patch("subprocess.run", return_value=mock_result):
                 client = TestClient(app)
                 response = client.post(
                     "/api/chat", json={"message": "Hello", "project_name": "test-project"}
