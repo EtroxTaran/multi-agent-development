@@ -120,6 +120,27 @@ class WorkflowStatusResponse(BaseModel):
     phase_status: dict[str, str] = Field(default_factory=dict)
     pending_interrupt: Optional[dict] = None
     message: Optional[str] = None
+    # Pause state
+    pause_requested: bool = False
+    paused_at_node: Optional[str] = None
+    paused_at_timestamp: Optional[str] = None
+    pause_reason: Optional[str] = None
+
+
+class PauseRequest(BaseModel):
+    """Request to pause a workflow."""
+
+    reason: Optional[str] = None
+
+
+class PauseResponse(BaseModel):
+    """Response from pause request."""
+
+    message: str
+    paused: bool = False
+    pause_requested: bool = True
+    paused_at_node: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class WorkflowHealthResponse(BaseModel):

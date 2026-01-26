@@ -849,6 +849,10 @@ class WorkflowState(TypedDict, total=False):
     research_findings: Optional[dict]
     research_errors: Optional[list[dict]]
 
+    # Guardrails system
+    guardrails_summary: Optional[dict]  # Summary of applied guardrails
+    guardrails_gaps: Optional[list[dict]]  # Identified gaps for research
+
     # Execution mode (Ralph Wiggum pattern)
     execution_mode: str  # "hitl" (human-in-the-loop) or "afk" (autonomous)
 
@@ -876,6 +880,12 @@ class WorkflowState(TypedDict, total=False):
     # Global error context (for Bugfixer agent)
     error_context: Optional[ErrorContext]  # Rich error context for current error
     execution_history: Annotated[list[AgentExecution], _append_executions]  # All agent executions
+
+    # Pause control (dashboard integration)
+    pause_requested: bool  # Set by dashboard API to request pause
+    paused_at_node: Optional[str]  # Which node we paused after
+    paused_at_timestamp: Optional[str]  # When pause was requested
+    pause_reason: Optional[str]  # Reason for pause (user-provided)
 
 
 def create_initial_state(
@@ -965,6 +975,11 @@ def create_initial_state(
         # Global error context (for Bugfixer agent)
         error_context=None,
         execution_history=[],
+        # Pause control (dashboard integration)
+        pause_requested=False,
+        paused_at_node=None,
+        paused_at_timestamp=None,
+        pause_reason=None,
     )
 
 

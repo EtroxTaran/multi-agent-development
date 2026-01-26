@@ -16,7 +16,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, RetryPolicy
 
-from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes; Discussion and Research nodes (GSD pattern); Handoff node (GSD pattern); Error dispatch node
+from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes; Discussion and Research nodes (GSD pattern); Handoff node (GSD pattern); Error dispatch node; Pause check node
     approval_gate_node,
     build_verification_node,
     completion_node,
@@ -34,8 +34,10 @@ from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes;
     gemini_review_node,
     gemini_validate_node,
     generate_handoff_node,
+    guardrails_agent_node,
     human_escalation_node,
     implementation_node,
+    pause_check_node,
     planning_node,
     pre_implementation_node,
     prerequisites_node,
@@ -78,10 +80,40 @@ def subgraph_router(state: WorkflowState) -> str:
     Returns:
         Next node name
     """
+    # Check for pause request first
+    if state.get("pause_requested", False):
+        return "pause_check"
+
     decision = state.get("next_decision")
     if decision == "escalate":
         return "human_escalation"
     return "continue"
+
+
+def pause_check_router(state: WorkflowState) -> str:
+    """Route after pause check completes.
+
+    Args:
+        state: Workflow state
+
+    Returns:
+        Next node to resume at
+    """
+    # If abort was chosen during pause
+    if state.get("next_decision") == "abort":
+        return "error_dispatch"
+
+    # Otherwise continue to the node we paused before
+    paused_at = state.get("paused_at_node", "build_verification")
+
+    # Map pause points to their continuation nodes
+    continuation_map = {
+        "after_validation": "approval_gate",
+        "after_implementation": "build_verification",
+        "after_verification": "coverage_check",
+    }
+
+    return continuation_map.get(paused_at, "build_verification")
 
 
 def create_workflow_graph(
@@ -145,6 +177,9 @@ def create_workflow_graph(
     # Core workflow nodes
     graph.add_node("prerequisites", prerequisites_node)
 
+    # Guardrails agent node (applies collection guardrails to project)
+    graph.add_node("guardrails_agent", guardrails_agent_node)
+
     # Discussion and Research nodes (GSD pattern)
     graph.add_node("discuss", discuss_phase_node)
     graph.add_node("research", research_phase_node)
@@ -152,9 +187,9 @@ def create_workflow_graph(
     graph.add_node(
         "product_validation", documentation_discovery_node
     )  # Renamed: uses documentation_discovery
-    graph.add_node("planning", planning_node, retry=agent_retry_policy)
-    graph.add_node("cursor_validate", cursor_validate_node, retry=agent_retry_policy)
-    graph.add_node("gemini_validate", gemini_validate_node, retry=agent_retry_policy)
+    graph.add_node("planning", planning_node, retry_policy=agent_retry_policy)
+    graph.add_node("cursor_validate", cursor_validate_node, retry_policy=agent_retry_policy)
+    graph.add_node("gemini_validate", gemini_validate_node, retry_policy=agent_retry_policy)
     graph.add_node("validation_fan_in", validation_fan_in_node)
     graph.add_node("approval_gate", approval_gate_node)
     graph.add_node("pre_implementation", pre_implementation_node)
@@ -164,14 +199,14 @@ def create_workflow_graph(
     graph.add_node("fixer_subgraph", create_fixer_subgraph())
 
     # Legacy implementation node (kept for compatibility)
-    graph.add_node("implementation", implementation_node, retry=implementation_retry_policy)
+    graph.add_node("implementation", implementation_node, retry_policy=implementation_retry_policy)
 
     # Post-implementation nodes
     graph.add_node("build_verification", build_verification_node)
     graph.add_node("quality_gate", quality_gate_node)  # A13: TypeScript/ESLint checks
     graph.add_node("review_gate", review_gate_node)
-    graph.add_node("cursor_review", cursor_review_node, retry=agent_retry_policy)
-    graph.add_node("gemini_review", gemini_review_node, retry=agent_retry_policy)
+    graph.add_node("cursor_review", cursor_review_node, retry_policy=agent_retry_policy)
+    graph.add_node("gemini_review", gemini_review_node, retry_policy=agent_retry_policy)
     graph.add_node("verification_fan_in", verification_fan_in_node)
     graph.add_node("coverage_check", coverage_check_node)
     graph.add_node("security_scan", security_scan_node)
@@ -190,6 +225,9 @@ def create_workflow_graph(
     # Handoff node (GSD pattern) - generates session brief before END
     graph.add_node("generate_handoff", generate_handoff_node)
 
+    # Pause check node (dashboard integration) - checks for pause requests at key points
+    graph.add_node("pause_check", pause_check_node)
+
     if retry_enabled:
         logger.info("Retry policies enabled for agent nodes")
 
@@ -198,16 +236,19 @@ def create_workflow_graph(
     # Start → prerequisites
     graph.add_edge(START, "prerequisites")
 
-    # Prerequisites → discuss (with conditional for escalation)
+    # Prerequisites → guardrails_agent → discuss (with conditional for escalation)
     graph.add_conditional_edges(
         "prerequisites",
         prerequisites_router,
         {
-            "planning": "discuss",  # Changed: go to discuss phase first (GSD pattern)
+            "planning": "guardrails_agent",  # Changed: go to guardrails_agent first
             "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
     )
+
+    # Guardrails agent → discuss (unconditional - guardrails are non-blocking)
+    graph.add_edge("guardrails_agent", "discuss")
 
     # Discuss → research (mandatory discussion phase, GSD pattern)
     graph.add_conditional_edges(
@@ -294,6 +335,19 @@ def create_workflow_graph(
         {
             "continue": "build_verification",  # Success path
             "human_escalation": "error_dispatch",
+            "pause_check": "pause_check",  # Dashboard requested pause
+        },
+    )
+
+    # Pause check → conditional routing back to workflow based on resume state
+    graph.add_conditional_edges(
+        "pause_check",
+        pause_check_router,
+        {
+            "approval_gate": "approval_gate",
+            "build_verification": "build_verification",
+            "coverage_check": "coverage_check",
+            "error_dispatch": "error_dispatch",  # User chose abort
         },
     )
 
@@ -709,16 +763,38 @@ class WorkflowRunner:
                 state_snapshot = await self.graph.aget_state(run_config)
 
         if state_snapshot.next:
-            # Workflow is paused (likely at human escalation)
-            # Use Command(resume=...) to resume from interrupt
-            resume_input = human_response if human_response else {"action": "abort"}
-            command = Command(resume=resume_input)
+            # Check if there are actual interrupts in the pending tasks
+            # Only use Command(resume=...) for interrupted workflows
+            # For regular pending tasks (no interrupts), just continue with ainvoke(None)
+            has_interrupts = False
+            if state_snapshot.tasks:
+                for task in state_snapshot.tasks:
+                    if hasattr(task, "interrupts") and task.interrupts:
+                        has_interrupts = True
+                        break
 
-            if progress_callback:
-                # Use streaming to capture node events
-                result = await self._resume_with_callbacks(command, run_config, progress_callback)
+            if has_interrupts:
+                # Workflow is paused at an interrupt (human escalation, approval gate, etc.)
+                # Use Command(resume=...) to provide human response
+                logger.info(f"Resuming from interrupt at: {state_snapshot.next}")
+                resume_input = human_response if human_response else {"action": "continue"}
+                command = Command(resume=resume_input)
+
+                if progress_callback:
+                    result = await self._resume_with_callbacks(
+                        command, run_config, progress_callback
+                    )
+                else:
+                    result = await self.graph.ainvoke(command, config=run_config)
             else:
-                result = await self.graph.ainvoke(command, config=run_config)
+                # Workflow has pending tasks but no interrupts - just continue execution
+                logger.info(f"Continuing workflow from: {state_snapshot.next}")
+                if progress_callback:
+                    result = await self._run_with_callbacks(
+                        self.graph, None, run_config, progress_callback
+                    )
+                else:
+                    result = await self.graph.ainvoke(None, config=run_config)
         else:
             # No pending work, workflow already complete
             logger.info("Workflow already complete, nothing to resume")

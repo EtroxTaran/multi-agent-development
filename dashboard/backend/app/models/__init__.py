@@ -20,6 +20,8 @@ from .schemas import (  # Enums; Project models; Workflow models; Task models; A
     EscalationResponse,
     FeedbackResponse,
     FolderInfo,
+    PauseRequest,
+    PauseResponse,
     PhaseStatus,
     ProjectInitRequest,
     ProjectInitResponse,
@@ -62,6 +64,8 @@ __all__ = [
     "WorkflowStartResponse",
     "WorkflowStatusResponse",
     "ResumeRequest",
+    "PauseRequest",
+    "PauseResponse",
     # Task models
     "TaskInfo",
     "TaskListResponse",

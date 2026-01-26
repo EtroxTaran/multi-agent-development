@@ -32,8 +32,14 @@ from .fixer_verify import fixer_verify_node
 
 # Handoff node (GSD pattern)
 from .generate_handoff import generate_handoff_node
+
+# Guardrails system
+from .guardrails_agent import guardrails_agent_node
 from .implement_task import implement_task_node, implement_tasks_parallel_node
 from .implementation import implementation_node
+
+# Pause check node (dashboard integration)
+from .pause_check import pause_check_node, pause_router
 from .planning import planning_node
 from .pre_implementation import pre_implementation_node
 from .prerequisites import prerequisites_node
@@ -59,6 +65,7 @@ from .write_tests import write_tests_node
 
 __all__ = [
     "prerequisites_node",
+    "guardrails_agent_node",
     "planning_node",
     "cursor_validate_node",
     "gemini_validate_node",
@@ -108,4 +115,7 @@ __all__ = [
     "evaluate_agent_node",
     "analyze_output_node",
     "optimize_prompts_node",
+    # Pause check node (dashboard integration)
+    "pause_check_node",
+    "pause_router",
 ]
