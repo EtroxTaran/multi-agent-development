@@ -246,8 +246,36 @@ export interface ChatResponse {
 }
 
 // WebSocket types
+export type WebSocketEventType =
+  | "node_start"
+  | "node_end"
+  | "phase_start"
+  | "phase_end"
+  | "phase_change"
+  | "task_start"
+  | "task_complete"
+  | "task_failed"
+  | "agent_start"
+  | "agent_complete"
+  | "ralph_iteration"
+  | "error_occurred"
+  | "escalation_required"
+  | "workflow_start"
+  | "workflow_complete"
+  | "workflow_paused"
+  | "workflow_resumed"
+  | "metrics_update"
+  | "path_decision"
+  | "heartbeat"
+  | "pause_requested"
+  // Legacy event types for backwards compatibility
+  | "state_change"
+  | "escalation"
+  | "workflow_error"
+  | "action";
+
 export interface WebSocketEvent {
-  type: string;
+  type: WebSocketEventType;
   data: Record<string, unknown>;
   timestamp: string;
 }

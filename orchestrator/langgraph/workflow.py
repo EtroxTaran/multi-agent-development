@@ -621,6 +621,8 @@ class WorkflowRunner:
             },
         }
         if progress_callback:
+            # Store callback in configurable for task nodes to emit events
+            run_config["configurable"]["progress_callback"] = progress_callback
 
             def path_emitter(router, decision, state):
                 if hasattr(progress_callback, "on_path_decision"):
@@ -764,6 +766,8 @@ class WorkflowRunner:
             },
         }
         if progress_callback:
+            # Store callback in configurable for task nodes to emit events
+            run_config["configurable"]["progress_callback"] = progress_callback
 
             def path_emitter(router, decision, state):
                 if hasattr(progress_callback, "on_path_decision"):

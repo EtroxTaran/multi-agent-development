@@ -97,6 +97,11 @@ async def verify_task_node(state: WorkflowState) -> dict[str, Any]:
         # Task verified successfully
         updated_task["status"] = TaskStatus.COMPLETED
 
+        # Emit task_complete event for real-time dashboard updates
+        from .task.callbacks import emit_task_complete
+
+        emit_task_complete(task_id, success=True)
+
         # Save verification result
         _save_verification_result(
             project_dir,
@@ -561,6 +566,11 @@ def _handle_verification_failure(
         # Max retries exceeded
         task["status"] = TaskStatus.FAILED
         logger.error(f"Task {task_id} failed verification after {attempts} attempts")
+
+        # Emit task_complete event with failure for real-time dashboard updates
+        from .task.callbacks import emit_task_complete
+
+        emit_task_complete(task_id, success=False)
 
         # Update trackers with failure status
         if project_dir:

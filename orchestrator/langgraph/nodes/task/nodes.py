@@ -193,7 +193,13 @@ async def implement_task_node(state: WorkflowState) -> dict[str, Any]:
             "next_decision": "escalate",
         }
 
-    logger.info(f"Implementing task: {task_id} - {task.get('title', 'Unknown')}")
+    task_title = task.get("title", "Unknown")
+    logger.info(f"Implementing task: {task_id} - {task_title}")
+
+    # Emit task_start event for real-time dashboard updates
+    from .callbacks import emit_task_start
+
+    emit_task_start(task_id, task_title)
 
     project_dir = Path(state["project_dir"])
 

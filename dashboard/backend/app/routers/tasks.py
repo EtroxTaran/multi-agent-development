@@ -1,7 +1,5 @@
 """Task management API routes."""
 
-import json
-
 # Import orchestrator modules
 import sys
 from pathlib import Path
@@ -15,52 +13,68 @@ from ..models import AuditEntry, ErrorResponse, TaskInfo, TaskListResponse, Task
 
 settings = get_settings()
 sys.path.insert(0, str(settings.conductor_root))
+from orchestrator.db.repositories.tasks import Task, get_task_repository
 from orchestrator.storage.audit_adapter import AuditStorageAdapter
 
 router = APIRouter(prefix="/projects/{project_name}/tasks", tags=["tasks"])
 
 
-def _load_tasks_from_workflow(project_dir: Path) -> list[dict]:
-    """Load tasks from workflow state.
+def _priority_to_int(priority: str) -> int:
+    """Convert priority string to integer for sorting.
 
     Args:
-        project_dir: Project directory
+        priority: Priority string (low, medium, high, critical)
 
     Returns:
-        List of task dictionaries
+        Integer priority value (0-3)
     """
-    # Try to load from plan.json
-    plan_path = project_dir / ".workflow" / "phases" / "planning" / "plan.json"
-    if plan_path.exists():
-        try:
-            plan = json.loads(plan_path.read_text())
-            tasks = plan.get("tasks", [])
-            if tasks:
-                return tasks
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    # Try to load from state.json
-    state_path = project_dir / ".workflow" / "state.json"
-    if state_path.exists():
-        try:
-            state = json.loads(state_path.read_text())
-            tasks = state.get("tasks", [])
-            if tasks:
-                return tasks
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    return []
+    return {"low": 0, "medium": 1, "high": 2, "critical": 3}.get(priority.lower(), 1)
 
 
-def _get_task_status(task: dict) -> TaskStatus:
-    """Convert task status string to enum."""
-    status_str = task.get("status", "pending").lower()
+def _complexity_to_score(complexity: str) -> Optional[float]:
+    """Convert complexity string to numeric score.
+
+    Args:
+        complexity: Complexity string (low, medium, high)
+
+    Returns:
+        Numeric complexity score or None
+    """
+    return {"low": 2.0, "medium": 5.0, "high": 8.0}.get(complexity.lower())
+
+
+def _task_to_task_info(task: Task) -> TaskInfo:
+    """Convert repository Task to API TaskInfo.
+
+    Args:
+        task: Task from repository
+
+    Returns:
+        TaskInfo for API response
+    """
+    # Map status string to TaskStatus enum
+    status_str = task.status.lower() if task.status else "pending"
     try:
-        return TaskStatus(status_str)
+        status = TaskStatus(status_str)
     except ValueError:
-        return TaskStatus.PENDING
+        status = TaskStatus.PENDING
+
+    return TaskInfo(
+        id=task.id,
+        title=task.title,
+        description=task.user_story or None,
+        status=status,
+        priority=_priority_to_int(task.priority),
+        dependencies=task.dependencies,
+        files_to_create=task.files_to_create,
+        files_to_modify=task.files_to_modify,
+        acceptance_criteria=task.acceptance_criteria,
+        complexity_score=_complexity_to_score(task.estimated_complexity),
+        created_at=task.created_at.isoformat() if task.created_at else None,
+        started_at=None,  # Not tracked in repository yet
+        completed_at=None,  # Not tracked in repository yet
+        error=task.error,
+    )
 
 
 @router.get(
@@ -71,52 +85,48 @@ def _get_task_status(task: dict) -> TaskStatus:
     responses={404: {"model": ErrorResponse}},
 )
 async def list_tasks(
+    project_name: str,
     project_dir: Path = Depends(get_project_dir),
     status: Optional[str] = Query(default=None, description="Filter by status"),
 ) -> TaskListResponse:
-    """List all tasks."""
-    tasks_data = _load_tasks_from_workflow(project_dir)
+    """List all tasks from SurrealDB."""
+    repo = get_task_repository(project_name)
 
-    # Convert to TaskInfo
-    tasks = []
-    for t in tasks_data:
-        task_status = _get_task_status(t)
-        if status and task_status.value != status:
-            continue
+    try:
+        # Fetch tasks from database
+        if status:
+            db_tasks = await repo.get_by_status(status)
+        else:
+            db_tasks = await repo.find_all(limit=1000)
 
-        tasks.append(
-            TaskInfo(
-                id=t.get("id", ""),
-                title=t.get("title", t.get("name", "")),
-                description=t.get("description"),
-                status=task_status,
-                priority=t.get("priority", 0),
-                dependencies=t.get("dependencies", t.get("depends_on", [])),
-                files_to_create=t.get("files_to_create", []),
-                files_to_modify=t.get("files_to_modify", []),
-                acceptance_criteria=t.get("acceptance_criteria", []),
-                complexity_score=t.get("complexity_score"),
-                created_at=t.get("created_at"),
-                started_at=t.get("started_at"),
-                completed_at=t.get("completed_at"),
-                error=t.get("error"),
-            )
+        # Convert to TaskInfo
+        tasks = [_task_to_task_info(t) for t in db_tasks]
+
+        # Get progress summary from database
+        progress = await repo.get_progress()
+
+        return TaskListResponse(
+            tasks=tasks,
+            total=progress.get("total", len(tasks)),
+            completed=progress.get("completed", 0),
+            in_progress=progress.get("in_progress", 0),
+            pending=progress.get("pending", 0),
+            failed=progress.get("failed", 0),
         )
+    except Exception as e:
+        # Log error but return empty response rather than failing
+        import logging
 
-    # Calculate counts
-    completed = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
-    in_progress = sum(1 for t in tasks if t.status == TaskStatus.IN_PROGRESS)
-    pending = sum(1 for t in tasks if t.status == TaskStatus.PENDING)
-    failed = sum(1 for t in tasks if t.status == TaskStatus.FAILED)
-
-    return TaskListResponse(
-        tasks=tasks,
-        total=len(tasks),
-        completed=completed,
-        in_progress=in_progress,
-        pending=pending,
-        failed=failed,
-    )
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to fetch tasks from database: {e}")
+        return TaskListResponse(
+            tasks=[],
+            total=0,
+            completed=0,
+            in_progress=0,
+            pending=0,
+            failed=0,
+        )
 
 
 @router.get(
@@ -127,30 +137,22 @@ async def list_tasks(
     responses={404: {"model": ErrorResponse}},
 )
 async def get_task(
+    project_name: str,
     task_id: str,
     project_dir: Path = Depends(get_project_dir),
 ) -> TaskInfo:
-    """Get task details."""
-    tasks_data = _load_tasks_from_workflow(project_dir)
+    """Get task details from SurrealDB."""
+    repo = get_task_repository(project_name)
 
-    for t in tasks_data:
-        if t.get("id") == task_id:
-            return TaskInfo(
-                id=t.get("id", ""),
-                title=t.get("title", t.get("name", "")),
-                description=t.get("description"),
-                status=_get_task_status(t),
-                priority=t.get("priority", 0),
-                dependencies=t.get("dependencies", t.get("depends_on", [])),
-                files_to_create=t.get("files_to_create", []),
-                files_to_modify=t.get("files_to_modify", []),
-                acceptance_criteria=t.get("acceptance_criteria", []),
-                complexity_score=t.get("complexity_score"),
-                created_at=t.get("created_at"),
-                started_at=t.get("started_at"),
-                completed_at=t.get("completed_at"),
-                error=t.get("error"),
-            )
+    try:
+        task = await repo.get_task(task_id)
+        if task:
+            return _task_to_task_info(task)
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to fetch task {task_id} from database: {e}")
 
     raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
 

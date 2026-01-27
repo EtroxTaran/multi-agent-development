@@ -61,30 +61,109 @@ export function useWebSocket(
 
           // Invalidate relevant queries based on event type
           switch (data.type) {
-            case "state_change":
-            case "escalation":
-            case "node_start":
-            case "node_end":
-            case "phase_change":
-              // Refresh status for state changes, phase transitions, and HITL escalation events
-              queryClient.invalidateQueries({
-                queryKey: workflowKeys.status(projectName),
-              });
-              break;
-            case "workflow_complete":
-            case "workflow_error":
-              // Invalidate both status and graph cache on completion/error
-              queryClient.invalidateQueries({
-                queryKey: workflowKeys.status(projectName),
-              });
-              queryClient.invalidateQueries({
-                queryKey: ["workflow", "graph", projectName],
-              });
-              break;
+            // Task events - invalidate task queries
+            case "task_start":
+            case "task_complete":
+            case "task_failed":
             case "action":
               queryClient.invalidateQueries({
                 queryKey: taskKeys.lists(projectName),
               });
+              if (data.data.task_id) {
+                queryClient.invalidateQueries({
+                  queryKey: taskKeys.detail(
+                    projectName,
+                    data.data.task_id as string,
+                  ),
+                });
+              }
+              break;
+
+            // Phase/Node events - invalidate workflow status
+            case "phase_start":
+            case "phase_end":
+            case "phase_change":
+            case "node_start":
+            case "node_end":
+            case "state_change":
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.status(projectName),
+              });
+              break;
+
+            // Workflow lifecycle
+            case "workflow_start":
+            case "workflow_complete":
+            case "workflow_error":
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.status(projectName),
+              });
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.health(projectName),
+              });
+              queryClient.invalidateQueries({
+                queryKey: ["workflow", "graph", projectName],
+              });
+              queryClient.invalidateQueries({
+                queryKey: taskKeys.lists(projectName),
+              });
+              break;
+
+            case "workflow_paused":
+            case "workflow_resumed":
+            case "pause_requested":
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.status(projectName),
+              });
+              break;
+
+            // Errors and escalations
+            case "error_occurred":
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.status(projectName),
+              });
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.health(projectName),
+              });
+              break;
+
+            case "escalation_required":
+            case "escalation":
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.status(projectName),
+              });
+              break;
+
+            // Agent events
+            case "agent_start":
+            case "agent_complete":
+              queryClient.invalidateQueries({
+                queryKey: workflowKeys.health(projectName),
+              });
+              break;
+
+            // Ralph iteration
+            case "ralph_iteration":
+              if (data.data.task_id) {
+                queryClient.invalidateQueries({
+                  queryKey: taskKeys.detail(
+                    projectName,
+                    data.data.task_id as string,
+                  ),
+                });
+              }
+              break;
+
+            // Metrics
+            case "metrics_update":
+              queryClient.invalidateQueries({
+                queryKey: ["budget", projectName],
+              });
+              break;
+
+            case "heartbeat":
+            case "path_decision":
+              // No action needed
               break;
           }
         } catch (e) {
