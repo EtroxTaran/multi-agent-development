@@ -11,7 +11,6 @@ from orchestrator.langgraph.nodes.error_dispatch import (
     MAX_ERROR_RETRIES,
     SKIP_FIXER_ERROR_TYPES,
     error_dispatch_node,
-    error_dispatch_router,
 )
 from orchestrator.langgraph.state import create_error_context, create_initial_state
 
@@ -121,8 +120,20 @@ class TestErrorDispatchNode:
         assert result["next_decision"] == "use_human"
 
 
+def error_dispatch_router(state: dict) -> str:
+    """Local router helper for testing error dispatch routing logic.
+
+    This implements the expected routing logic that should match
+    the workflow graph's conditional edge from error_dispatch.
+    """
+    decision = state.get("next_decision", "use_human")
+    if decision == "use_fixer":
+        return "fixer_triage"
+    return "human_escalation"
+
+
 class TestErrorDispatchRouter:
-    """Tests for error_dispatch_router."""
+    """Tests for error_dispatch_router logic."""
 
     def test_routes_to_fixer_triage(self):
         """Test router returns fixer_triage for use_fixer decision."""

@@ -750,28 +750,60 @@ class BudgetManager:
 
         return sorted(report, key=lambda x: x["spent_usd"], reverse=True)
 
-    def reset_task_spending(self, task_id: str) -> bool:
+    def reset_task_spending(self, task_id: str, hard_delete: bool = False) -> bool:
         """Reset spending for a specific task.
 
-        Note: With DB-based storage, this would require a delete query.
-        For now, this is a no-op as DB records are immutable.
+        By default uses soft delete strategy: creates a reset record with
+        negative cost that zeros out the balance while preserving audit history.
 
         Args:
             task_id: Task identifier
+            hard_delete: If True, permanently delete records (no audit trail)
 
         Returns:
-            True (always succeeds but doesn't actually delete DB records)
+            True if spending was reset, False if no spending existed
         """
-        logger.warning(f"reset_task_spending called for {task_id} - DB records are immutable")
-        return True
+        from orchestrator.storage.async_utils import run_async
 
-    def reset_all(self) -> None:
+        with self._lock:
+            storage = self._get_storage()
+            db = storage._get_db_backend()
+
+            if hard_delete:
+                count = run_async(db.delete_task_records(task_id))
+                logger.info(f"Hard deleted {count} budget records for task {task_id}")
+            else:
+                count = run_async(db.reset_task_spending(task_id))
+                logger.info(f"Reset spending for task {task_id} (soft delete)")
+
+            return count > 0
+
+    def reset_all(self, hard_delete: bool = False) -> int:
         """Reset all spending records.
 
-        Note: With DB-based storage, this would require a delete query.
-        For now, this is a no-op as DB records are immutable.
+        By default uses soft delete strategy: creates reset records with
+        negative costs that zero out all balances while preserving audit history.
+
+        Args:
+            hard_delete: If True, permanently delete all records (no audit trail)
+
+        Returns:
+            Number of tasks/records reset
         """
-        logger.warning("reset_all called - DB records are immutable")
+        from orchestrator.storage.async_utils import run_async
+
+        with self._lock:
+            storage = self._get_storage()
+            db = storage._get_db_backend()
+
+            if hard_delete:
+                count = run_async(db.delete_all_records())
+                logger.warning(f"Hard deleted {count} budget records")
+            else:
+                count = run_async(db.reset_all_spending())
+                logger.info(f"Reset spending for {count} tasks (soft delete)")
+
+            return count
 
 
 def estimate_cost(

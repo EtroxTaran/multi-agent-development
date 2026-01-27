@@ -55,6 +55,6 @@ class MigrationLangGraphPersistence(BaseMigration):
         await ctx.execute(self.SCHEMA)
 
     async def down(self, ctx: MigrationContext) -> None:
-        """Rollback."""
-        await ctx.execute("REMOVE TABLE graph_checkpoints")
-        await ctx.execute("REMOVE TABLE graph_writes")
+        """Rollback by removing LangGraph persistence tables."""
+        await ctx.execute("REMOVE TABLE IF EXISTS graph_writes")
+        await ctx.execute("REMOVE TABLE IF EXISTS graph_checkpoints")

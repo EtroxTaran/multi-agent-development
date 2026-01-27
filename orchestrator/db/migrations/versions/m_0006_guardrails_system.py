@@ -94,8 +94,8 @@ class MigrationGuardrailsSystem(BaseMigration):
         await ctx.execute(self.SCHEMA)
 
     async def down(self, ctx: MigrationContext) -> None:
-        """Rollback."""
-        await ctx.execute("REMOVE TABLE collection_items")
-        await ctx.execute("REMOVE TABLE collection_tags")
-        await ctx.execute("REMOVE TABLE project_guardrails")
-        await ctx.execute("REMOVE TABLE gap_analysis_results")
+        """Rollback by removing guardrails system tables."""
+        await ctx.execute("REMOVE TABLE IF EXISTS gap_analysis_results")
+        await ctx.execute("REMOVE TABLE IF EXISTS project_guardrails")
+        await ctx.execute("REMOVE TABLE IF EXISTS collection_tags")
+        await ctx.execute("REMOVE TABLE IF EXISTS collection_items")

@@ -41,24 +41,52 @@ class TestValidationFanIn:
 
     @pytest.mark.asyncio
     async def test_missing_cursor_feedback(self, workflow_state_phase_2, gemini_feedback_approved):
-        """Test fan-in with missing cursor feedback."""
+        """Test fan-in with missing cursor feedback when single-agent fallback is disabled."""
         workflow_state_phase_2["validation_feedback"] = {
             "gemini": gemini_feedback_approved,
         }
 
-        result = await validation_fan_in_node(workflow_state_phase_2)
+        # Mock review config to disable single-agent fallback
+        mock_config = type(
+            "MockReviewConfig",
+            (),
+            {
+                "allow_single_agent_approval": False,
+                "single_agent_score_penalty": 1.0,
+                "single_agent_minimum_score": 6.0,
+            },
+        )()
+
+        with patch(
+            "orchestrator.langgraph.nodes.validation.get_review_config", return_value=mock_config
+        ):
+            result = await validation_fan_in_node(workflow_state_phase_2)
 
         assert "errors" in result
         assert "cursor" in str(result["errors"])
 
     @pytest.mark.asyncio
     async def test_missing_gemini_feedback(self, workflow_state_phase_2, cursor_feedback_approved):
-        """Test fan-in with missing gemini feedback."""
+        """Test fan-in with missing gemini feedback when single-agent fallback is disabled."""
         workflow_state_phase_2["validation_feedback"] = {
             "cursor": cursor_feedback_approved,
         }
 
-        result = await validation_fan_in_node(workflow_state_phase_2)
+        # Mock review config to disable single-agent fallback
+        mock_config = type(
+            "MockReviewConfig",
+            (),
+            {
+                "allow_single_agent_approval": False,
+                "single_agent_score_penalty": 1.0,
+                "single_agent_minimum_score": 6.0,
+            },
+        )()
+
+        with patch(
+            "orchestrator.langgraph.nodes.validation.get_review_config", return_value=mock_config
+        ):
+            result = await validation_fan_in_node(workflow_state_phase_2)
 
         assert "errors" in result
         assert "gemini" in str(result["errors"])

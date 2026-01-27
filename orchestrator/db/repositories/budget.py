@@ -354,6 +354,128 @@ class BudgetRepository(BaseRepository[BudgetRecord]):
                 for r in results
             ]
 
+    async def reset_task_spending(self, task_id: str) -> int:
+        """Reset (delete) all spending records for a specific task.
+
+        Uses soft delete strategy: creates a reset record with negative cost
+        that zeroes out the balance while preserving the audit history.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Number of records affected (always 1 if task had spending)
+        """
+        # Get current task spending
+        current_spent = await self.get_task_cost(task_id)
+
+        if current_spent <= 0:
+            logger.debug(f"No spending to reset for task {task_id}")
+            return 0
+
+        # Create a reset record with negative cost to zero out the balance
+        # This preserves audit trail while effectively resetting spending
+        reset_record = BudgetRecord(
+            task_id=task_id,
+            agent="system_reset",
+            cost_usd=-current_spent,  # Negative to cancel out
+            model=None,
+            tokens_input=None,
+            tokens_output=None,
+            created_at=datetime.now(),
+        )
+
+        await self.create(reset_record.to_dict())
+        logger.info(f"Reset spending for task {task_id}: ${current_spent:.4f} zeroed out")
+
+        return 1
+
+    async def reset_all_spending(self) -> int:
+        """Reset (delete) all spending records.
+
+        Uses soft delete strategy: creates reset records with negative costs
+        that zero out all task balances while preserving the audit history.
+
+        Returns:
+            Number of tasks reset
+        """
+        # Get all task spending
+        summary = await self.get_summary()
+
+        if not summary.by_task:
+            logger.debug("No spending to reset")
+            return 0
+
+        reset_count = 0
+        for task_id, spent in summary.by_task.items():
+            if spent > 0:
+                # Create reset record for each task
+                reset_record = BudgetRecord(
+                    task_id=task_id,
+                    agent="system_reset",
+                    cost_usd=-spent,
+                    model=None,
+                    tokens_input=None,
+                    tokens_output=None,
+                    created_at=datetime.now(),
+                )
+                await self.create(reset_record.to_dict())
+                reset_count += 1
+
+        # Also handle any spending not associated with a task
+        total_without_task = summary.total_cost_usd - sum(summary.by_task.values())
+        if total_without_task > 0:
+            reset_record = BudgetRecord(
+                task_id=None,
+                agent="system_reset",
+                cost_usd=-total_without_task,
+                model=None,
+                tokens_input=None,
+                tokens_output=None,
+                created_at=datetime.now(),
+            )
+            await self.create(reset_record.to_dict())
+            reset_count += 1
+
+        logger.info(f"Reset all spending: {reset_count} tasks zeroed out")
+        return reset_count
+
+    async def delete_task_records(self, task_id: str) -> int:
+        """Permanently delete all spending records for a task (hard delete).
+
+        WARNING: This permanently removes data and cannot be undone.
+        Prefer reset_task_spending() for audit trail preservation.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Number of records deleted
+        """
+        async with get_connection(self.project_name) as conn:
+            results = await conn.query(
+                "DELETE FROM budget_records WHERE task_id = $task_id RETURN BEFORE",
+                {"task_id": task_id},
+            )
+            count = len(results) if results else 0
+            logger.warning(f"Hard deleted {count} budget records for task {task_id}")
+            return count
+
+    async def delete_all_records(self) -> int:
+        """Permanently delete all spending records (hard delete).
+
+        WARNING: This permanently removes ALL data and cannot be undone.
+        Prefer reset_all_spending() for audit trail preservation.
+
+        Returns:
+            Number of records deleted
+        """
+        async with get_connection(self.project_name) as conn:
+            results = await conn.query("DELETE FROM budget_records RETURN BEFORE")
+            count = len(results) if results else 0
+            logger.warning(f"Hard deleted {count} budget records")
+            return count
+
 
 # Global repository cache
 _budget_repos: dict[str, BudgetRepository] = {}

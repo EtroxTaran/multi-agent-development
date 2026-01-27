@@ -1,6 +1,11 @@
 """
 Fixtures for orchestrator-api tests.
+
+Note: These tests require the orchestrator-api FastAPI app to be present.
+Skip if not available.
 """
+
+from __future__ import annotations
 
 import json
 import shutil
@@ -11,19 +16,35 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
 
-# Add orchestrator-api to path
+# Add orchestrator-api to path if it exists
 CONDUCTOR_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(CONDUCTOR_ROOT / "orchestrator-api"))
-sys.path.insert(0, str(CONDUCTOR_ROOT))
+orchestrator_api_path = CONDUCTOR_ROOT / "orchestrator-api"
 
-from main import app
+HAS_API = False
+app = None
+TestClient = None
+
+if orchestrator_api_path.exists():
+    sys.path.insert(0, str(orchestrator_api_path))
+    sys.path.insert(0, str(CONDUCTOR_ROOT))
+    try:
+        from fastapi.testclient import TestClient
+        from main import app
+
+        HAS_API = True
+    except ImportError:
+        pass
+
+# Skip all tests in this module if API not available
+pytestmark = pytest.mark.skipif(not HAS_API, reason="orchestrator-api not available")
 
 
 @pytest.fixture
-def test_client() -> TestClient:
+def test_client():
     """Create a test client for the FastAPI app."""
+    if not HAS_API or TestClient is None:
+        pytest.skip("orchestrator-api not available")
     return TestClient(app)
 
 

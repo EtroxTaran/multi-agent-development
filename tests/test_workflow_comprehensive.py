@@ -309,7 +309,7 @@ class TestValidationFanInRobustness:
 
     @pytest.mark.asyncio
     async def test_handles_missing_cursor_feedback(self, mock_project_dir):
-        """Should handle when only gemini feedback is present."""
+        """Should handle when only gemini feedback is present and single-agent fallback is disabled."""
         from orchestrator.langgraph.nodes.validation import validation_fan_in_node
 
         gemini_feedback = AgentFeedback(
@@ -326,7 +326,21 @@ class TestValidationFanInRobustness:
             "phase_status": {},
         }
 
-        result = await validation_fan_in_node(state)
+        # Mock review config to disable single-agent fallback
+        mock_config = type(
+            "MockReviewConfig",
+            (),
+            {
+                "allow_single_agent_approval": False,
+                "single_agent_score_penalty": 1.0,
+                "single_agent_minimum_score": 6.0,
+            },
+        )()
+
+        with patch(
+            "orchestrator.langgraph.nodes.validation.get_review_config", return_value=mock_config
+        ):
+            result = await validation_fan_in_node(state)
 
         # Should indicate missing feedback
         assert result.get("next_decision") == "retry"
@@ -334,7 +348,7 @@ class TestValidationFanInRobustness:
 
     @pytest.mark.asyncio
     async def test_handles_missing_gemini_feedback(self, mock_project_dir):
-        """Should handle when only cursor feedback is present."""
+        """Should handle when only cursor feedback is present and single-agent fallback is disabled."""
         from orchestrator.langgraph.nodes.validation import validation_fan_in_node
 
         cursor_feedback = AgentFeedback(
@@ -351,7 +365,21 @@ class TestValidationFanInRobustness:
             "phase_status": {},
         }
 
-        result = await validation_fan_in_node(state)
+        # Mock review config to disable single-agent fallback
+        mock_config = type(
+            "MockReviewConfig",
+            (),
+            {
+                "allow_single_agent_approval": False,
+                "single_agent_score_penalty": 1.0,
+                "single_agent_minimum_score": 6.0,
+            },
+        )()
+
+        with patch(
+            "orchestrator.langgraph.nodes.validation.get_review_config", return_value=mock_config
+        ):
+            result = await validation_fan_in_node(state)
 
         # Should indicate missing feedback
         assert result.get("next_decision") == "retry"

@@ -397,13 +397,27 @@ class TestVerificationFanIn:
     async def test_missing_feedback_returns_error(
         self, workflow_state_phase_4, cursor_feedback_approved
     ):
-        """Test missing feedback returns error."""
+        """Test missing feedback returns error when single-agent fallback is disabled."""
         workflow_state_phase_4["verification_feedback"] = {
             "cursor": cursor_feedback_approved,
             # gemini missing
         }
 
-        result = await verification_fan_in_node(workflow_state_phase_4)
+        # Mock review config to disable single-agent fallback
+        mock_config = type(
+            "MockReviewConfig",
+            (),
+            {
+                "allow_single_agent_approval": False,
+                "single_agent_score_penalty": 1.0,
+                "single_agent_minimum_score": 7.0,
+            },
+        )()
+
+        with patch(
+            "orchestrator.langgraph.nodes.verification.get_review_config", return_value=mock_config
+        ):
+            result = await verification_fan_in_node(workflow_state_phase_4)
 
         assert "errors" in result
         assert result["next_decision"] == "retry"

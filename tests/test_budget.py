@@ -1,6 +1,7 @@
 """Unit tests for BudgetManager."""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -22,10 +23,116 @@ def temp_project(tmp_path: Path) -> Path:
     return project
 
 
+def create_mock_budget_storage():
+    """Create a mock BudgetStorageAdapter with in-memory tracking."""
+    mock_storage = MagicMock()
+
+    # In-memory data store
+    mock_storage._records = []
+    mock_storage.project_budget_usd = 50.0
+    mock_storage.task_budget_usd = 5.0
+    mock_storage.invocation_budget_usd = 1.0
+
+    # Mock DB backend
+    mock_db = MagicMock()
+    mock_storage._get_db_backend = MagicMock(return_value=mock_db)
+
+    def record_spend(task_id, agent, cost_usd, model=None, tokens_input=None, tokens_output=None):
+        record = MagicMock()
+        record.id = f"spend-{len(mock_storage._records)}"
+        record.task_id = task_id
+        record.agent = agent
+        record.cost_usd = cost_usd
+        record.model = model
+        mock_storage._records.append(record)
+        return record
+
+    def get_task_spent(task_id):
+        return sum(r.cost_usd for r in mock_storage._records if r.task_id == task_id)
+
+    def get_total_spent():
+        return sum(r.cost_usd for r in mock_storage._records)
+
+    def get_task_ids():
+        return list({r.task_id for r in mock_storage._records})
+
+    def get_all_records():
+        return mock_storage._records
+
+    def get_project_remaining():
+        total = sum(r.cost_usd for r in mock_storage._records)
+        return mock_storage.project_budget_usd - total
+
+    def get_summary():
+        summary = MagicMock()
+        summary.total_cost_usd = sum(r.cost_usd for r in mock_storage._records)
+        # Build by_task dict
+        by_task = {}
+        for r in mock_storage._records:
+            if r.task_id not in by_task:
+                by_task[r.task_id] = 0.0
+            by_task[r.task_id] += r.cost_usd
+        summary.by_task = by_task
+        summary.by_agent = {}
+        summary.record_count = len(mock_storage._records)
+        summary.total_tokens_input = 0
+        summary.total_tokens_output = 0
+        summary.by_model = {}
+        return summary
+
+    mock_storage.record_spend = MagicMock(side_effect=record_spend)
+    mock_storage.get_task_spent = MagicMock(side_effect=get_task_spent)
+    mock_storage.get_total_spent = MagicMock(side_effect=get_total_spent)
+    mock_storage.get_task_ids = MagicMock(side_effect=get_task_ids)
+    mock_storage.get_all_records = MagicMock(side_effect=get_all_records)
+    mock_storage.get_project_remaining = MagicMock(side_effect=get_project_remaining)
+    mock_storage.get_summary = MagicMock(side_effect=get_summary)
+
+    # Mock async reset methods for db backend
+    async def mock_reset_task(task_id):
+        # Add negative record to zero out spending
+        spent = sum(r.cost_usd for r in mock_storage._records if r.task_id == task_id)
+        if spent > 0:
+            record = MagicMock()
+            record.task_id = task_id
+            record.agent = "system_reset"
+            record.cost_usd = -spent
+            mock_storage._records.append(record)
+            return 1
+        return 0
+
+    async def mock_delete_task(task_id):
+        initial_count = len(mock_storage._records)
+        mock_storage._records = [r for r in mock_storage._records if r.task_id != task_id]
+        return initial_count - len(mock_storage._records)
+
+    async def mock_reset_all():
+        task_ids = list({r.task_id for r in mock_storage._records if r.cost_usd > 0})
+        for tid in task_ids:
+            await mock_reset_task(tid)
+        return len(task_ids)
+
+    async def mock_delete_all():
+        count = len(mock_storage._records)
+        mock_storage._records = []
+        return count
+
+    mock_db.reset_task_spending = mock_reset_task
+    mock_db.delete_task_records = mock_delete_task
+    mock_db.reset_all_spending = mock_reset_all
+    mock_db.delete_all_records = mock_delete_all
+
+    return mock_storage
+
+
 @pytest.fixture
 def budget_manager(temp_project: Path) -> BudgetManager:
-    """Create a budget manager for testing."""
-    return BudgetManager(temp_project)
+    """Create a budget manager for testing with mocked storage."""
+    manager = BudgetManager(temp_project)
+    # Replace storage with mock
+    mock_storage = create_mock_budget_storage()
+    manager._storage = mock_storage
+    return manager
 
 
 class TestSpendRecord:
@@ -234,33 +341,70 @@ class TestBudgetManager:
         assert report[2]["task_id"] == "T2"
 
     def test_reset_task_spending(self, budget_manager: BudgetManager):
-        """Test resetting task spending."""
+        """Test resetting task spending using soft delete."""
         budget_manager.record_spend("T1", "claude", 5.0)
         budget_manager.record_spend("T2", "claude", 3.0)
 
         result = budget_manager.reset_task_spending("T1")
 
         assert result is True
+        # Soft delete creates a negative record that zeros out the balance
+        assert budget_manager.get_task_spent("T1") == 0.0
+        assert budget_manager.get_task_spent("T2") == 3.0
+
+    def test_reset_task_spending_no_spending(self, budget_manager: BudgetManager):
+        """Test resetting task with no spending returns False."""
+        result = budget_manager.reset_task_spending("T1")
+        assert result is False
+
+    def test_reset_task_spending_hard_delete(self, budget_manager: BudgetManager):
+        """Test hard delete removes records permanently."""
+        budget_manager.record_spend("T1", "claude", 5.0)
+        budget_manager.record_spend("T2", "claude", 3.0)
+
+        result = budget_manager.reset_task_spending("T1", hard_delete=True)
+
+        assert result is True
         assert budget_manager.get_task_spent("T1") == 0.0
         assert budget_manager.get_task_spent("T2") == 3.0
 
     def test_reset_all(self, budget_manager: BudgetManager):
-        """Test resetting all spending."""
+        """Test resetting all spending using soft delete."""
         budget_manager.set_project_budget(100.0)
         budget_manager.record_spend("T1", "claude", 10.0)
         budget_manager.record_spend("T2", "claude", 5.0)
 
-        budget_manager.reset_all()
+        count = budget_manager.reset_all()
 
+        assert count == 2  # Two tasks were reset
+        status = budget_manager.get_budget_status()
+        # Soft delete creates negative records, so total becomes 0
+        assert status["total_spent_usd"] == 0.0
+        # Config should be preserved
+        assert status["project_budget_usd"] == 100.0
+
+    def test_reset_all_hard_delete(self, budget_manager: BudgetManager):
+        """Test hard delete removes all records permanently."""
+        budget_manager.set_project_budget(100.0)
+        budget_manager.record_spend("T1", "claude", 10.0)
+        budget_manager.record_spend("T2", "claude", 5.0)
+
+        count = budget_manager.reset_all(hard_delete=True)
+
+        assert count >= 2  # At least 2 records deleted
         status = budget_manager.get_budget_status()
         assert status["total_spent_usd"] == 0.0
-        assert status["task_count"] == 0
         assert status["record_count"] == 0
         # Config should be preserved
         assert status["project_budget_usd"] == 100.0
 
+    @pytest.mark.db_integration
     def test_budget_persistence(self, temp_project: Path):
-        """Test that budget state persists."""
+        """Test that budget state persists.
+
+        This test requires a real SurrealDB connection.
+        """
+        pytest.skip("Integration test - requires SurrealDB")
         manager1 = BudgetManager(temp_project)
         manager1.set_project_budget(50.0)
         manager1.record_spend("T1", "claude", 10.0)
