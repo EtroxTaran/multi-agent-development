@@ -24,6 +24,13 @@ import {
 import { cn, getStatusColor } from "@/lib/utils";
 import type { TaskInfo } from "@/types";
 
+function getComplexityLevel(score?: number): string {
+  if (score === undefined) return "";
+  if (score <= 3) return "low";
+  if (score <= 6) return "medium";
+  return "high";
+}
+
 interface TaskBoardProps {
   projectName: string;
 }
@@ -90,7 +97,8 @@ export function TaskBoard({ projectName }: TaskBoardProps) {
       // Complexity filter
       const matchesComplexity =
         complexityFilter === "all" ||
-        (task.complexity || "").toLowerCase() === complexityFilter;
+        getComplexityLevel(task.complexity_score).toLowerCase() ===
+          complexityFilter;
 
       return matchesSearch && matchesComplexity;
     });

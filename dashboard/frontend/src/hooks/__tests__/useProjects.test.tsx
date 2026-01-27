@@ -176,8 +176,9 @@ describe("useProject", () => {
     expect(result.current.data).toEqual(
       expect.objectContaining({
         name: "test-project",
-        product_md_valid: true,
-        has_context_files: true,
+        path: "/projects/test-project",
+        files: expect.any(Object),
+        phases: expect.any(Object),
       }),
     );
   });
@@ -300,7 +301,9 @@ describe("useInitProject", () => {
       }
     });
 
-    expect(result.current.isError).toBe(true);
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
   });
 });
 

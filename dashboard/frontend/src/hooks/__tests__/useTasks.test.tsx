@@ -156,7 +156,7 @@ describe("useTask", () => {
       title: expect.any(String),
       description: expect.any(String),
       status: expect.any(String),
-      complexity: expect.any(String),
+      complexity_score: expect.any(Number),
       priority: expect.any(Number),
       files_to_create: expect.any(Array),
       files_to_modify: expect.any(Array),

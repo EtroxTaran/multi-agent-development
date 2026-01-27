@@ -19,31 +19,29 @@ export const mockProjects: ProjectSummary[] = [
   {
     name: "test-project",
     path: "/projects/test-project",
-    description: "Test project for testing",
     workflow_status: "not_started",
     current_phase: 0,
-    git_info: {
-      current_branch: "main",
-      commit_hash: "abc123",
-      is_dirty: false,
-    },
+    has_documents: true,
+    has_product_spec: true,
+    has_claude_md: true,
+    has_gemini_md: false,
+    has_cursor_rules: false,
   },
   {
     name: "active-project",
     path: "/projects/active-project",
-    description: "Active project for testing",
     workflow_status: "in_progress",
     current_phase: 2,
-    git_info: {
-      current_branch: "feature/test",
-      commit_hash: "def456",
-      is_dirty: true,
-    },
+    has_documents: true,
+    has_product_spec: true,
+    has_claude_md: true,
+    has_gemini_md: true,
+    has_cursor_rules: true,
   },
 ];
 
 export const mockWorkflowStatus: WorkflowStatusResponse = {
-  status: "idle",
+  status: "not_started",
   mode: "langgraph",
   current_phase: 1,
   phase_status: {
@@ -57,13 +55,19 @@ export const mockWorkflowStatus: WorkflowStatusResponse = {
 
 export const mockWorkflowHealth: WorkflowHealthResponse = {
   status: "healthy",
-  db_connected: true,
-  agents_available: {
+  project: "test-project",
+  current_phase: 1,
+  phase_status: "in_progress",
+  iteration_count: 3,
+  last_updated: new Date().toISOString(),
+  agents: {
     claude: true,
     cursor: true,
     gemini: false,
   },
-  errors: [],
+  langgraph_enabled: true,
+  has_context: true,
+  total_commits: 5,
 };
 
 export const mockTasks: TaskInfo[] = [
@@ -72,7 +76,7 @@ export const mockTasks: TaskInfo[] = [
     title: "Implement feature A",
     description: "Implement the first feature",
     status: "completed",
-    complexity: "low",
+    complexity_score: 2.5,
     priority: 1,
     files_to_create: ["src/featureA.ts"],
     files_to_modify: [],
@@ -84,7 +88,7 @@ export const mockTasks: TaskInfo[] = [
     title: "Implement feature B",
     description: "Implement the second feature",
     status: "in_progress",
-    complexity: "medium",
+    complexity_score: 5.5,
     priority: 2,
     files_to_create: [],
     files_to_modify: ["src/index.ts"],
@@ -94,25 +98,49 @@ export const mockTasks: TaskInfo[] = [
 ];
 
 export const mockAgentStatus: AgentStatusResponse = {
-  agents: {
-    claude: { available: true, last_active: new Date().toISOString() },
-    cursor: { available: true, last_active: new Date().toISOString() },
-    gemini: { available: false, last_active: null },
-  },
-  active_task_id: "task-2",
-  active_agent: "claude",
+  agents: [
+    {
+      agent: "claude",
+      available: true,
+      last_invocation: new Date().toISOString(),
+      total_invocations: 10,
+      success_rate: 0.9,
+      avg_duration_seconds: 45.2,
+      total_cost_usd: 1.5,
+    },
+    {
+      agent: "cursor",
+      available: true,
+      last_invocation: new Date().toISOString(),
+      total_invocations: 8,
+      success_rate: 0.85,
+      avg_duration_seconds: 30.1,
+      total_cost_usd: 0.8,
+    },
+    {
+      agent: "gemini",
+      available: false,
+      total_invocations: 2,
+      success_rate: 0.5,
+      avg_duration_seconds: 60.0,
+      total_cost_usd: 0.3,
+    },
+  ],
 };
 
 export const mockBudgetStatus: BudgetStatus = {
-  project_budget: {
-    limit_usd: 10.0,
-    spent_usd: 2.5,
-    remaining_usd: 7.5,
+  total_spent_usd: 2.5,
+  project_budget_usd: 10.0,
+  project_remaining_usd: 7.5,
+  project_used_percent: 25.0,
+  task_count: 2,
+  record_count: 10,
+  task_spent: {
+    "task-1": 1.5,
+    "task-2": 1.0,
   },
-  task_budgets: {
-    "task-1": { limit_usd: 2.0, spent_usd: 1.5, remaining_usd: 0.5 },
-    "task-2": { limit_usd: 3.0, spent_usd: 1.0, remaining_usd: 2.0 },
-  },
+  updated_at: new Date().toISOString(),
+  enabled: true,
 };
 
 // Handlers
@@ -128,9 +156,17 @@ export const handlers = [
       return HttpResponse.json({ error: "Project not found" }, { status: 404 });
     }
     return HttpResponse.json({
-      ...project,
-      product_md_valid: true,
-      has_context_files: true,
+      name: project.name,
+      path: project.path,
+      files: {
+        "CLAUDE.md": project.has_claude_md,
+        "GEMINI.md": project.has_gemini_md,
+        "Docs/PRODUCT.md": project.has_product_spec,
+      },
+      phases: {
+        phase_1: { exists: true, has_output: true },
+        phase_2: { exists: true, has_output: false },
+      },
     } as ProjectStatus);
   }),
 

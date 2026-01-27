@@ -2,7 +2,7 @@
  * Tests for useWorkflow hooks
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -44,7 +44,7 @@ describe("useWorkflowStatus", () => {
     });
 
     expect(result.current.data).toEqual({
-      status: "idle",
+      status: "not_started",
       mode: "langgraph",
       current_phase: 1,
       phase_status: expect.any(Object),
@@ -95,9 +95,15 @@ describe("useWorkflowHealth", () => {
 
     expect(result.current.data).toEqual({
       status: "healthy",
-      db_connected: true,
-      agents_available: expect.any(Object),
-      errors: [],
+      project: "test-project",
+      current_phase: 1,
+      phase_status: "in_progress",
+      iteration_count: 3,
+      last_updated: expect.any(String),
+      agents: expect.any(Object),
+      langgraph_enabled: true,
+      has_context: true,
+      total_commits: 5,
     });
   });
 });

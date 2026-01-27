@@ -13,8 +13,6 @@ import {
   useRespondToEscalation,
   chatKeys,
 } from "../useChat";
-import { server } from "@/test/mocks/server";
-import { http, HttpResponse } from "msw";
 
 // Mock createChatWebSocket
 vi.mock("@/lib/api", async (importOriginal) => {
