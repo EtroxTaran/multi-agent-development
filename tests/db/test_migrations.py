@@ -150,28 +150,32 @@ class TestMigrationContext:
     async def test_table_exists(self, ctx, mock_conn):
         """Test table_exists method."""
         mock_conn.query.return_value = [{"fields": {}, "indexes": {}}]
-        result = await ctx.table_exists("test_table")
+        # Use a real table name from the allowlist
+        result = await ctx.table_exists("tasks")
         assert result is True
 
     @pytest.mark.asyncio
     async def test_table_not_exists(self, ctx, mock_conn):
         """Test table_exists when table doesn't exist."""
         mock_conn.query.side_effect = Exception("Table not found")
-        result = await ctx.table_exists("nonexistent")
+        # Use a real table name from the allowlist that doesn't exist in DB
+        result = await ctx.table_exists("workflow_state")
         assert result is False
 
     @pytest.mark.asyncio
     async def test_field_exists(self, ctx, mock_conn):
         """Test field_exists method."""
         mock_conn.query.return_value = [{"fields": {"name": "string"}}]
-        result = await ctx.field_exists("test_table", "name")
+        # Use real table and field names from the allowlist
+        result = await ctx.field_exists("tasks", "name")
         assert result is True
 
     @pytest.mark.asyncio
     async def test_index_exists(self, ctx, mock_conn):
         """Test index_exists method."""
         mock_conn.query.return_value = [{"indexes": {"idx_name": "..."}}]
-        result = await ctx.index_exists("test_table", "idx_name")
+        # Use a real table name from the allowlist
+        result = await ctx.index_exists("tasks", "idx_name")
         assert result is True
 
     def test_executed_statements_tracking(self, ctx):
