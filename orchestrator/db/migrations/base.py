@@ -15,6 +15,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
+from ...security import validate_sql_table
 from ..connection import Connection
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,8 @@ class MigrationContext:
             return True
 
         try:
-            result = await self.conn.query(f"INFO FOR TABLE {table}")
+            validated_table = validate_sql_table(table)
+            result = await self.conn.query(f"INFO FOR TABLE {validated_table}")
             return bool(result)
         except Exception:
             return False
@@ -129,7 +131,8 @@ class MigrationContext:
             return True
 
         try:
-            result = await self.conn.query(f"INFO FOR TABLE {table}")
+            validated_table = validate_sql_table(table)
+            result = await self.conn.query(f"INFO FOR TABLE {validated_table}")
             if result and isinstance(result, list) and result[0]:
                 fields = result[0].get("fields", {})
                 return field_name in fields
@@ -151,7 +154,8 @@ class MigrationContext:
             return True
 
         try:
-            result = await self.conn.query(f"INFO FOR TABLE {table}")
+            validated_table = validate_sql_table(table)
+            result = await self.conn.query(f"INFO FOR TABLE {validated_table}")
             if result and isinstance(result, list) and result[0]:
                 indexes = result[0].get("indexes", {})
                 return index_name in indexes

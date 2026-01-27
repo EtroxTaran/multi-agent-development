@@ -7,11 +7,14 @@ and validates against configurable thresholds.
 import json
 import logging
 import re
+import shlex
 import subprocess
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Optional
+
+from ..security import validate_coverage_command
 
 logger = logging.getLogger(__name__)
 
@@ -159,17 +162,30 @@ class CoverageChecker:
         )
 
     def _run_coverage_command(self) -> None:
-        """Run the coverage command for the project."""
+        """Run the coverage command for the project safely.
+
+        Validates the command against an allowlist and uses list-form
+        execution to prevent command injection.
+        """
         coverage_cmd = self._detect_coverage_command()
         if not coverage_cmd:
             logger.warning("Could not detect coverage command")
             return
 
+        # Validate the coverage command against allowlist
+        try:
+            validate_coverage_command(coverage_cmd)
+        except Exception as e:
+            logger.warning(f"Coverage command validation failed: {e}")
+            return
+
         logger.info(f"Running coverage: {coverage_cmd}")
         try:
+            # Use shlex.split to safely parse the command into a list
+            cmd_parts = shlex.split(coverage_cmd)
             subprocess.run(
-                coverage_cmd,
-                shell=True,
+                cmd_parts,
+                shell=False,
                 cwd=self.project_dir,
                 timeout=300,
                 capture_output=True,

@@ -49,11 +49,31 @@ fi
 # Read prompt from file
 PROMPT=$(cat "$PROMPT_FILE")
 
-# Build context file options
+# File safety check function
+check_file_safety() {
+    local file="$1"
+    # Check if file is a symlink (could point outside expected directory)
+    if [ -L "$file" ]; then
+        echo "Error: '$file' is a symlink - refusing to read for security" >&2
+        return 1
+    fi
+    # Check file size (max 10MB to prevent memory issues)
+    local size
+    size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo 0)
+    if [ "$size" -gt 10485760 ]; then
+        echo "Error: '$file' is too large (>10MB)" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Build context file options using array for safe expansion
 # Cursor reads .cursor/rules automatically, but we can also specify AGENTS.md
-CONTEXT_OPTS=""
+CONTEXT_ARGS=()
 if [ -f "AGENTS.md" ]; then
-    CONTEXT_OPTS="--read AGENTS.md"
+    if check_file_safety "AGENTS.md"; then
+        CONTEXT_ARGS+=("--read" "AGENTS.md")
+    fi
 fi
 
 # Call Cursor CLI with JSON output
@@ -73,7 +93,7 @@ run_cursor() {
         --output-format json \
         --force \
         --model "$model" \
-        $CONTEXT_OPTS \
+        "${CONTEXT_ARGS[@]}" \
         "$PROMPT" \
         > "$OUTPUT_FILE" 2>&1
 }

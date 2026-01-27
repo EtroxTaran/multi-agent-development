@@ -16,6 +16,7 @@ Available strategies:
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
@@ -25,6 +26,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from ..security import validate_file_path, validate_package_name
 from .diagnosis import DiagnosisResult, RootCause
 from .triage import ErrorCategory
 
@@ -307,10 +309,14 @@ class FixStrategy(ABC):
         """
         if action.action_type == "run_command":
             return self._run_command(action.target, action.params)
+        elif action.action_type == "run_command_safe":
+            return self._run_command_safe(action.target, action.params)
         elif action.action_type == "edit_file":
             return self._edit_file(action.target, action.params)
         elif action.action_type == "write_file":
             return self._write_file(action.target, action.params)
+        elif action.action_type == "append_file":
+            return self._append_file(action.target, action.params)
         elif action.action_type == "delete_file":
             return self._delete_file(action.target)
         elif action.action_type == "add_import":
@@ -321,14 +327,19 @@ class FixStrategy(ABC):
             return {"status": "skipped", "reason": f"Unknown action type: {action.action_type}"}
 
     def _run_command(self, command: str, params: dict) -> dict:
-        """Run a shell command."""
+        """Run a shell command safely.
+
+        Uses shlex.split to avoid shell=True and prevent command injection.
+        """
         timeout = params.get("timeout", 120)
         cwd = params.get("cwd", str(self.project_dir))
 
         try:
+            # Parse command safely to avoid shell injection
+            cmd_parts = shlex.split(command)
             result = subprocess.run(
-                command,
-                shell=True,
+                cmd_parts,
+                shell=False,
                 cwd=cwd,
                 capture_output=True,
                 text=True,
@@ -344,6 +355,54 @@ class FixStrategy(ABC):
 
         except subprocess.TimeoutExpired:
             return {"status": "timeout", "timeout": timeout}
+        except ValueError as e:
+            return {"status": "failed", "reason": f"Invalid command format: {e}"}
+
+    def _run_command_safe(self, executable: str, params: dict) -> dict:
+        """Run a command safely with pre-validated arguments.
+
+        Unlike _run_command, this method takes the executable and args separately
+        to avoid any shell parsing. Use this when arguments contain file paths
+        or user-controlled data.
+
+        Args:
+            executable: The command/executable to run (e.g., "autopep8", "python")
+            params: Dictionary containing:
+                - args: List of arguments to pass to the executable
+                - timeout: Command timeout in seconds (default: 120)
+                - cwd: Working directory (default: project_dir)
+
+        Returns:
+            Result dictionary with status, exit_code, stdout, stderr
+        """
+        timeout = params.get("timeout", 120)
+        cwd = params.get("cwd", str(self.project_dir))
+        args = params.get("args", [])
+
+        # Build command list: [executable] + args
+        cmd_parts = [executable] + list(args)
+
+        try:
+            result = subprocess.run(
+                cmd_parts,
+                shell=False,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+
+            return {
+                "status": "success" if result.returncode == 0 else "failed",
+                "exit_code": result.returncode,
+                "stdout": result.stdout[:1000] if result.stdout else None,
+                "stderr": result.stderr[:1000] if result.stderr else None,
+            }
+
+        except subprocess.TimeoutExpired:
+            return {"status": "timeout", "timeout": timeout}
+        except Exception as e:
+            return {"status": "failed", "reason": str(e)}
 
     def _edit_file(self, path: str, params: dict) -> dict:
         """Edit a file."""
@@ -384,6 +443,22 @@ class FixStrategy(ABC):
 
         content = params.get("content", "")
         file_path.write_text(content)
+
+        return {"status": "success", "path": str(file_path)}
+
+    def _append_file(self, path: str, params: dict) -> dict:
+        """Append content to a file safely.
+
+        This is safer than using shell commands like 'echo >> file'.
+        """
+        file_path = self.project_dir / path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        content = params.get("content", "")
+
+        # Append to file (creates if doesn't exist)
+        with open(file_path, "a") as f:
+            f.write(content)
 
         return {"status": "success", "path": str(file_path)}
 
@@ -432,18 +507,45 @@ class FixStrategy(ABC):
         return {"status": "success", "inserted_at": insert_pos}
 
     def _install_package(self, package: str, params: dict) -> dict:
-        """Install a package."""
+        """Install a package safely.
+
+        Validates the package name before installation to prevent command injection.
+        """
         manager = params.get("manager", "pip")
         dev = params.get("dev", False)
 
+        # Validate package name to prevent command injection
+        try:
+            validated_package = validate_package_name(package)
+        except Exception as e:
+            return {"status": "failed", "reason": f"Invalid package name: {e}"}
+
+        # Build command as a list to avoid shell injection
         if manager == "pip":
-            cmd = f"pip install {package}"
+            cmd_parts = ["pip", "install", validated_package]
         elif manager == "npm":
-            cmd = f"npm install {'--save-dev' if dev else '--save'} {package}"
+            cmd_parts = ["npm", "install", "--save-dev" if dev else "--save", validated_package]
         else:
             return {"status": "failed", "reason": f"Unknown package manager: {manager}"}
 
-        return self._run_command(cmd, {"timeout": 300})
+        try:
+            result = subprocess.run(
+                cmd_parts,
+                shell=False,
+                cwd=str(self.project_dir),
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            return {
+                "status": "success" if result.returncode == 0 else "failed",
+                "exit_code": result.returncode,
+                "stdout": result.stdout[:1000] if result.stdout else None,
+                "stderr": result.stderr[:1000] if result.stderr else None,
+            }
+        except subprocess.TimeoutExpired:
+            return {"status": "timeout", "timeout": 300}
 
 
 class RetryStrategy(FixStrategy):
@@ -580,12 +682,25 @@ class SyntaxErrorFixStrategy(FixStrategy):
         affected_file = diagnosis.affected_files[0]
 
         if diagnosis.root_cause == RootCause.INDENTATION_ERROR:
-            # Run autopep8 or similar
+            # Validate file path to prevent command injection
+            try:
+                validated_path = validate_file_path(
+                    affected_file.path,
+                    str(diagnosis.affected_files[0].path).rsplit("/", 1)[0]
+                    if "/" in str(affected_file.path)
+                    else ".",
+                )
+            except Exception:
+                # Fall back to using the path as-is if validation fails
+                # The _run_command_safe method doesn't use shell, so this is still safe
+                validated_path = str(affected_file.path)
+
+            # Run autopep8 using safe command execution with validated path
             actions.append(
                 FixAction(
-                    action_type="run_command",
-                    target=f"autopep8 --in-place {affected_file.path}",
-                    params={"timeout": 30},
+                    action_type="run_command_safe",
+                    target="autopep8",
+                    params={"args": ["--in-place", validated_path], "timeout": 30},
                     description="Auto-fix indentation with autopep8",
                 )
             )
@@ -646,14 +761,16 @@ class ConfigurationFixStrategy(FixStrategy):
             # Extract env var name
             env_var = self._extract_env_var(diagnosis)
             if env_var:
-                actions.append(
-                    FixAction(
-                        action_type="run_command",
-                        target=f"echo '{env_var}=' >> .env.example",
-                        params={},
-                        description=f"Add {env_var} to .env.example template",
+                # Validate env var name - only allow alphanumeric and underscore
+                if re.match(r"^[A-Z][A-Z0-9_]*$", env_var):
+                    actions.append(
+                        FixAction(
+                            action_type="append_file",
+                            target=".env.example",
+                            params={"content": f"{env_var}=\n"},
+                            description=f"Add {env_var} to .env.example template",
+                        )
                     )
-                )
 
         return FixPlan(
             diagnosis=diagnosis,

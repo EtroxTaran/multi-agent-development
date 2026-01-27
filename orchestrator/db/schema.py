@@ -11,6 +11,7 @@ the migration runner to apply versioned migrations.
 import logging
 from typing import Optional
 
+from ..security import validate_sql_field, validate_sql_table
 from .connection import Connection, get_connection
 
 logger = logging.getLogger(__name__)
@@ -482,8 +483,15 @@ async def _migrate_to_flexible_types(conn: Connection) -> None:
     for table, fields in flexible_fields.items():
         for field_name, field_def in fields:
             try:
-                await conn.query(f"REMOVE FIELD IF EXISTS {field_name} ON TABLE {table}")
-                await conn.query(f"DEFINE FIELD {field_name} ON TABLE {table} {field_def}")
+                # Validate table and field names to prevent SQL injection
+                validated_table = validate_sql_table(table)
+                validated_field = validate_sql_field(field_name)
+                await conn.query(
+                    f"REMOVE FIELD IF EXISTS {validated_field} ON TABLE {validated_table}"
+                )
+                await conn.query(
+                    f"DEFINE FIELD {validated_field} ON TABLE {validated_table} {field_def}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to migrate {table}.{field_name}: {e}")
 
@@ -500,18 +508,10 @@ async def apply_schema(conn: Connection) -> bool:
     try:
         # Import here to avoid circular imports
         from .migrations import MigrationRunner
-        from .migrations.base import MigrationContext
 
         # Create a temporary project name from the connection
         # The connection is already scoped to a database
         project_name = getattr(conn, "_database", "default")
-
-        # Create migration context
-        ctx = MigrationContext(
-            conn=conn,
-            project_name=project_name,
-            dry_run=False,
-        )
 
         # Use migration runner
         runner = MigrationRunner(project_name)

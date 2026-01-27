@@ -49,11 +49,31 @@ fi
 # Read prompt from file
 PROMPT=$(cat "$PROMPT_FILE")
 
-# Build context file options
+# File safety check function
+check_file_safety() {
+    local file="$1"
+    # Check if file is a symlink (could point outside expected directory)
+    if [ -L "$file" ]; then
+        echo "Error: '$file' is a symlink - refusing to read for security" >&2
+        return 1
+    fi
+    # Check file size (max 10MB to prevent memory issues)
+    local size
+    size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo 0)
+    if [ "$size" -gt 10485760 ]; then
+        echo "Error: '$file' is too large (>10MB)" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Build context file options using array for safe expansion
 # Gemini CLI reads GEMINI.md automatically, but we can also specify AGENTS.md
-CONTEXT_OPTS=""
+CONTEXT_ARGS=()
 if [ -f "AGENTS.md" ]; then
-    CONTEXT_OPTS="--read AGENTS.md"
+    if check_file_safety "AGENTS.md"; then
+        CONTEXT_ARGS+=("--read" "AGENTS.md")
+    fi
 fi
 
 # Call Gemini CLI
@@ -66,12 +86,14 @@ echo "Calling Gemini CLI with model: $GEMINI_MODEL"
 
 # Create temp file for raw output
 TEMP_OUTPUT=$(mktemp)
-trap "rm -f $TEMP_OUTPUT" EXIT
+# Use single quotes in trap to properly quote the variable at execution time
+trap 'rm -f "$TEMP_OUTPUT"' EXIT
 
 # Run Gemini CLI (note: no --output-format flag available)
 run_gemini() {
     gemini --model "$GEMINI_MODEL" \
         --yolo \
+        "${CONTEXT_ARGS[@]}" \
         "$PROMPT" \
         > "$TEMP_OUTPUT" 2>&1
 }

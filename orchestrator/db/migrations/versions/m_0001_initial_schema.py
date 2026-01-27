@@ -13,6 +13,7 @@ Creates the base schema for the orchestrator database including:
 - Workflow events
 """
 
+from ....security import validate_sql_table
 from ..base import BaseMigration, MigrationContext
 
 
@@ -250,4 +251,5 @@ DEFINE INDEX IF NOT EXISTS idx_events_time ON TABLE workflow_events COLUMNS crea
         ]
 
         for table in tables:
-            await ctx.execute(f"REMOVE TABLE IF EXISTS {table}")
+            validated_table = validate_sql_table(table)
+            await ctx.execute(f"REMOVE TABLE IF EXISTS {validated_table}")

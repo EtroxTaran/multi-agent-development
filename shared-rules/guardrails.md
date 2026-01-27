@@ -1,8 +1,8 @@
 # Guardrails (All Agents)
 
 <!-- SHARED: This file applies to ALL agents -->
-<!-- Version: 2.0 -->
-<!-- Last Updated: 2026-01-21 -->
+<!-- Version: 2.1 -->
+<!-- Last Updated: 2026-01-27 -->
 
 ## Security Guardrails
 
@@ -20,6 +20,119 @@
 - Validate and sanitize all external input
 - Use secure defaults (HTTPS, secure cookies)
 - Follow least privilege principle
+
+---
+
+## Input Validation Guardrails
+
+**Use the `orchestrator.security` module for all input validation.**
+
+### SQL Identifiers
+
+All table and field names must be validated against allowlists before use in queries.
+
+```python
+from orchestrator.security import validate_sql_table, validate_sql_field
+
+# Always validate before query construction
+validated_table = validate_sql_table(table_name)
+validated_field = validate_sql_field(field_name)
+await conn.query(f"INFO FOR TABLE {validated_table}")
+```
+
+### Never Do
+- Interpolate unvalidated identifiers into SQL queries
+- Add new tables without updating `ALLOWED_TABLES`
+- Use string concatenation for SQL construction
+
+### Command Execution
+
+All shell commands must use list-form execution to prevent injection.
+
+```python
+import subprocess
+import shlex
+from orchestrator.security import validate_package_name, validate_file_path
+
+# For package installation - validate first
+validated_pkg = validate_package_name(package)
+subprocess.run(["pip", "install", validated_pkg], shell=False)
+
+# For file operations - validate path
+validated_path = validate_file_path(user_path, base_dir)
+subprocess.run(["autopep8", "--in-place", validated_path], shell=False)
+
+# For arbitrary commands - use shlex.split
+cmd_parts = shlex.split(command_string)
+subprocess.run(cmd_parts, shell=False)
+```
+
+### Never Do
+- Use `shell=True` with dynamic input
+- Interpolate user input directly into command strings
+- Trust package names without validation
+
+### Prompt Construction
+
+User-provided content must be sanitized before inclusion in LLM prompts.
+
+```python
+from orchestrator.security import sanitize_prompt_content, detect_prompt_injection
+from orchestrator.agents.prompts import format_prompt
+
+# Check for injection patterns
+suspicious = detect_prompt_injection(user_content)
+if suspicious:
+    logger.warning(f"Potential injection: {suspicious}")
+
+# Sanitize with boundaries
+sanitized = sanitize_prompt_content(
+    user_content,
+    max_length=50000,
+    validate_injection=True,
+    boundary_markers=True,
+)
+
+# Use format_prompt with validation enabled
+prompt = format_prompt(template, validate_injection=True, content=user_content)
+```
+
+### Never Do
+- Insert raw user content directly into prompts
+- Skip injection detection for external content
+- Ignore warnings about detected injection patterns
+
+### Always Do
+- Wrap user content with boundary markers
+- Add defensive instructions after user content
+- Truncate overly long content
+
+### Shell Scripts
+
+Shell scripts must follow safe quoting practices.
+
+```bash
+# Always quote variables
+echo "$VARIABLE"
+
+# Use arrays for multi-word arguments
+ARGS=("--flag1" "value with spaces")
+command "${ARGS[@]}"
+
+# Use single quotes in traps
+trap 'rm -f "$TEMP_FILE"' EXIT
+
+# Check file safety before reading
+if [ -L "$FILE" ]; then
+    echo "Error: symlink" >&2
+    exit 1
+fi
+```
+
+### Never Do
+- Leave variables unquoted
+- Use string variables for multi-argument options
+- Use double quotes in trap commands with variables
 
 ---
 

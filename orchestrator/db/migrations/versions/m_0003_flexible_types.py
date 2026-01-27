@@ -5,6 +5,7 @@ SurrealDB v2.x requires FLEXIBLE TYPE for nested objects in SCHEMAFULL tables.
 Regular TYPE object strips nested data.
 """
 
+from ....security import validate_sql_field, validate_sql_table
 from ..base import BaseMigration, MigrationContext
 
 
@@ -55,10 +56,19 @@ class MigrationFlexibleTypes(BaseMigration):
             if not await ctx.table_exists(table):
                 continue
 
+            # Validate table name to prevent SQL injection
+            validated_table = validate_sql_table(table)
+
             for field_name, field_def in fields:
+                # Validate field name to prevent SQL injection
+                validated_field = validate_sql_field(field_name)
                 # Remove old field definition and add new one
-                await ctx.execute(f"REMOVE FIELD IF EXISTS {field_name} ON TABLE {table}")
-                await ctx.execute(f"DEFINE FIELD {field_name} ON TABLE {table} {field_def}")
+                await ctx.execute(
+                    f"REMOVE FIELD IF EXISTS {validated_field} ON TABLE {validated_table}"
+                )
+                await ctx.execute(
+                    f"DEFINE FIELD {validated_field} ON TABLE {validated_table} {field_def}"
+                )
 
     async def down(self, ctx: MigrationContext) -> None:
         """Rollback by reverting to regular TYPE object.
@@ -102,6 +112,15 @@ class MigrationFlexibleTypes(BaseMigration):
             if not await ctx.table_exists(table):
                 continue
 
+            # Validate table name to prevent SQL injection
+            validated_table = validate_sql_table(table)
+
             for field_name, field_def in fields:
-                await ctx.execute(f"REMOVE FIELD IF EXISTS {field_name} ON TABLE {table}")
-                await ctx.execute(f"DEFINE FIELD {field_name} ON TABLE {table} {field_def}")
+                # Validate field name to prevent SQL injection
+                validated_field = validate_sql_field(field_name)
+                await ctx.execute(
+                    f"REMOVE FIELD IF EXISTS {validated_field} ON TABLE {validated_table}"
+                )
+                await ctx.execute(
+                    f"DEFINE FIELD {validated_field} ON TABLE {validated_table} {field_def}"
+                )

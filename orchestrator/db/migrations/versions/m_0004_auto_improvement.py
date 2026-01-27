@@ -7,6 +7,7 @@ Adds tables for the auto-improvement system:
 - optimization_history: Records of optimization attempts
 """
 
+from ....security import validate_sql_table
 from ..base import BaseMigration, MigrationContext
 
 
@@ -148,4 +149,5 @@ DEFINE INDEX IF NOT EXISTS idx_opt_time ON TABLE optimization_history COLUMNS cr
         ]
 
         for table in tables:
-            await ctx.execute(f"REMOVE TABLE IF EXISTS {table}")
+            validated_table = validate_sql_table(table)
+            await ctx.execute(f"REMOVE TABLE IF EXISTS {validated_table}")

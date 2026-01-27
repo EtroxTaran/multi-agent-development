@@ -211,7 +211,8 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
     plan_json = json.dumps(plan, indent=2)
     try:
         template = load_prompt("cursor", "validation")
-        prompt = format_prompt(template, plan=plan_json)
+        # Enable injection checking for user-provided plan content
+        prompt = format_prompt(template, validate_injection=True, plan=plan_json)
     except FileNotFoundError:
         logger.debug("Cursor validation template not found, using inline prompt")
         prompt = CURSOR_VALIDATION_PROMPT.format(plan=plan_json)
@@ -411,7 +412,8 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
     plan_json = json.dumps(plan, indent=2)
     try:
         template = load_prompt("gemini", "validation")
-        prompt = format_prompt(template, plan=plan_json)
+        # Enable injection checking for user-provided plan content
+        prompt = format_prompt(template, validate_injection=True, plan=plan_json)
     except FileNotFoundError:
         logger.debug("Gemini validation template not found, using inline prompt")
         prompt = GEMINI_VALIDATION_PROMPT.format(plan=plan_json)
