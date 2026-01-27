@@ -2,7 +2,7 @@
  * Keyboard shortcuts hook for global navigation
  */
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useMemo } from "react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
 
 export interface Shortcut {
@@ -28,36 +28,39 @@ export function useKeyboardShortcuts(
   const location = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Define shortcuts
-  const shortcuts: Shortcut[] = [
-    {
-      key: "g p",
-      description: "Go to Projects list",
-      action: () => navigate({ to: "/" }),
-      category: "navigation",
-    },
-    {
-      key: "g h",
-      description: "Go to Home",
-      action: () => navigate({ to: "/" }),
-      category: "navigation",
-    },
-    {
-      key: "?",
-      description: "Show keyboard shortcuts",
-      action: () => {
-        setIsDialogOpen(true);
-        onShowHelp?.();
+  // Define shortcuts - memoized to prevent dependency changes
+  const shortcuts: Shortcut[] = useMemo(
+    () => [
+      {
+        key: "g p",
+        description: "Go to Projects list",
+        action: () => navigate({ to: "/" }),
+        category: "navigation",
       },
-      category: "other",
-    },
-    {
-      key: "Escape",
-      description: "Close dialogs / Cancel",
-      action: () => setIsDialogOpen(false),
-      category: "other",
-    },
-  ];
+      {
+        key: "g h",
+        description: "Go to Home",
+        action: () => navigate({ to: "/" }),
+        category: "navigation",
+      },
+      {
+        key: "?",
+        description: "Show keyboard shortcuts",
+        action: () => {
+          setIsDialogOpen(true);
+          onShowHelp?.();
+        },
+        category: "other",
+      },
+      {
+        key: "Escape",
+        description: "Close dialogs / Cancel",
+        action: () => setIsDialogOpen(false),
+        category: "other",
+      },
+    ],
+    [navigate, onShowHelp],
+  );
 
   // Track key sequence for multi-key shortcuts (e.g., "g p")
   const [keySequence, setKeySequence] = useState<string[]>([]);
@@ -111,7 +114,7 @@ export function useKeyboardShortcuts(
         setKeySequence((prev) => (prev.length > 0 ? [] : prev));
       }, 1000);
     },
-    [enabled, keySequence, navigate, onShowHelp, shortcuts],
+    [enabled, keySequence, onShowHelp, shortcuts],
   );
 
   useEffect(() => {

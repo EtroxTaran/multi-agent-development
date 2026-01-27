@@ -144,5 +144,6 @@ export async function waitForQueries(queryClient: QueryClient) {
 }
 
 // Re-export testing library utilities
+// eslint-disable-next-line react-refresh/only-export-components -- test utility re-exports
 export * from "@testing-library/react";
 export { default as userEvent } from "@testing-library/user-event";

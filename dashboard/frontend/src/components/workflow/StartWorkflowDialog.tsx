@@ -44,9 +44,11 @@ export function StartWorkflowDialog({ projectName }: StartWorkflowDialogProps) {
         setOpen(false);
         setSuccess(false);
       }, 1200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to start workflow", err);
-      setError(err.message || "Failed to start workflow");
+      const message =
+        err instanceof Error ? err.message : "Failed to start workflow";
+      setError(message);
     }
   };
 

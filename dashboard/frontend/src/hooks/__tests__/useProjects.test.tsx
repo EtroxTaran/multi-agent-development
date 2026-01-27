@@ -334,7 +334,9 @@ describe("useDeleteProject", () => {
       });
     });
 
-    expect(result.current.isSuccess).toBe(true);
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
   });
 
   it("should invalidate queries and remove detail after delete", async () => {

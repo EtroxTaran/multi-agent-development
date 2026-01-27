@@ -2,7 +2,7 @@
  * API mock handlers for E2E tests
  */
 
-import { Page, Route } from "@playwright/test";
+import { Page } from "@playwright/test";
 import {
   mockProjects,
   mockWorkflowStatus,

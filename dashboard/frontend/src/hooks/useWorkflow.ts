@@ -113,7 +113,7 @@ export function useResumeWorkflow(projectName: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (humanResponse?: Record<string, any>) =>
+    mutationFn: (humanResponse?: Record<string, unknown>) =>
       workflowApi.resume(projectName, {
         autonomous: false,
         humanResponse,

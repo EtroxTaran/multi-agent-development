@@ -8,7 +8,6 @@ import { ProjectsPage, ProjectDashboardPage } from "./page-objects";
 import {
   setupApiMocks,
   failApiMock,
-  timeoutApiMock,
   mockProjects,
   mockWorkflowStatus,
 } from "./fixtures";
