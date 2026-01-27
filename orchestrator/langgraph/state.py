@@ -4,7 +4,6 @@ Defines the TypedDict state used by the workflow graph, including
 reducers for merging parallel execution results.
 """
 
-import operator
 import traceback
 import uuid
 from dataclasses import dataclass, field
@@ -285,6 +284,9 @@ def create_agent_execution(
 # Maximum executions to keep in history
 MAX_EXECUTION_HISTORY = 50
 
+# Maximum fix attempts to keep in history
+MAX_FIX_HISTORY = 50
+
 
 def _append_executions(
     existing: Optional[list[AgentExecution]],
@@ -309,6 +311,34 @@ def _append_executions(
     # Keep only most recent executions if over limit
     if len(result) > MAX_EXECUTION_HISTORY:
         result = result[-MAX_EXECUTION_HISTORY:]
+
+    return result
+
+
+def _append_fix_history(
+    existing: Optional[list[dict]],
+    new: list[dict],
+) -> list[dict]:
+    """Reducer for appending fix history with size limit.
+
+    Keeps most recent MAX_FIX_HISTORY fix attempts to prevent
+    unbounded memory growth on long-running workflows.
+
+    Args:
+        existing: Existing fix history list
+        new: New fix attempts to append
+
+    Returns:
+        Combined list (limited to MAX_FIX_HISTORY)
+    """
+    if existing is None:
+        result = list(new)
+    else:
+        result = list(existing) + list(new)
+
+    # Keep only most recent fix attempts if over limit
+    if len(result) > MAX_FIX_HISTORY:
+        result = result[-MAX_FIX_HISTORY:]
 
     return result
 
@@ -341,6 +371,142 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     BLOCKED = "blocked"
+
+
+class CriterionStatus(str, Enum):
+    """Status of an individual acceptance criterion."""
+
+    PENDING = "pending"
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    PARTIAL = "partial"  # Partially implemented
+
+
+class TaskProgress(TypedDict, total=False):
+    """Detailed progress tracking for a task.
+
+    Provides granular visibility into task completion beyond
+    binary pass/fail status.
+
+    Attributes:
+        task_id: Task identifier
+        criteria_status: Status of each acceptance criterion (by index)
+        files_created: List of files successfully created
+        files_modified: List of files successfully modified
+        tests_passing: List of passing test names
+        tests_failing: List of failing test names
+        tests_skipped: List of skipped test names
+        code_coverage: Coverage percentage if available
+        implementation_progress: Percentage complete (0-100)
+        last_checkpoint: Last successful checkpoint ID
+        error_details: Details of any errors encountered
+        started_at: When implementation started
+        updated_at: Last update timestamp
+    """
+
+    task_id: str
+    criteria_status: dict[int, str]  # index -> CriterionStatus value
+    files_created: list[str]
+    files_modified: list[str]
+    tests_passing: list[str]
+    tests_failing: list[str]
+    tests_skipped: list[str]
+    code_coverage: Optional[float]
+    implementation_progress: int  # 0-100
+    last_checkpoint: Optional[str]
+    error_details: Optional[dict]
+    started_at: Optional[str]
+    updated_at: Optional[str]
+
+
+def create_task_progress(
+    task_id: str,
+    num_criteria: int = 0,
+) -> TaskProgress:
+    """Create initial task progress tracking.
+
+    Args:
+        task_id: Task identifier
+        num_criteria: Number of acceptance criteria
+
+    Returns:
+        Initial TaskProgress
+    """
+    now = datetime.now().isoformat()
+    return TaskProgress(
+        task_id=task_id,
+        criteria_status={i: CriterionStatus.PENDING.value for i in range(num_criteria)},
+        files_created=[],
+        files_modified=[],
+        tests_passing=[],
+        tests_failing=[],
+        tests_skipped=[],
+        code_coverage=None,
+        implementation_progress=0,
+        last_checkpoint=None,
+        error_details=None,
+        started_at=now,
+        updated_at=now,
+    )
+
+
+def update_criterion_status(
+    progress: TaskProgress,
+    criterion_index: int,
+    status: CriterionStatus,
+) -> TaskProgress:
+    """Update the status of a specific acceptance criterion.
+
+    Args:
+        progress: Current task progress
+        criterion_index: Index of the criterion to update
+        status: New status for the criterion
+
+    Returns:
+        Updated TaskProgress
+    """
+    criteria_status = dict(progress.get("criteria_status", {}))
+    criteria_status[criterion_index] = status.value
+
+    # Calculate implementation progress based on criteria status
+    total = len(criteria_status)
+    if total > 0:
+        passed = sum(1 for s in criteria_status.values() if s == CriterionStatus.PASSED.value)
+        partial = sum(1 for s in criteria_status.values() if s == CriterionStatus.PARTIAL.value)
+        progress_pct = int((passed + partial * 0.5) / total * 100)
+    else:
+        progress_pct = 0
+
+    return TaskProgress(
+        **{
+            **progress,
+            "criteria_status": criteria_status,
+            "implementation_progress": progress_pct,
+            "updated_at": datetime.now().isoformat(),
+        }
+    )
+
+
+def calculate_task_completion(progress: TaskProgress) -> tuple[int, int, float]:
+    """Calculate task completion statistics from progress.
+
+    Args:
+        progress: Task progress data
+
+    Returns:
+        Tuple of (passed_count, total_count, completion_percentage)
+    """
+    criteria_status = progress.get("criteria_status", {})
+    total = len(criteria_status)
+
+    if total == 0:
+        return 0, 0, 0.0
+
+    passed = sum(1 for s in criteria_status.values() if s == CriterionStatus.PASSED.value)
+    completion_pct = (passed / total) * 100
+
+    return passed, total, completion_pct
 
 
 class Task(TypedDict, total=False):
@@ -838,6 +1004,9 @@ class WorkflowState(TypedDict, total=False):
     completed_task_ids: Annotated[list[str], _append_unique]
     failed_task_ids: Annotated[list[str], _append_unique]
 
+    # Task progress tracking (per-criterion granularity)
+    task_progress: dict[str, TaskProgress]  # task_id -> TaskProgress
+
     # Discussion phase (GSD pattern)
     discussion_complete: bool
     context_file: Optional[str]
@@ -867,7 +1036,7 @@ class WorkflowState(TypedDict, total=False):
     fixer_attempts: int
     fixer_circuit_breaker_open: bool
     current_fix_attempt: Optional[dict]
-    fix_history: Annotated[list[dict], operator.add]
+    fix_history: Annotated[list[dict], _append_fix_history]
 
     # Auto-improvement state
     last_agent_execution: Optional[AgentExecution]  # Most recent agent execution for evaluation
@@ -942,6 +1111,8 @@ def create_initial_state(
         in_flight_task_ids=[],
         completed_task_ids=[],
         failed_task_ids=[],
+        # Task progress tracking (per-criterion granularity)
+        task_progress={},
         # Discussion phase fields (GSD pattern)
         discussion_complete=False,
         context_file=None,

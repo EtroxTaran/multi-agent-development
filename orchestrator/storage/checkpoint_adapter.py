@@ -2,9 +2,16 @@
 
 Provides unified interface for checkpoint management using SurrealDB.
 This is the DB-only version - no file fallback.
+
+Supports both full and incremental checkpointing:
+- Full checkpoints: Store complete state snapshot (default)
+- Incremental checkpoints: Store only changed fields since last checkpoint
 """
 
+import hashlib
+import json
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -12,6 +19,163 @@ from .async_utils import run_async
 from .base import CheckpointData, CheckpointStorageProtocol
 
 logger = logging.getLogger(__name__)
+
+
+# Fields that are safe to skip in incremental checkpoints (large or regenerable)
+INCREMENTAL_SKIP_FIELDS = {
+    "execution_history",  # Can be large, regenerated from audit trail
+    "fix_history",  # Can be large, kept in separate history
+    "errors",  # Append-only, kept separately
+}
+
+# Fields that should always be included in incremental checkpoints
+INCREMENTAL_REQUIRED_FIELDS = {
+    "current_phase",
+    "phase_status",
+    "current_task_id",
+    "next_decision",
+}
+
+
+@dataclass
+class StateDelta:
+    """Represents the difference between two workflow states.
+
+    Used for incremental checkpointing to only store changed fields.
+    """
+
+    changed_fields: dict[str, Any] = field(default_factory=dict)
+    deleted_fields: list[str] = field(default_factory=list)
+    base_checkpoint_id: Optional[str] = None
+    field_hashes: dict[str, str] = field(default_factory=dict)
+
+    def is_empty(self) -> bool:
+        """Check if there are no changes."""
+        return not self.changed_fields and not self.deleted_fields
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for storage."""
+        return {
+            "changed_fields": self.changed_fields,
+            "deleted_fields": self.deleted_fields,
+            "base_checkpoint_id": self.base_checkpoint_id,
+            "field_hashes": self.field_hashes,
+            "is_incremental": True,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "StateDelta":
+        """Create from dictionary."""
+        return cls(
+            changed_fields=data.get("changed_fields", {}),
+            deleted_fields=data.get("deleted_fields", []),
+            base_checkpoint_id=data.get("base_checkpoint_id"),
+            field_hashes=data.get("field_hashes", {}),
+        )
+
+
+def _compute_field_hash(value: Any) -> str:
+    """Compute a hash for a field value to detect changes.
+
+    Args:
+        value: The field value to hash
+
+    Returns:
+        MD5 hash of the JSON-serialized value
+    """
+    try:
+        # Sort keys for consistent hashing
+        serialized = json.dumps(value, sort_keys=True, default=str)
+        return hashlib.md5(serialized.encode()).hexdigest()[:12]
+    except (TypeError, ValueError):
+        # For non-serializable values, use repr
+        return hashlib.md5(repr(value).encode()).hexdigest()[:12]
+
+
+def compute_state_delta(
+    current_state: dict,
+    previous_state: dict,
+    previous_hashes: Optional[dict[str, str]] = None,
+) -> StateDelta:
+    """Compute the difference between two workflow states.
+
+    Args:
+        current_state: Current workflow state
+        previous_state: Previous workflow state (from last checkpoint)
+        previous_hashes: Optional pre-computed hashes from previous checkpoint
+
+    Returns:
+        StateDelta containing only changed fields
+    """
+    delta = StateDelta()
+
+    # Compute hashes for current state
+    current_hashes: dict[str, str] = {}
+    for key, value in current_state.items():
+        if key not in INCREMENTAL_SKIP_FIELDS:
+            current_hashes[key] = _compute_field_hash(value)
+
+    delta.field_hashes = current_hashes
+
+    # If we have previous hashes, use them for comparison
+    if previous_hashes:
+        for key, current_hash in current_hashes.items():
+            prev_hash = previous_hashes.get(key)
+            if prev_hash != current_hash or key in INCREMENTAL_REQUIRED_FIELDS:
+                delta.changed_fields[key] = current_state[key]
+
+        # Check for deleted fields
+        for key in previous_hashes:
+            if key not in current_hashes:
+                delta.deleted_fields.append(key)
+    else:
+        # No previous hashes - compare values directly
+        for key, value in current_state.items():
+            if key in INCREMENTAL_SKIP_FIELDS:
+                continue
+
+            prev_value = previous_state.get(key)
+
+            # Include if changed or required
+            if key in INCREMENTAL_REQUIRED_FIELDS:
+                delta.changed_fields[key] = value
+            elif prev_value is None and value is not None:
+                delta.changed_fields[key] = value
+            elif prev_value != value:
+                delta.changed_fields[key] = value
+
+        # Check for deleted fields
+        for key in previous_state:
+            if key not in current_state and key not in INCREMENTAL_SKIP_FIELDS:
+                delta.deleted_fields.append(key)
+
+    return delta
+
+
+def reconstruct_state_from_deltas(
+    base_state: dict,
+    deltas: list[StateDelta],
+) -> dict:
+    """Reconstruct a full state from a base state and a chain of deltas.
+
+    Args:
+        base_state: The full base checkpoint state
+        deltas: List of deltas to apply in order
+
+    Returns:
+        Reconstructed full state
+    """
+    state = dict(base_state)
+
+    for delta in deltas:
+        # Apply changes
+        state.update(delta.changed_fields)
+
+        # Remove deleted fields
+        for field_name in delta.deleted_fields:
+            state.pop(field_name, None)
+
+    return state
 
 
 class CheckpointStorageAdapter(CheckpointStorageProtocol):
@@ -237,6 +401,156 @@ class CheckpointStorageAdapter(CheckpointStorageProtocol):
         """
         db = self._get_db_backend()
         return run_async(db.prune_old_checkpoints(keep_count))
+
+    def create_incremental_checkpoint(
+        self,
+        name: str,
+        notes: str = "",
+    ) -> CheckpointData:
+        """Create an incremental checkpoint storing only changed fields.
+
+        This is more efficient than full checkpoints for frequent saves,
+        as it only stores fields that have changed since the last checkpoint.
+
+        Args:
+            name: Human-readable checkpoint name
+            notes: Optional notes about this checkpoint
+
+        Returns:
+            Created CheckpointData (with incremental delta in state_snapshot)
+        """
+        # Get current state
+        current_state = self._get_current_state()
+        task_progress = self._get_task_progress(current_state)
+        phase = current_state.get("current_phase", 0)
+
+        # Get the latest checkpoint for comparison
+        latest = self.get_latest()
+        base_checkpoint_id = None
+        previous_state = {}
+        previous_hashes = None
+
+        if latest and latest.state_snapshot:
+            # Check if latest is also incremental
+            if latest.state_snapshot.get("is_incremental"):
+                # Need to reconstruct full state from base
+                # For simplicity, use the latest as base even if incremental
+                # In production, you'd chain deltas or use periodic full checkpoints
+                previous_state = latest.state_snapshot.get("changed_fields", {})
+                previous_hashes = latest.state_snapshot.get("field_hashes")
+            else:
+                previous_state = latest.state_snapshot
+                previous_hashes = None  # Will be computed
+
+            base_checkpoint_id = latest.id
+
+        # Compute delta
+        delta = compute_state_delta(current_state, previous_state, previous_hashes)
+        delta.base_checkpoint_id = base_checkpoint_id
+
+        # If no changes, still create checkpoint with required fields
+        if delta.is_empty():
+            logger.info(f"No changes detected, creating minimal checkpoint: {name}")
+
+        db = self._get_db_backend()
+        checkpoint = run_async(
+            db.create_checkpoint(
+                name=name,
+                state_snapshot=delta.to_dict(),
+                phase=phase,
+                notes=f"[incremental] {notes}",
+                task_progress=task_progress,
+                files_snapshot=[],
+            )
+        )
+        return self._db_checkpoint_to_data(checkpoint)
+
+    def reconstruct_full_state(self, checkpoint_id: str) -> Optional[dict]:
+        """Reconstruct full state from a checkpoint.
+
+        For full checkpoints, returns the state directly.
+        For incremental checkpoints, reconstructs from base + deltas.
+
+        Args:
+            checkpoint_id: Checkpoint ID
+
+        Returns:
+            Full reconstructed state, or None if checkpoint not found
+        """
+        checkpoint = self.get_checkpoint(checkpoint_id)
+        if not checkpoint or not checkpoint.state_snapshot:
+            return None
+
+        state_snapshot = checkpoint.state_snapshot
+
+        # Check if this is an incremental checkpoint
+        if not state_snapshot.get("is_incremental"):
+            return state_snapshot
+
+        # Reconstruct from delta chain
+        delta = StateDelta.from_dict(state_snapshot)
+        base_checkpoint_id = delta.base_checkpoint_id
+
+        if not base_checkpoint_id:
+            # No base, return changed fields as state
+            return delta.changed_fields
+
+        # Get base state (recursively reconstruct if needed)
+        base_state = self.reconstruct_full_state(base_checkpoint_id)
+        if not base_state:
+            logger.warning(f"Base checkpoint {base_checkpoint_id} not found")
+            return delta.changed_fields
+
+        # Apply delta to base
+        return reconstruct_state_from_deltas(base_state, [delta])
+
+    def should_create_full_checkpoint(self, max_delta_chain: int = 10) -> bool:
+        """Check if a full checkpoint should be created instead of incremental.
+
+        Creates full checkpoints periodically to prevent long delta chains.
+
+        Args:
+            max_delta_chain: Maximum incremental checkpoints before full
+
+        Returns:
+            True if full checkpoint is recommended
+        """
+        checkpoints = self.list_checkpoints()
+
+        # Count consecutive incremental checkpoints
+        consecutive_incremental = 0
+        for checkpoint in reversed(checkpoints):
+            if checkpoint.state_snapshot and checkpoint.state_snapshot.get("is_incremental"):
+                consecutive_incremental += 1
+            else:
+                break
+
+        return consecutive_incremental >= max_delta_chain
+
+    def create_smart_checkpoint(
+        self,
+        name: str,
+        notes: str = "",
+        max_delta_chain: int = 10,
+    ) -> CheckpointData:
+        """Create a checkpoint, automatically choosing full or incremental.
+
+        Creates incremental checkpoints for efficiency, but periodically
+        creates full checkpoints to prevent long delta chains.
+
+        Args:
+            name: Human-readable checkpoint name
+            notes: Optional notes
+            max_delta_chain: Max incremental checkpoints before full
+
+        Returns:
+            Created CheckpointData
+        """
+        if self.should_create_full_checkpoint(max_delta_chain):
+            logger.info(f"Creating full checkpoint (delta chain limit reached): {name}")
+            return self.create_checkpoint(name, notes)
+        else:
+            return self.create_incremental_checkpoint(name, notes)
 
     def get_latest(self) -> Optional[CheckpointData]:
         """Get the most recent checkpoint.

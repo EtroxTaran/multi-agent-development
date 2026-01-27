@@ -99,6 +99,39 @@ class ResearchConfig:
 
 
 @dataclass
+class ReviewConfig:
+    """Configuration for reviewer timeout and fallback behavior.
+
+    Controls how the workflow handles slow or failing review agents.
+    """
+
+    # Timeout for individual reviewers (seconds)
+    reviewer_timeout_seconds: int = 300  # 5 minutes
+
+    # Whether to allow single-agent approval when one reviewer fails/times out
+    allow_single_agent_approval: bool = True
+
+    # Score penalty when only one reviewer provides feedback
+    # Final score = single_agent_score - single_agent_score_penalty
+    single_agent_score_penalty: float = 1.0
+
+    # Minimum score for single-agent approval (higher than dual-agent)
+    single_agent_minimum_score: float = 7.5
+
+    # Maximum retries for a failed reviewer before falling back
+    max_reviewer_retries: int = 2
+
+    # Whether to prefer Cursor or Gemini for single-agent fallback
+    # "cursor" = prefer Cursor (security-focused)
+    # "gemini" = prefer Gemini (architecture-focused)
+    # "any" = use whichever succeeds
+    single_agent_preference: str = "any"
+
+    # Whether to log reviewer timeouts for monitoring
+    log_timeouts: bool = True
+
+
+@dataclass
 class QualityGateConfig:
     """Configuration for A13 Quality Gate checks."""
 
@@ -180,6 +213,7 @@ class ProjectConfig:
     research: ResearchConfig = field(default_factory=ResearchConfig)
     quality_gate: QualityGateConfig = field(default_factory=QualityGateConfig)
     dependency: DependencyConfig = field(default_factory=DependencyConfig)
+    review: ReviewConfig = field(default_factory=ReviewConfig)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -246,6 +280,15 @@ class ProjectConfig:
                 "blocking_severities": self.dependency.blocking_severities,
                 "generate_dependabot": self.dependency.generate_dependabot,
                 "generate_renovate": self.dependency.generate_renovate,
+            },
+            "review": {
+                "reviewer_timeout_seconds": self.review.reviewer_timeout_seconds,
+                "allow_single_agent_approval": self.review.allow_single_agent_approval,
+                "single_agent_score_penalty": self.review.single_agent_score_penalty,
+                "single_agent_minimum_score": self.review.single_agent_minimum_score,
+                "max_reviewer_retries": self.review.max_reviewer_retries,
+                "single_agent_preference": self.review.single_agent_preference,
+                "log_timeouts": self.review.log_timeouts,
             },
         }
 
@@ -547,6 +590,24 @@ def _merge_config(base: ProjectConfig, custom: dict) -> ProjectConfig:
             base.workflow.features.quality_gate = bool(f["quality_gate"])
         if "dependency_check" in f:
             base.workflow.features.dependency_check = bool(f["dependency_check"])
+
+    # Update review config
+    if "review" in custom:
+        r = custom["review"]
+        if "reviewer_timeout_seconds" in r:
+            base.review.reviewer_timeout_seconds = int(r["reviewer_timeout_seconds"])
+        if "allow_single_agent_approval" in r:
+            base.review.allow_single_agent_approval = bool(r["allow_single_agent_approval"])
+        if "single_agent_score_penalty" in r:
+            base.review.single_agent_score_penalty = float(r["single_agent_score_penalty"])
+        if "single_agent_minimum_score" in r:
+            base.review.single_agent_minimum_score = float(r["single_agent_minimum_score"])
+        if "max_reviewer_retries" in r:
+            base.review.max_reviewer_retries = int(r["max_reviewer_retries"])
+        if "single_agent_preference" in r:
+            base.review.single_agent_preference = str(r["single_agent_preference"])
+        if "log_timeouts" in r:
+            base.review.log_timeouts = bool(r["log_timeouts"])
 
     return base
 

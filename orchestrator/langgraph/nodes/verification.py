@@ -1,7 +1,7 @@
 """Verification nodes for Phase 4.
 
 Cursor reviews code quality and Gemini reviews architecture,
-then results are merged to determine approval.
+then results are merged to determine approval with timeout and fallback support.
 """
 
 import asyncio
@@ -26,6 +26,7 @@ from ..state import (
     create_agent_execution,
     create_error_context,
 )
+from ..utils.reviewer_fallback import apply_single_agent_penalty, get_review_config
 
 logger = logging.getLogger(__name__)
 
@@ -537,6 +538,9 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
     phase_4.started_at = phase_4.started_at or datetime.now().isoformat()
     phase_4.attempts += 1
 
+    # Load review config for fallback settings
+    review_config = get_review_config(str(project_dir))
+
     if not cursor_feedback or not gemini_feedback:
         missing = []
         if not cursor_feedback:
@@ -544,6 +548,65 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
         if not gemini_feedback:
             missing.append("gemini")
 
+        # Try single-agent fallback if enabled
+        if review_config.allow_single_agent_approval:
+            available_feedback = cursor_feedback or gemini_feedback
+            if available_feedback:
+                agent_name = "cursor" if cursor_feedback else "gemini"
+                logger.info(f"Using single-agent fallback with {agent_name} for verification")
+
+                # Apply score penalty for single-agent review
+                penalized_feedback = apply_single_agent_penalty(available_feedback, review_config)
+
+                # Verification requires higher threshold
+                verification_min_score = max(
+                    review_config.single_agent_minimum_score,
+                    7.0,  # Verification has higher baseline
+                )
+
+                if penalized_feedback.score >= verification_min_score:
+                    phase_4.status = PhaseStatus.COMPLETED
+                    phase_4.completed_at = datetime.now().isoformat()
+                    phase_status["4"] = phase_4
+
+                    logger.info(
+                        f"Single-agent verification approved by {agent_name} "
+                        f"(penalized score: {penalized_feedback.score:.1f})"
+                    )
+
+                    # Save consolidated feedback
+                    consolidated = {
+                        "combined_score": penalized_feedback.score,
+                        f"{agent_name}_score": available_feedback.score,
+                        "approved": True,
+                        "decision": "approve",
+                        "single_agent_fallback": True,
+                        "fallback_agent": agent_name,
+                        "missing_agents": missing,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+
+                    from ...db.repositories.phase_outputs import get_phase_output_repository
+                    from ...storage.async_utils import run_async
+
+                    repo = get_phase_output_repository(state["project_name"])
+                    run_async(
+                        repo.save_output(phase=4, output_type="consolidated", content=consolidated)
+                    )
+
+                    return {
+                        "phase_status": phase_status,
+                        "current_phase": 5,
+                        "next_decision": "continue",
+                        "updated_at": datetime.now().isoformat(),
+                    }
+                else:
+                    logger.warning(
+                        f"Single-agent score {penalized_feedback.score:.1f} "
+                        f"below minimum {verification_min_score}"
+                    )
+
+        # No fallback or fallback rejected - return retry
         return {
             "phase_status": phase_status,
             "errors": [
@@ -551,6 +614,7 @@ async def verification_fan_in_node(state: WorkflowState) -> dict[str, Any]:
                     "type": "verification_incomplete",
                     "missing_agents": missing,
                     "message": f"Missing review from: {', '.join(missing)}",
+                    "single_agent_fallback_enabled": review_config.allow_single_agent_approval,
                     "timestamp": datetime.now().isoformat(),
                 }
             ],
