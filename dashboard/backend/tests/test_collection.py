@@ -247,3 +247,125 @@ class TestListTags:
             assert "technology" in data
             assert "feature" in data
             assert "priority" in data
+
+
+class TestItemToResponse:
+    """Tests for _item_to_response conversion function.
+
+    These tests ensure proper handling of SurrealDB types during serialization.
+    """
+
+    def test_item_id_converted_to_string(self):
+        """Test that SurrealDB RecordID is properly converted to string.
+
+        This is a regression test for a bug where RecordID objects were passed
+        directly to Pydantic models, causing validation errors:
+        'Input should be a valid string, input_type=RecordID'
+        """
+        from orchestrator.collection import ItemType
+
+        from app.routers.collection import _item_to_response
+
+        # Create a mock item with a RecordID-like object for id
+        class MockRecordID:
+            """Simulates SurrealDB RecordID object."""
+
+            def __init__(self, table_name: str, record_id: str):
+                self.table_name = table_name
+                self.record_id = record_id
+
+            def __str__(self):
+                return f"{self.table_name}:{self.record_id}"
+
+        mock_item = MagicMock()
+        mock_item.id = MockRecordID("collection_items", "test-rule")
+        mock_item.name = "Test Rule"
+        mock_item.item_type = ItemType.RULE
+        mock_item.category = "test"
+        mock_item.file_path = "rules/test.md"
+        mock_item.summary = "Test summary"
+        mock_item.tags = MagicMock()
+        mock_item.tags.technology = ["python"]
+        mock_item.tags.feature = ["testing"]
+        mock_item.tags.priority = "high"
+        mock_item.version = 1
+        mock_item.is_active = True
+        mock_item.content = None
+
+        # This should not raise a validation error
+        response = _item_to_response(mock_item)
+
+        # The id should be converted to a string
+        assert isinstance(response.id, str)
+        assert response.id == "collection_items:test-rule"
+
+    def test_item_with_string_id_unchanged(self):
+        """Test that items with string IDs are handled correctly."""
+        from orchestrator.collection import ItemType
+
+        from app.routers.collection import _item_to_response
+
+        mock_item = MagicMock()
+        mock_item.id = "simple-string-id"
+        mock_item.name = "Test Rule"
+        mock_item.item_type = ItemType.RULE
+        mock_item.category = "test"
+        mock_item.file_path = "rules/test.md"
+        mock_item.summary = "Test summary"
+        mock_item.tags = MagicMock()
+        mock_item.tags.technology = ["python"]
+        mock_item.tags.feature = ["testing"]
+        mock_item.tags.priority = "high"
+        mock_item.version = 1
+        mock_item.is_active = True
+        mock_item.content = None
+
+        response = _item_to_response(mock_item)
+
+        assert isinstance(response.id, str)
+        assert response.id == "simple-string-id"
+
+    def test_list_items_returns_string_ids(self, mock_collection_service: MagicMock):
+        """Test that list_items endpoint returns items with string IDs.
+
+        This is an integration test ensuring the full pipeline handles
+        RecordID conversion correctly.
+        """
+        from orchestrator.collection import ItemType
+
+        # Create a mock item with a RecordID-like object
+        class MockRecordID:
+            def __init__(self, table_name: str, record_id: str):
+                self.table_name = table_name
+                self.record_id = record_id
+
+            def __str__(self):
+                return f"{self.table_name}:{self.record_id}"
+
+        mock_item = MagicMock()
+        mock_item.id = MockRecordID("collection_items", "security-guardrails")
+        mock_item.name = "Security Guardrails"
+        mock_item.item_type = ItemType.RULE
+        mock_item.category = "guardrails"
+        mock_item.file_path = "rules/guardrails/security.md"
+        mock_item.summary = "Security rules"
+        mock_item.tags = MagicMock()
+        mock_item.tags.technology = ["python"]
+        mock_item.tags.feature = ["security"]
+        mock_item.tags.priority = "critical"
+        mock_item.version = 1
+        mock_item.is_active = True
+        mock_item.content = None
+
+        mock_collection_service.list_items = AsyncMock(return_value=[mock_item])
+
+        with patch("app.routers.collection.collection_service", mock_collection_service):
+            client = TestClient(app)
+            response = client.get("/api/collection/items")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["items"]) == 1
+            # ID must be a string, not an object
+            assert isinstance(data["items"][0]["id"], str)
+            assert data["items"][0]["id"] == "collection_items:security-guardrails"

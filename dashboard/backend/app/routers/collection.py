@@ -637,7 +637,7 @@ async def apply_recommended_guardrails(project_name: str):
 def _item_to_response(item: CollectionItem) -> CollectionItemResponse:
     """Convert CollectionItem to response model."""
     return CollectionItemResponse(
-        id=item.id,
+        id=str(item.id),
         name=item.name,
         item_type=item.item_type.value if isinstance(item.item_type, ItemType) else item.item_type,
         category=item.category,

@@ -82,6 +82,14 @@ interface TagsList {
 const API_BASE = "/api/collection";
 
 // API Functions
+interface PaginatedResponse {
+  items: CollectionItem[];
+  total: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
+}
+
 async function fetchItems(filters: {
   type?: string;
   technologies?: string;
@@ -97,7 +105,8 @@ async function fetchItems(filters: {
 
   const res = await fetch(`${API_BASE}/items?${params}`);
   if (!res.ok) throw new Error("Failed to fetch items");
-  return res.json();
+  const data: PaginatedResponse = await res.json();
+  return data.items;
 }
 
 async function fetchItem(itemId: string): Promise<CollectionItem> {
