@@ -18,6 +18,17 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
+
+
+class AgentConfig(TypedDict):
+    """Type definition for agent configuration."""
+
+    output: Path
+    override: Path
+    header: str
+    description: str
+
 
 # Configuration
 SHARED_RULES_DIR = Path("shared-rules")
@@ -33,7 +44,7 @@ SHARED_FILES = [
 ]
 
 # Agent output configuration
-AGENTS = {
+AGENTS: dict[str, AgentConfig] = {
     "claude": {
         "output": Path("CLAUDE.md"),
         "override": AGENT_OVERRIDES_DIR / "claude.md",
@@ -91,56 +102,80 @@ def load_agent_override(agent: str) -> str:
         return override_path.read_text().strip()
     return ""
 
-    return "\n".join(parts)
-
 
 def load_skills() -> str:
-    """Load and format skills from .claude/skills directory."""
+    """Load and format skills from .claude/skills directory.
+
+    Returns a compact summary instead of full table for token efficiency.
+    Users can run /skills to see the full list dynamically.
+    """
     skills_dir = Path(".claude/skills")
     if not skills_dir.exists():
         return ""
 
-    skills = []
+    # Categorize skills by purpose
+    workflow_skills = []
+    code_quality_skills = []
+    git_skills = []
+    debug_skills = []
+    other_skills = []
+
+    workflow_keywords = [
+        "orchestrate",
+        "plan",
+        "validate",
+        "verify",
+        "implement",
+        "task",
+        "phase",
+        "status",
+        "workflow",
+    ]
+    code_keywords = ["test", "refactor", "api", "frontend", "ts-strict", "ui-design", "e2e"]
+    git_keywords = ["git", "pr", "commit", "release"]
+    debug_keywords = ["debug", "github-actions"]
+
     for skill_path in skills_dir.glob("*/SKILL.md"):
-        content = skill_path.read_text()
-        lines = content.splitlines()
+        name = skill_path.parent.name
 
-        # Parse frontmatter
-        meta = {}
-        if lines[0] == "---":
-            for line in lines[1:]:
-                if line == "---":
-                    break
-                if ":" in line:
-                    key, val = line.split(":", 1)
-                    meta[key.strip()] = val.strip().strip('"').strip("'")
+        # Categorize
+        name_lower = name.lower()
+        if any(kw in name_lower for kw in workflow_keywords):
+            workflow_skills.append(name)
+        elif any(kw in name_lower for kw in git_keywords):
+            git_skills.append(name)
+        elif any(kw in name_lower for kw in debug_keywords):
+            debug_skills.append(name)
+        elif any(kw in name_lower for kw in code_keywords):
+            code_quality_skills.append(name)
+        else:
+            other_skills.append(name)
 
-        # Fallback if no frontmatter or missing keys
-        name = meta.get("name", skill_path.parent.name)
-        desc = meta.get("description", "No description provided")
+    total = sum(
+        len(x)
+        for x in [workflow_skills, code_quality_skills, git_skills, debug_skills, other_skills]
+    )
 
-        # Infer command from name if not explicit
-        # We assume command is /<name> for now, or check typical patterns
-        command = f"/{name}"
-        if name == "frontend-dev-guidelines":
-            command = "n/a"
-
-        skills.append(f"| {name.upper()} | {command} | {desc} |")
-
-    if not skills:
+    if total == 0:
         return ""
 
-    # Sort by name
-    skills.sort()
-
-    header = [
-        "\n## Available Skills\n",
-        "The following skills are available for use via the specified commands:\n",
-        "| Skill | Command | Description |",
-        "|-------|---------|-------------|",
+    # Build compact summary
+    lines = [
+        "\n## Slash Commands\n",
+        f"**{total} skills available.** Run `/skills` for full list with descriptions.\n",
+        "",
+        "**Workflow**: "
+        + ", ".join(f"`/{s}`" for s in sorted(workflow_skills)[:6])
+        + ("..." if len(workflow_skills) > 6 else ""),
+        "**Git & PRs**: " + ", ".join(f"`/{s}`" for s in sorted(git_skills)),
+        "**Code Quality**: "
+        + ", ".join(f"`/{s}`" for s in sorted(code_quality_skills)[:5])
+        + ("..." if len(code_quality_skills) > 5 else ""),
+        "**Debugging**: " + ", ".join(f"`/{s}`" for s in sorted(debug_skills)),
+        "",
     ]
 
-    return "\n".join(header + skills) + "\n"
+    return "\n".join(lines)
 
 
 def sync_cursor_rules(dry_run: bool = False) -> int:
@@ -317,7 +352,7 @@ def validate_rules() -> bool:
     for agent, config in AGENTS.items():
         override_path = config["override"]
         if not override_path.exists():
-            warnings.append(f"Missing agent override: {override_path}")
+            warnings.append(f"Missing agent override for {agent}: {override_path}")
 
     # Check for version markers
     for filename in SHARED_FILES:

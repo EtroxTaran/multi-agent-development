@@ -138,49 +138,12 @@ fi
 
 ## Orchestrator Storage Guardrails
 
-**These rules apply specifically to the orchestrator (Claude as lead orchestrator).**
+**See `shared-rules/agent-overrides/claude.md` for full storage architecture details.**
 
-### Storage Architecture
-All workflow state is stored in **SurrealDB** - there is no local file storage for workflow state.
-
-### Orchestrator CAN
-- Store workflow state in SurrealDB (via storage adapters)
-- Read project files (Docs/, PRODUCT.md, CLAUDE.md)
-- Spawn worker Claude for code changes
-
-### Orchestrator CANNOT Write To
-```
-projects/<name>/src/**               <- Application source code
-projects/<name>/tests/**             <- Test files
-projects/<name>/test/**              <- Test files (alternative)
-projects/<name>/lib/**               <- Library code
-projects/<name>/app/**               <- Application code
-projects/<name>/*.py                 <- Python files at root
-projects/<name>/*.ts, *.js, *.tsx    <- TypeScript/JavaScript files
-projects/<name>/*.go, *.rs           <- Go/Rust files
-projects/<name>/CLAUDE.md            <- Worker context file
-projects/<name>/GEMINI.md            <- Gemini context file
-projects/<name>/PRODUCT.md           <- Feature specification
-projects/<name>/.cursor/**           <- Cursor context files
-```
-
-### Never Do (Orchestrator)
-- Write application code directly (spawn workers instead)
-- Write workflow state to local files (use DB)
-- Change project context files (CLAUDE.md, GEMINI.md)
-- Run workflow without SurrealDB connection
-
-### Always Do (Orchestrator)
-- Use storage adapters for workflow state
-- Use repositories for phase outputs and logs
-- Spawn worker Claude for any code changes
-- Verify DB connection before starting workflow
-
-### Error Recovery
-If you see `DatabaseRequiredError`:
-1. Set `SURREAL_URL` environment variable
-2. Verify SurrealDB instance is running
-3. Check network connectivity to database
+Key rules:
+- **SurrealDB only** - No local file storage for workflow state
+- **Never write code** - Spawn worker Claude instead
+- **Verify DB** - Check `SURREAL_URL` before workflow starts
 
 ---
 
