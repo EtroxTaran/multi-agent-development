@@ -36,6 +36,9 @@ class SchedulerConfig:
     # Minimum samples before optimization
     min_samples: int = 10
 
+    # Minimum samples per template before optimization
+    min_samples_per_template: int = 3
+
     # Cooldown between optimization attempts (hours)
     optimization_cooldown_hours: int = 24
 
@@ -168,29 +171,58 @@ class OptimizationScheduler:
             if not agent or total < self.config.min_samples:
                 continue
 
-            # Check if below threshold
+            # Check if below threshold - queue for per-template optimization
             if avg_score < self.config.score_threshold:
-                should_optimize, reason = await self.optimizer.should_optimize(
+                # Get template-specific statistics for this agent
+                template_stats = await eval_repo.get_statistics_by_template(
                     agent=agent,
-                    template_name="default",  # TODO: Support multiple templates
-                    threshold=self.config.score_threshold,
+                    days=7,
                 )
 
-                if should_optimize:
-                    trigger = OptimizationTrigger(
+                if not template_stats:
+                    # Fall back to default template if no template-specific data
+                    template_stats = [
+                        {"template_name": "default", "total": total, "avg_score": avg_score}
+                    ]
+
+                for tmpl_stat in template_stats:
+                    template_name = tmpl_stat.get("template_name") or "default"
+                    tmpl_total = tmpl_stat.get("total", 0)
+                    tmpl_avg_score = tmpl_stat.get("avg_score", 10.0)
+
+                    # Skip templates with insufficient samples
+                    if tmpl_total < self.config.min_samples_per_template:
+                        logger.debug(
+                            f"Skipping {agent}:{template_name} - insufficient samples "
+                            f"({tmpl_total} < {self.config.min_samples_per_template})"
+                        )
+                        continue
+
+                    # Skip templates above threshold
+                    if tmpl_avg_score >= self.config.score_threshold:
+                        continue
+
+                    should_optimize, reason = await self.optimizer.should_optimize(
                         agent=agent,
-                        template_name="default",
-                        reason=reason,
-                        priority=int((self.config.score_threshold - avg_score) * 10),
+                        template_name=template_name,
+                        threshold=self.config.score_threshold,
                     )
 
-                    if self.queue_optimization(
-                        agent=trigger.agent,
-                        template_name=trigger.template_name,
-                        reason=trigger.reason,
-                        priority=trigger.priority,
-                    ):
-                        new_triggers.append(trigger)
+                    if should_optimize:
+                        trigger = OptimizationTrigger(
+                            agent=agent,
+                            template_name=template_name,
+                            reason=reason,
+                            priority=int((self.config.score_threshold - tmpl_avg_score) * 10),
+                        )
+
+                        if self.queue_optimization(
+                            agent=trigger.agent,
+                            template_name=trigger.template_name,
+                            reason=trigger.reason,
+                            priority=trigger.priority,
+                        ):
+                            new_triggers.append(trigger)
 
         return new_triggers
 

@@ -295,12 +295,14 @@ async def promote_guardrail(
     if not conductor_dir.exists():
         raise HTTPException(status_code=404, detail="No guardrails directory found in project")
 
-    # Search for the item file
+    # Search for the item file and determine type from subdirectory
     item_file = None
+    item_subdir = None
     for subdir in ["guardrails", "rules", "skills"]:
         path = conductor_dir / subdir / f"{item_id}.md"
         if path.exists():
             item_file = path
+            item_subdir = subdir
             break
 
     if not item_file:
@@ -308,19 +310,60 @@ async def promote_guardrail(
             status_code=404, detail=f"Guardrail file '{item_id}' not found in project"
         )
 
-    # Copy to global collection
+    # Register in global collection
     try:
+        from orchestrator.collection.models import CollectionTags, ItemType
         from orchestrator.collection.service import CollectionService
 
-        _service = CollectionService()  # noqa: F841
-        # TODO: Use service to register the item in global collection
-        # This is a simplified version - full implementation would parse the file
+        service = CollectionService()
+
+        # Read file content
+        content = item_file.read_text()
+
+        # Parse YAML frontmatter
+        metadata = service._parse_file_metadata(item_file)
+        if not metadata:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not parse metadata from '{item_id}'. Ensure file has YAML frontmatter.",
+            )
+
+        # Determine ItemType from subdirectory
+        type_map = {
+            "guardrails": ItemType.RULE,
+            "rules": ItemType.RULE,
+            "skills": ItemType.SKILL,
+        }
+        item_type = type_map.get(item_subdir, ItemType.RULE)
+
+        # Extract tags from metadata
+        tags_data = metadata.get("tags", {})
+        tags = CollectionTags.from_dict(tags_data)
+
+        # Get name and summary from metadata
+        name = metadata.get("name", item_id)
+        summary = metadata.get("summary", metadata.get("description", ""))
+        category = metadata.get("category", "project-promoted")
+
+        # Create item in global collection
+        created_item = await service.create_item(
+            name=name,
+            item_type=item_type,
+            category=category,
+            content=content,
+            tags=tags,
+            summary=summary,
+        )
 
         return {
             "item_id": item_id,
+            "global_id": created_item.id,
+            "global_path": created_item.file_path,
             "promoted": True,
-            "message": f"Guardrail '{item_id}' promoted to global collection",
+            "message": f"Guardrail '{item_id}' promoted to global collection as '{created_item.id}'",
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

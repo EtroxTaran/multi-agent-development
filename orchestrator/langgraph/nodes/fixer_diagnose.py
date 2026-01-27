@@ -5,13 +5,165 @@ creates a fix plan.
 """
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..state import WorkflowState
 
+if TYPE_CHECKING:
+    from ...fixer import FixPlan, KnownFix
+    from ...fixer.diagnosis import DiagnosisResult
+
 logger = logging.getLogger(__name__)
+
+
+def _extract_placeholder_value(
+    diagnosis: "DiagnosisResult",
+    known_fix: "KnownFix",
+) -> Optional[str]:
+    """Extract placeholder value from error message using known fix pattern.
+
+    Args:
+        diagnosis: The diagnosis result containing error info
+        known_fix: The known fix with pattern to match
+
+    Returns:
+        Extracted value (e.g., module name, env var) or None
+    """
+    error_text = f"{diagnosis.error.message}\n{diagnosis.error.stack_trace or ''}"
+    pattern = known_fix.pattern.pattern
+
+    match = re.search(pattern, error_text, re.IGNORECASE)
+    if match and match.groups():
+        return match.group(1)
+
+    return None
+
+
+def _create_plan_from_known_fix(
+    diagnosis: "DiagnosisResult",
+    known_fix: "KnownFix",
+) -> Optional["FixPlan"]:
+    """Create a FixPlan from a KnownFix when no strategy is available.
+
+    Args:
+        diagnosis: The diagnosis result
+        known_fix: The known fix to create plan from
+
+    Returns:
+        FixPlan or None if plan cannot be created
+    """
+    from ...fixer import FixPlan
+    from ...fixer.strategies import FixAction
+
+    fix_type = known_fix.fix_type
+    fix_data = known_fix.fix_data
+    extracted_value = _extract_placeholder_value(diagnosis, known_fix)
+    actions = []
+
+    # Map fix_type to FixAction objects
+    if fix_type == "install_package":
+        command_template = fix_data.get("command", "pip install {module}")
+        if extracted_value:
+            command = command_template.replace("{module}", extracted_value)
+        else:
+            # Cannot create plan without knowing which module
+            return None
+        actions.append(
+            FixAction(
+                action_type="run_command",
+                target=command,
+                params={"timeout": 300},
+                description=f"Install missing package: {extracted_value}",
+            )
+        )
+
+    elif fix_type == "add_import":
+        if not diagnosis.affected_files:
+            return None
+        module = fix_data.get("module", "{name}")
+        if extracted_value:
+            module = module.replace("{name}", extracted_value)
+        actions.append(
+            FixAction(
+                action_type="add_import",
+                target=diagnosis.affected_files[0].path,
+                params={"import_statement": f"import {module}"},
+                description=f"Add import statement for {module}",
+            )
+        )
+
+    elif fix_type == "fix_indentation":
+        if not diagnosis.affected_files:
+            return None
+        actions.append(
+            FixAction(
+                action_type="run_command",
+                target=f"autopep8 --in-place {diagnosis.affected_files[0].path}",
+                params={"timeout": 30},
+                description="Auto-fix indentation with autopep8",
+            )
+        )
+
+    elif fix_type == "increase_timeout":
+        multiplier = fix_data.get("multiplier", 2)
+        actions.append(
+            FixAction(
+                action_type="increase_timeout",
+                target="",
+                params={"multiplier": multiplier},
+                description=f"Increase timeout by {multiplier}x",
+            )
+        )
+
+    elif fix_type == "add_env_var":
+        if not extracted_value:
+            return None
+        default = fix_data.get("default", "")
+        actions.append(
+            FixAction(
+                action_type="run_command",
+                target=f"echo '{extracted_value}={default}' >> .env.example",
+                params={},
+                description=f"Add {extracted_value} to .env.example template",
+            )
+        )
+
+    elif fix_type == "use_parameterized_query":
+        if not diagnosis.affected_files:
+            return None
+        actions.append(
+            FixAction(
+                action_type="security_fix",
+                target=diagnosis.affected_files[0].path,
+                params={"fix_type": "parameterized_query"},
+                description="Convert to parameterized SQL query (requires agent)",
+            )
+        )
+
+    elif fix_type == "analyze_test_failure":
+        # This requires agent analysis - return empty plan to trigger escalation
+        # But with a plan object so we have context
+        pass
+
+    else:
+        logger.warning(f"Unknown fix_type: {fix_type}")
+        return None
+
+    # Create plan with confidence based on known fix success rate
+    confidence = max(0.3, known_fix.success_rate) if known_fix.success_rate > 0 else 0.5
+
+    return FixPlan(
+        diagnosis=diagnosis,
+        strategy_name=f"known_fix:{known_fix.id}",
+        actions=actions,
+        estimated_impact=len(diagnosis.affected_files) if diagnosis.affected_files else 1,
+        requires_validation=fix_type in ("use_parameterized_query", "analyze_test_failure"),
+        requires_security_notification=fix_type == "use_parameterized_query",
+        confidence=confidence,
+    )
 
 
 async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
@@ -34,6 +186,7 @@ async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
         ErrorCategory,
         FixerError,
         KnownFixDatabase,
+        RootCause,
         get_strategy_for_error,
     )
 
@@ -94,7 +247,7 @@ async def fixer_diagnose_node(state: WorkflowState) -> dict[str, Any]:
         plan = strategy.create_plan(diagnosis)
     else:
         # Use known fix to create plan
-        plan = None  # TODO: Create plan from known fix
+        plan = _create_plan_from_known_fix(diagnosis, known_fix)
 
     if plan is None or not plan.actions:
         logger.warning("Could not create fix plan")

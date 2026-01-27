@@ -308,6 +308,46 @@ class EvaluationRepository(BaseRepository[dict]):
             )
             return len(results)
 
+    async def get_statistics_by_template(
+        self,
+        agent: str,
+        days: int = 30,
+    ) -> list[dict]:
+        """Get evaluation statistics grouped by template.
+
+        Args:
+            agent: Agent name to filter by
+            days: Number of days to include
+
+        Returns:
+            List of statistics per template, each containing:
+            - template_name: Name of the template
+            - total: Number of evaluations
+            - avg_score: Average score
+            - min_score: Minimum score
+            - max_score: Maximum score
+        """
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
+        async with get_connection(self.project_name) as conn:
+            results = await conn.query(
+                f"""
+                SELECT
+                    metadata.template_name as template_name,
+                    count() as total,
+                    math::mean(overall_score) as avg_score,
+                    math::min(overall_score) as min_score,
+                    math::max(overall_score) as max_score
+                FROM {self.table_name}
+                WHERE agent = $agent
+                    AND created_at >= $cutoff
+                    AND metadata.template_name != NONE
+                GROUP BY metadata.template_name
+                """,
+                {"agent": agent, "cutoff": cutoff},
+            )
+            return results if results else []
+
 
 # Repository cache
 _repos: dict[str, EvaluationRepository] = {}
