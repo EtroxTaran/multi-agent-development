@@ -24,13 +24,14 @@ export function useWorkflowStatus(projectName: string) {
     queryFn: () => workflowApi.getStatus(projectName),
     enabled: !!projectName,
     // Poll faster when workflow is active, slower when idle
+    // WebSocket handles real-time updates; this is a safety fallback
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "in_progress" ||
         status === "starting" ||
         status === "paused"
-        ? 5000 // 5 seconds when active
-        : 30000; // 30 seconds when idle
+        ? 3000 // 3 seconds when active (reduced from 5s)
+        : 15000; // 15 seconds when idle (reduced from 30s)
     },
   });
 }
@@ -43,7 +44,7 @@ export function useWorkflowHealth(projectName: string) {
     queryKey: workflowKeys.health(projectName),
     queryFn: () => workflowApi.getHealth(projectName),
     enabled: !!projectName,
-    refetchInterval: 60000, // Poll every 60 seconds
+    refetchInterval: 30000, // Poll every 30 seconds (reduced from 60s)
   });
 }
 

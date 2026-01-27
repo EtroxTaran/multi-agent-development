@@ -186,6 +186,11 @@ async def task_breakdown_node(state: WorkflowState) -> dict[str, Any]:
 
     logger.info(f"Created {len(tasks)} tasks in {len(milestones)} milestones")
 
+    # Emit tasks_created event for dashboard real-time update
+    from .task.callbacks import emit_tasks_created
+
+    emit_tasks_created(task_count=len(tasks), milestone_count=len(milestones))
+
     return {
         "tasks": tasks,
         "milestones": milestones,

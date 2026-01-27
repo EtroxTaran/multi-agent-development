@@ -84,3 +84,20 @@ def emit_ralph_iteration(
             )
         except Exception as e:
             logger.debug(f"Failed to emit ralph_iteration event: {e}")
+
+
+def emit_tasks_created(task_count: int, milestone_count: int) -> None:
+    """Emit tasks_created event via progress callback.
+
+    Used by task breakdown to notify dashboard when tasks are created.
+
+    Args:
+        task_count: Number of tasks created
+        milestone_count: Number of milestones created
+    """
+    callback = get_progress_callback()
+    if callback and hasattr(callback, "on_tasks_created"):
+        try:
+            callback.on_tasks_created(task_count, milestone_count)
+        except Exception as e:
+            logger.debug(f"Failed to emit tasks_created event: {e}")

@@ -255,6 +255,7 @@ export type WebSocketEventType =
   | "task_start"
   | "task_complete"
   | "task_failed"
+  | "tasks_created"
   | "agent_start"
   | "agent_complete"
   | "ralph_iteration"

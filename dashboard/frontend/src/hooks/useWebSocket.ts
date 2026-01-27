@@ -79,6 +79,13 @@ export function useWebSocket(
               }
               break;
 
+            // Tasks created event - immediately refresh task list
+            case "tasks_created":
+              queryClient.invalidateQueries({
+                queryKey: taskKeys.lists(projectName),
+              });
+              break;
+
             // Phase/Node events - invalidate workflow status
             case "phase_start":
             case "phase_end":

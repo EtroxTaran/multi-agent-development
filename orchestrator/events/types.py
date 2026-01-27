@@ -29,6 +29,7 @@ class EventType(str, Enum):
     TASK_START = "task_start"
     TASK_COMPLETE = "task_complete"
     TASK_FAILED = "task_failed"
+    TASKS_CREATED = "tasks_created"
 
     # Agent lifecycle
     AGENT_START = "agent_start"
@@ -417,5 +418,105 @@ def path_decision_event(
         data={
             "router": router,
             "decision": decision,
+        },
+    )
+
+
+def phase_start_event(
+    project_name: str,
+    phase: int,
+    node_name: Optional[str] = None,
+) -> WorkflowEvent:
+    """Create a phase start event.
+
+    Used to notify dashboard that a workflow phase has started.
+    High priority for immediate delivery.
+
+    Args:
+        project_name: Project name
+        phase: Phase number starting
+        node_name: Optional node name that triggered the phase
+
+    Returns:
+        WorkflowEvent for phase start
+    """
+    return WorkflowEvent(
+        event_type=EventType.PHASE_START,
+        project_name=project_name,
+        phase=phase,
+        node_name=node_name,
+        priority=EventPriority.HIGH,
+        data={
+            "phase": phase,
+            "status": "in_progress",
+        },
+    )
+
+
+def phase_end_event(
+    project_name: str,
+    phase: int,
+    success: bool,
+    node_name: Optional[str] = None,
+    error: Optional[str] = None,
+) -> WorkflowEvent:
+    """Create a phase end event.
+
+    Used to notify dashboard that a workflow phase has completed.
+    High priority for immediate delivery.
+
+    Args:
+        project_name: Project name
+        phase: Phase number ending
+        success: Whether the phase completed successfully
+        node_name: Optional node name that completed the phase
+        error: Optional error message if phase failed
+
+    Returns:
+        WorkflowEvent for phase end
+    """
+    return WorkflowEvent(
+        event_type=EventType.PHASE_END,
+        project_name=project_name,
+        phase=phase,
+        node_name=node_name,
+        priority=EventPriority.HIGH,
+        data={
+            "phase": phase,
+            "success": success,
+            "status": "completed" if success else "failed",
+            "error": error,
+        },
+    )
+
+
+def tasks_created_event(
+    project_name: str,
+    task_count: int,
+    milestone_count: int,
+    phase: int = 1,
+) -> WorkflowEvent:
+    """Create a tasks_created event.
+
+    Emitted when task breakdown creates new tasks.
+    High priority to trigger immediate frontend refresh.
+
+    Args:
+        project_name: Project name
+        task_count: Number of tasks created
+        milestone_count: Number of milestones created
+        phase: Current phase (usually 1 for planning)
+
+    Returns:
+        WorkflowEvent for tasks created
+    """
+    return WorkflowEvent(
+        event_type=EventType.TASKS_CREATED,
+        project_name=project_name,
+        phase=phase,
+        priority=EventPriority.HIGH,
+        data={
+            "task_count": task_count,
+            "milestone_count": milestone_count,
         },
     )

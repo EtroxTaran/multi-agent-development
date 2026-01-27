@@ -198,3 +198,75 @@ class TestDashboardCallback:
         )
 
         emitter.emit.assert_called()
+
+    # ==================== Phase Event Tests ====================
+
+    def test_on_phase_start_emits_immediately(self):
+        """Test that phase start emits immediately via emit_now."""
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.project_name = "test-project"
+        callback = DashboardCallback(emitter)
+
+        callback.on_phase_start(phase=2, node_name="planning")
+
+        # Should use emit_now for immediate delivery
+        emitter.emit_now.assert_called()
+        # Should update current_phase
+        assert callback.current_phase == 2
+
+    def test_on_phase_start_without_node_name(self):
+        """Test phase_start without node_name."""
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.project_name = "test-project"
+        callback = DashboardCallback(emitter)
+
+        callback.on_phase_start(phase=1)
+
+        emitter.emit_now.assert_called()
+        assert callback.current_phase == 1
+
+    def test_on_phase_end_success(self):
+        """Test that phase end emits immediately with success."""
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.project_name = "test-project"
+        callback = DashboardCallback(emitter)
+
+        callback.on_phase_end(phase=1, success=True, node_name="planning")
+
+        emitter.emit_now.assert_called()
+
+    def test_on_phase_end_with_error(self):
+        """Test phase end with error message."""
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.project_name = "test-project"
+        callback = DashboardCallback(emitter)
+
+        callback.on_phase_end(
+            phase=2,
+            success=False,
+            error="Validation failed",
+        )
+
+        emitter.emit_now.assert_called()
+
+    def test_on_phase_change_emits_immediately(self):
+        """Test that phase change emits immediately via emit_now."""
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.project_name = "test-project"
+        callback = DashboardCallback(emitter)
+
+        callback.on_phase_change(from_phase=1, to_phase=2, status="in_progress")
+
+        emitter.emit_now.assert_called()
+        # Should update current_phase
+        assert callback.current_phase == 2
+
+    def test_on_tasks_created_emits_immediately(self):
+        """Test that tasks_created emits immediately via emit_now."""
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.project_name = "test-project"
+        callback = DashboardCallback(emitter)
+
+        callback.on_tasks_created(task_count=5, milestone_count=2)
+
+        emitter.emit_now.assert_called()

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, RetryPolicy
+from langgraph.types import Command, RetryPolicy, Send
 
 from ..config.thresholds import ProjectConfig, RetryConfig
 from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes; Discussion and Research nodes (GSD pattern); Handoff node (GSD pattern); Error dispatch node; Pause check node
@@ -115,6 +115,58 @@ def pause_check_router(state: WorkflowState) -> str:
     }
 
     return continuation_map.get(paused_at, "build_verification")
+
+
+def planning_send_router(state: WorkflowState) -> list[Send]:
+    """Conditional parallel dispatch after planning phase.
+
+    Uses LangGraph's Send() API to conditionally fan-out to validation nodes
+    only if planning succeeded. This prevents validation from running when
+    planning failed.
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        List of Send objects:
+        - [Send(cursor_validate), Send(gemini_validate)] if plan exists
+        - [Send(error_dispatch)] if planning failed
+    """
+    # Check if plan exists and is valid
+    plan = state.get("plan")
+    has_valid_plan = plan and plan.get("plan_name")
+
+    # Check phase status for explicit failure
+    phase_status = state.get("phase_status", {})
+    phase_1 = phase_status.get("1")
+
+    # Determine if planning failed
+    planning_failed = False
+    if phase_1 and hasattr(phase_1, "status"):
+        from .state import PhaseStatus
+
+        if phase_1.status == PhaseStatus.FAILED:
+            planning_failed = True
+
+    # Check next_decision for explicit escalation/abort
+    decision = state.get("next_decision")
+    if decision in ("escalate", "abort"):
+        planning_failed = True
+
+    if has_valid_plan and not planning_failed:
+        # Success: fan-out to both validators in parallel
+        logger.info("Planning succeeded - dispatching to parallel validation")
+        return [
+            Send("cursor_validate", state),
+            Send("gemini_validate", state),
+        ]
+    else:
+        # Failure: route to error dispatch
+        logger.warning(
+            f"Planning failed - routing to error dispatch "
+            f"(has_plan={has_valid_plan}, failed={planning_failed}, decision={decision})"
+        )
+        return [Send("error_dispatch", state)]
 
 
 def create_workflow_graph(
@@ -289,9 +341,10 @@ def create_workflow_graph(
         },
     )
 
-    # Planning → parallel validation fan-out
-    graph.add_edge("planning", "cursor_validate")
-    graph.add_edge("planning", "gemini_validate")
+    # Planning → conditional parallel validation fan-out
+    # Uses Send() to dispatch to both validators only if planning succeeded.
+    # If planning failed, routes to error_dispatch instead.
+    graph.add_conditional_edges("planning", planning_send_router)
 
     # Validation fan-in: both validators merge here
     graph.add_edge("cursor_validate", "validation_fan_in")
@@ -703,6 +756,14 @@ class WorkflowRunner:
             Final workflow state
         """
         result = None
+        previous_phase: int | None = initial_state.get("current_phase") if initial_state else None
+
+        # Emit phase_start for the initial phase
+        if previous_phase is not None and hasattr(callback, "on_phase_start"):
+            try:
+                callback.on_phase_start(phase=previous_phase)
+            except Exception as e:
+                logger.warning(f"Callback error on_phase_start (initial): {e}")
 
         # Use astream_events for detailed event tracking
         async for event in graph.astream_events(
@@ -733,6 +794,46 @@ class WorkflowRunner:
                             callback.on_node_end(event_name, output)
                         except Exception as e:
                             logger.warning(f"Callback error on_node_end: {e}")
+
+                        # Detect phase changes and emit phase events
+                        current_phase = output.get("current_phase")
+                        if current_phase is not None and current_phase != previous_phase:
+                            try:
+                                # Check if phase ended successfully (no errors for that phase)
+                                phase_status = output.get("phase_status", {})
+                                prev_phase_status = (
+                                    phase_status.get(str(previous_phase), {})
+                                    if previous_phase
+                                    else {}
+                                )
+                                prev_success = prev_phase_status.get("status") != "failed"
+
+                                # Emit phase_end for the previous phase
+                                if previous_phase is not None and hasattr(callback, "on_phase_end"):
+                                    callback.on_phase_end(
+                                        phase=previous_phase,
+                                        success=prev_success,
+                                        node_name=event_name,
+                                    )
+
+                                # Emit phase_change for the transition
+                                if hasattr(callback, "on_phase_change"):
+                                    callback.on_phase_change(
+                                        from_phase=previous_phase or 0,
+                                        to_phase=current_phase,
+                                        status="in_progress",
+                                    )
+
+                                # Emit phase_start for the new phase
+                                if hasattr(callback, "on_phase_start"):
+                                    callback.on_phase_start(
+                                        phase=current_phase,
+                                        node_name=event_name,
+                                    )
+
+                                previous_phase = current_phase
+                            except Exception as e:
+                                logger.warning(f"Callback error on phase change: {e}")
 
         return result or initial_state
 
@@ -860,6 +961,12 @@ class WorkflowRunner:
         """
         result = None
 
+        # Get current state to track phase changes
+        state_snapshot = await self.graph.aget_state(run_config)
+        previous_phase: int | None = None
+        if state_snapshot and state_snapshot.values:
+            previous_phase = state_snapshot.values.get("current_phase")
+
         async for event in self.graph.astream_events(
             command,
             config=run_config,
@@ -886,6 +993,42 @@ class WorkflowRunner:
                             callback.on_node_end(event_name, output)
                         except Exception as e:
                             logger.warning(f"Callback error on_node_end: {e}")
+
+                        # Detect phase changes and emit phase events
+                        current_phase = output.get("current_phase")
+                        if current_phase is not None and current_phase != previous_phase:
+                            try:
+                                phase_status = output.get("phase_status", {})
+                                prev_phase_status = (
+                                    phase_status.get(str(previous_phase), {})
+                                    if previous_phase
+                                    else {}
+                                )
+                                prev_success = prev_phase_status.get("status") != "failed"
+
+                                if previous_phase is not None and hasattr(callback, "on_phase_end"):
+                                    callback.on_phase_end(
+                                        phase=previous_phase,
+                                        success=prev_success,
+                                        node_name=event_name,
+                                    )
+
+                                if hasattr(callback, "on_phase_change"):
+                                    callback.on_phase_change(
+                                        from_phase=previous_phase or 0,
+                                        to_phase=current_phase,
+                                        status="in_progress",
+                                    )
+
+                                if hasattr(callback, "on_phase_start"):
+                                    callback.on_phase_start(
+                                        phase=current_phase,
+                                        node_name=event_name,
+                                    )
+
+                                previous_phase = current_phase
+                            except Exception as e:
+                                logger.warning(f"Callback error on phase change: {e}")
 
         return result or {}
 

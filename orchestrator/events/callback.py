@@ -19,9 +19,13 @@ from .types import (
     node_end_event,
     node_start_event,
     path_decision_event,
+    phase_change_event,
+    phase_end_event,
+    phase_start_event,
     ralph_iteration_event,
     task_complete_event,
     task_start_event,
+    tasks_created_event,
     workflow_complete_event,
     workflow_paused_event,
     workflow_start_event,
@@ -304,6 +308,100 @@ class DashboardCallback:
             phase=self.current_phase,
             node_name=node_name,
             reason=reason,
+        )
+        self._emit_sync(self.emitter.emit_now(event))
+
+    # ==================== Phase Event Methods ====================
+
+    def on_phase_start(
+        self,
+        phase: int,
+        node_name: Optional[str] = None,
+    ) -> None:
+        """Called when a workflow phase starts.
+
+        Emits immediately for real-time dashboard updates.
+
+        Args:
+            phase: Phase number starting
+            node_name: Optional node that triggered the phase
+        """
+        self.current_phase = phase
+        event = phase_start_event(
+            project_name=self.emitter.project_name,
+            phase=phase,
+            node_name=node_name,
+        )
+        self._emit_sync(self.emitter.emit_now(event))
+
+    def on_phase_end(
+        self,
+        phase: int,
+        success: bool,
+        node_name: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """Called when a workflow phase ends.
+
+        Emits immediately for real-time dashboard updates.
+
+        Args:
+            phase: Phase number ending
+            success: Whether the phase completed successfully
+            node_name: Optional node that completed the phase
+            error: Optional error message if phase failed
+        """
+        event = phase_end_event(
+            project_name=self.emitter.project_name,
+            phase=phase,
+            success=success,
+            node_name=node_name,
+            error=error,
+        )
+        self._emit_sync(self.emitter.emit_now(event))
+
+    def on_phase_change(
+        self,
+        from_phase: int,
+        to_phase: int,
+        status: str = "in_progress",
+    ) -> None:
+        """Called when workflow transitions between phases.
+
+        Emits immediately for real-time dashboard updates.
+
+        Args:
+            from_phase: Phase number transitioning from
+            to_phase: Phase number transitioning to
+            status: Status of the transition
+        """
+        self.current_phase = to_phase
+        event = phase_change_event(
+            project_name=self.emitter.project_name,
+            from_phase=from_phase,
+            to_phase=to_phase,
+            status=status,
+        )
+        self._emit_sync(self.emitter.emit_now(event))
+
+    def on_tasks_created(
+        self,
+        task_count: int,
+        milestone_count: int,
+    ) -> None:
+        """Called when task breakdown creates new tasks.
+
+        Emits immediately so dashboard can refresh task list.
+
+        Args:
+            task_count: Number of tasks created
+            milestone_count: Number of milestones created
+        """
+        event = tasks_created_event(
+            project_name=self.emitter.project_name,
+            task_count=task_count,
+            milestone_count=milestone_count,
+            phase=self.current_phase,
         )
         self._emit_sync(self.emitter.emit_now(event))
 

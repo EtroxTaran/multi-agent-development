@@ -29,8 +29,8 @@ export function useTasks(projectName: string, status?: string) {
     queryKey: taskKeys.list(projectName, status),
     queryFn: () => tasksApi.list(projectName, status),
     enabled: !!projectName,
-    refetchInterval: 30000, // Reduce to 30s fallback (WebSocket handles real-time)
-    staleTime: 10000, // Data fresh for 10 seconds
+    refetchInterval: 10000, // 10s fallback (reduced from 30s; WebSocket handles real-time)
+    staleTime: 5000, // Data fresh for 5 seconds (reduced from 10s)
   });
 }
 
