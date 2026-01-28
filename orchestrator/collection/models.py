@@ -112,8 +112,13 @@ class CollectionItem:
         if isinstance(item_type, str):
             item_type = ItemType(item_type)
 
+        # Convert id to string in case it's a SurrealDB RecordID
+        item_id = data.get("id", "")
+        if item_id and not isinstance(item_id, str):
+            item_id = str(item_id)
+
         return cls(
-            id=data.get("id", ""),
+            id=item_id,
             name=data.get("name", ""),
             item_type=item_type,
             category=data.get("category", ""),

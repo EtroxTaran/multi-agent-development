@@ -4,7 +4,7 @@ globs: **/*
 
 
 <!-- AUTO-GENERATED from shared-rules/ -->
-<!-- Last synced: 2026-01-27 17:25:06 -->
+<!-- Last synced: 2026-01-28 20:12:35 -->
 <!-- DO NOT EDIT - Run: python scripts/sync-rules.py -->
 
 Instructions for Cursor as code quality reviewer.
@@ -639,8 +639,8 @@ If a bug cannot be fixed with a regression test (extremely rare):
 # CLI Reference (All Agents)
 
 <!-- SHARED: This file applies to ALL agents -->
-<!-- Version: 3.0 -->
-<!-- Last Updated: 2026-01-27 -->
+<!-- Version: 3.1 -->
+<!-- Last Updated: 2026-01-28 -->
 
 ## Quick Reference Table
 
@@ -683,9 +683,47 @@ If a bug cannot be fixed with a regression test (extremely rare):
 
 **Command**: `cursor-agent --print --output-format json "prompt"`
 
-- `--print` or `-p`: Non-interactive mode
+### Key Flags
+| Flag | Purpose |
+|------|---------|
+| `--print` or `-p` | Non-interactive mode |
+| `--output-format` | Output format (json, text) |
+| `--mode` | Agent mode (agent, plan, ask) |
+| `--resume <thread-id>` | Continue previous session |
+| `--model` | Model selection |
+| `--force` | Force execution without confirmation |
+
+### Agent Modes (New - Jan 2026)
+| Mode | Flag | In-Session | Purpose |
+|------|------|------------|---------|
+| Agent | `--mode=agent` | (default) | Execute changes directly |
+| Plan | `--mode=plan` | `/plan` | Research, ask questions, create plan before coding |
+| Ask | `--mode=ask` | `/ask` | Explore code without making changes |
+
+### Plan Mode Workflow
+1. Agent asks clarifying questions
+2. Researches codebase for context
+3. Creates implementation plan (markdown file)
+4. You review/edit the plan
+5. Click "Build" to execute
+
+Plans can be saved to `.cursor/plans/` for team sharing.
+
+### Decision Matrix (Cursor)
+
+| Scenario | Mode | When to Use |
+|----------|------|-------------|
+| Simple code review | agent | Direct validation/verification |
+| Complex validation | plan | Multi-file reviews needing context |
+| Architecture review | plan | Requires deep codebase research |
+| Quick Q&A | ask | Explore without changes |
+| Routine verification | agent | Standard Phase 4 reviews |
+
+### Notes
 - Prompt is POSITIONAL (at the END)
 - Common mistake: `-p "prompt"` is wrong (means `--print`)
+- Use `Shift+Tab` to cycle modes in interactive sessions
+- `/compress` reduces context window usage
 
 ---
 
@@ -740,13 +778,26 @@ export PARALLEL_WORKERS=3               # Parallel workers
 ## Autonomous Decision Guidelines
 
 **DO automatically:**
-- Use plan mode for ≥3 files or high complexity
+- Use Claude plan mode for ≥3 files or high complexity
+- Use Cursor plan mode for complex validations requiring deep research
 - Resume sessions for Ralph iterations 2+
 - Set budget limits on all invocations
 
 **DO NOT without asking:**
 - Skip budget limits entirely
 - Change project-wide budget limits
+
+### When to Use Cursor Plan Mode
+
+**Use plan mode (`--mode=plan`):**
+- Complex multi-file architecture reviews
+- Validations requiring extensive codebase research
+- When the review scope is unclear
+
+**Use agent mode (default):**
+- Standard Phase 2 plan validation
+- Standard Phase 4 code verification
+- Routine security scans
 
 ---
 
@@ -758,8 +809,8 @@ export PARALLEL_WORKERS=3               # Parallel workers
 
 <!-- SHARED: This file applies to ALL agents -->
 <!-- Add new lessons at the TOP of this file -->
-<!-- Version: 2.0 -->
-<!-- Last Updated: 2026-01-27 -->
+<!-- Version: 2.1 -->
+<!-- Last Updated: 2026-01-28 -->
 
 ## How to Add a Lesson
 
@@ -774,6 +825,14 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons (Last 5)
+
+### 2026-01-28 - Cursor CLI Plan Mode Support (Jan 2026 Update)
+
+- **Issue**: Documentation incorrectly stated Cursor CLI doesn't support plan mode
+- **Root Cause**: Cursor CLI Jan 16, 2026 update added `--mode=plan` and `--mode=ask` flags, which weren't reflected in docs
+- **Fix**: Updated CLI reference, CursorAgent class, and call-cursor.sh to support `--mode` flag with agent/plan/ask modes
+- **Prevention**: Always verify tool capabilities with web research before documenting limitations; CLI tools evolve rapidly
+- **Applies To**: cursor
 
 ### 2026-01-23 - Global Bugfixer and Optimizer Agents
 
