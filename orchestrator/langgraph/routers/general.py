@@ -153,14 +153,15 @@ def implementation_router(
             return "planning"
 
     # Check implementation result
-    impl_result = state.get("implementation_result", {})
-    if impl_result.get("success"):
-        return "cursor_review"
+    impl_result = state.get("implementation_result")
+    if isinstance(impl_result, dict):
+        if impl_result.get("success"):
+            return "cursor_review"
 
-    # Check for test failures
-    test_results = impl_result.get("test_results", {})
-    if test_results.get("failed", 0) > 0:
-        return "planning"
+        # Check for test failures
+        test_results = impl_result.get("test_results")
+        if isinstance(test_results, dict) and test_results.get("failed", 0) > 0:
+            return "planning"
 
     # Default to verification
     return "cursor_review"
@@ -544,8 +545,8 @@ def quality_gate_router(
         return "__end__"
 
     # Check quality gate result
-    qg_result = state.get("quality_gate_result", {})
-    if qg_result.get("passed"):
+    qg_result = state.get("quality_gate_result")
+    if isinstance(qg_result, dict) and qg_result.get("passed"):
         return "cursor_review"
 
     # Default to code review (non-blocking by default)
@@ -582,14 +583,70 @@ def dependency_check_router(
         return "__end__"
 
     # Check dependency check result
-    dep_result = state.get("dependency_check_result", {})
-    if dep_result.get("passed"):
-        return "completion"
+    dep_result = state.get("dependency_check_result")
+    if isinstance(dep_result, dict):
+        if dep_result.get("passed"):
+            return "completion"
 
-    # Check for critical vulnerabilities
-    blocking_issues = dep_result.get("blocking_issues", [])
-    if blocking_issues:
-        return "human_escalation"
+        # Check for critical vulnerabilities
+        blocking_issues = dep_result.get("blocking_issues", [])
+        if blocking_issues:
+            return "human_escalation"
 
     # Default to completion
     return "completion"
+
+
+def test_pass_gate_router(
+    state: WorkflowState,
+) -> Literal["completion", "task_subgraph", "human_escalation", "__end__"]:
+    """Route after test pass gate verification.
+
+    This router determines the next step based on test results:
+    - If all tests pass, proceed to completion
+    - If tests fail, route back to task_subgraph for fixes
+    - If max retries exceeded, escalate to human
+
+    Args:
+        state: Current workflow state
+
+    Returns:
+        Next node name:
+        - "completion": All tests passed, proceed to completion
+        - "task_subgraph": Tests failed, retry implementation
+        - "human_escalation": Max retries exceeded
+        - "__end__": Abort workflow
+    """
+    decision = state.get("next_decision")
+
+    if decision == WorkflowDecision.CONTINUE or decision == "continue":
+        return "completion"
+
+    if decision == WorkflowDecision.RETRY or decision == "retry":
+        return "task_subgraph"
+
+    if decision == WorkflowDecision.ESCALATE or decision == "escalate":
+        return "human_escalation"
+
+    if decision == WorkflowDecision.ABORT or decision == "abort":
+        return "__end__"
+
+    # Check test gate results
+    test_results = state.get("test_gate_results")
+    if isinstance(test_results, dict):
+        status = test_results.get("status")
+        if status == "passed":
+            return "completion"
+
+        if status in ("skipped", "timeout", "error"):
+            # Non-blocking issues - proceed with warning
+            return "completion"
+
+    # Tests failed - check attempt count
+    raw_attempts = state.get("test_gate_attempts")
+    attempts = raw_attempts if isinstance(raw_attempts, int) else 0
+    if attempts >= 3:  # MAX_TEST_GATE_ATTEMPTS
+        return "human_escalation"
+
+    # Route back for fixes
+    return "task_subgraph"

@@ -49,10 +49,14 @@ from .product_validation import product_validation_node
 from .quality_gate import quality_gate_node
 from .research_phase import research_phase_node
 from .security_scan import security_scan_node
+from .security_specialist import security_specialist_node
 from .select_task import select_next_task_node
 
 # Task loop nodes (incremental execution)
 from .task_breakdown import task_breakdown_node
+
+# Test pass gate node (final verification before completion)
+from .test_pass_gate import test_pass_gate_node
 from .validation import cursor_validate_node, gemini_validate_node, validation_fan_in_node
 from .verification import (
     cursor_review_node,
@@ -84,6 +88,7 @@ __all__ = [
     "build_verification_node",
     "coverage_check_node",
     "security_scan_node",
+    "security_specialist_node",
     "approval_gate_node",
     # Quality infrastructure nodes
     "quality_gate_node",
@@ -118,4 +123,6 @@ __all__ = [
     # Pause check node (dashboard integration)
     "pause_check_node",
     "pause_router",
+    # Test pass gate node (final verification before completion)
+    "test_pass_gate_node",
 ]

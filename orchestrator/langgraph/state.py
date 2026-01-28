@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Optional, TypedDict
+from typing import Annotated, Any, Optional, TypedDict, cast
 
 # ============== ERROR CONTEXT ==============
 # Rich error context for the Bugfixer agent
@@ -660,7 +660,8 @@ class AgentFeedback:
 
         archive_path = Path(self._archived_path)
         if archive_path.exists():
-            return json.loads(archive_path.read_text())
+            data = json.loads(archive_path.read_text())
+            return cast(dict, data) if isinstance(data, dict) else None
         return None
 
 
@@ -732,6 +733,52 @@ def _latest_timestamp(
         return new
     # Compare ISO format timestamps (lexicographically works for ISO format)
     return max(existing, new)
+
+
+def _latest_execution(
+    existing: Optional["AgentExecution"],
+    new: Optional["AgentExecution"],
+) -> Optional["AgentExecution"]:
+    """Reducer for keeping the latest agent execution.
+
+    When parallel nodes both produce executions, keep the latest by timestamp.
+
+    Args:
+        existing: Existing agent execution
+        new: New agent execution
+
+    Returns:
+        The later execution by timestamp
+    """
+    if new is None:
+        return existing
+    if existing is None:
+        return new
+
+    # Compare timestamps (ISO format is lexicographically sortable)
+    existing_ts = existing.get("timestamp", "")
+    new_ts = new.get("timestamp", "")
+    return new if new_ts >= existing_ts else existing
+
+
+def _latest_dict(
+    existing: Optional[dict],
+    new: Optional[dict],
+) -> Optional[dict]:
+    """Reducer for keeping the latest dict value.
+
+    When parallel nodes both produce dicts, keep the newer one.
+
+    Args:
+        existing: Existing dict
+        new: New dict
+
+    Returns:
+        The new dict if provided, else existing
+    """
+    if new is None:
+        return existing
+    return new
 
 
 # Maximum unique IDs to track in state
@@ -881,24 +928,24 @@ def _merge_task_fields(existing: Task, new: Task) -> Task:
     Returns:
         Merged task
     """
-    merged = dict(existing)
+    merged: dict[str, Any] = dict(existing)
 
     # Update with new values
     for key, value in new.items():
         if value is not None:
             # For lists, merge instead of overwrite
-            if isinstance(value, list) and isinstance(merged.get(key), list):
-                existing_list = merged[key]
+            existing_val = merged.get(key)
+            if isinstance(value, list) and isinstance(existing_val, list):
                 for item in value:
-                    if item not in existing_list:
-                        existing_list.append(item)
+                    if item not in existing_val:
+                        existing_val.append(item)
             else:
                 merged[key] = value
 
     # Take the higher attempt count
     merged["attempts"] = max(existing.get("attempts", 0), new.get("attempts", 0))
 
-    return merged
+    return cast(Task, merged)
 
 
 class WorkflowState(TypedDict, total=False):
@@ -1042,16 +1089,16 @@ class WorkflowState(TypedDict, total=False):
     current_fix_attempt: Optional[dict]
     fix_history: Annotated[list[dict], _append_fix_history]
 
-    # Auto-improvement state
-    last_agent_execution: Optional[AgentExecution]  # Most recent agent execution for evaluation
-    last_evaluation: Optional[dict]  # Most recent evaluation result
-    last_analysis: Optional[dict]  # Most recent output analysis
+    # Auto-improvement state (annotated for parallel node safety)
+    last_agent_execution: Annotated[Optional[AgentExecution], _latest_execution]
+    last_evaluation: Annotated[Optional[dict], _latest_dict]
+    last_analysis: Annotated[Optional[dict], _latest_dict]
     optimization_queue: list[dict]  # Templates queued for optimization
     optimization_results: list[dict]  # Results from optimization attempts
     active_experiments: dict[str, str]  # A/B testing: template -> version_id
 
     # Global error context (for Bugfixer agent)
-    error_context: Optional[ErrorContext]  # Rich error context for current error
+    error_context: Annotated[Optional[ErrorContext], _latest_dict]  # Rich error context
     execution_history: Annotated[list[AgentExecution], _append_executions]  # All agent executions
 
     # Pause control (dashboard integration)
@@ -1059,6 +1106,10 @@ class WorkflowState(TypedDict, total=False):
     paused_at_node: Optional[str]  # Which node we paused after
     paused_at_timestamp: Optional[str]  # When pause was requested
     pause_reason: Optional[str]  # Reason for pause (user-provided)
+
+    # Test pass gate (final verification before completion)
+    test_gate_attempts: int  # Track retry count
+    test_gate_results: Optional[dict]  # Latest test run results
 
 
 def create_initial_state(
@@ -1158,6 +1209,9 @@ def create_initial_state(
         paused_at_node=None,
         paused_at_timestamp=None,
         pause_reason=None,
+        # Test pass gate (final verification before completion)
+        test_gate_attempts=0,
+        test_gate_results=None,
     )
 
 

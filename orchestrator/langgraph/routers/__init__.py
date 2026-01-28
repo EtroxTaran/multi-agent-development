@@ -33,7 +33,7 @@ from .fixer import (
     fixer_verify_router,
     should_use_fixer_router,
 )
-from .general import (  # Risk mitigation routers; Discussion and Research routers (GSD pattern); Quality infrastructure routers
+from .general import (  # Risk mitigation routers; Discussion and Research routers (GSD pattern); Quality infrastructure routers; Test pass gate router
     approval_gate_router,
     build_verification_router,
     completion_router,
@@ -50,6 +50,7 @@ from .general import (  # Risk mitigation routers; Discussion and Research route
     quality_gate_router,
     research_router,
     security_scan_router,
+    test_pass_gate_router,
 )
 from .task import (
     implement_task_router,
@@ -117,4 +118,6 @@ __all__ = [
     "analyze_output_router",
     "optimize_prompts_router",
     "should_evaluate_router",
+    # Test pass gate router
+    "test_pass_gate_router",
 ]

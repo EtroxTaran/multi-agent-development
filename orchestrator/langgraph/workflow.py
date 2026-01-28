@@ -17,7 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, RetryPolicy, Send
 
 from ..config.thresholds import ProjectConfig, RetryConfig
-from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes; Discussion and Research nodes (GSD pattern); Handoff node (GSD pattern); Error dispatch node; Pause check node
+from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes; Discussion and Research nodes (GSD pattern); Handoff node (GSD pattern); Error dispatch node; Pause check node; Test pass gate node
     approval_gate_node,
     build_verification_node,
     completion_node,
@@ -47,10 +47,11 @@ from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes;
     review_gate_node,
     security_scan_node,
     security_specialist_node,
+    test_pass_gate_node,
     validation_fan_in_node,
     verification_fan_in_node,
 )
-from .routers import (  # New risk mitigation routers; Quality infrastructure routers; Discussion and Research routers (GSD pattern); Error dispatch router
+from .routers import (  # New risk mitigation routers; Quality infrastructure routers; Discussion and Research routers (GSD pattern); Error dispatch router; Test pass gate router
     approval_gate_router,
     coverage_check_router,
     dependency_check_router,
@@ -63,6 +64,7 @@ from .routers import (  # New risk mitigation routers; Quality infrastructure ro
     quality_gate_router,
     research_router,
     security_scan_router,
+    test_pass_gate_router,
     validation_router,
     verification_router,
 )
@@ -106,7 +108,8 @@ def pause_check_router(state: WorkflowState) -> str:
         return "error_dispatch"
 
     # Otherwise continue to the node we paused before
-    paused_at = state.get("paused_at_node", "build_verification")
+    paused_at = state.get("paused_at_node")
+    paused_at_str = paused_at if isinstance(paused_at, str) else "build_verification"
 
     # Map pause points to their continuation nodes
     continuation_map = {
@@ -115,7 +118,7 @@ def pause_check_router(state: WorkflowState) -> str:
         "after_verification": "coverage_check",
     }
 
-    return continuation_map.get(paused_at, "build_verification")
+    return continuation_map.get(paused_at_str, "build_verification")
 
 
 def planning_send_router(state: WorkflowState) -> list[Send]:
@@ -273,6 +276,7 @@ def create_workflow_graph(
     graph.add_node("coverage_check", coverage_check_node)
     graph.add_node("security_scan", security_scan_node)
     graph.add_node("dependency_check", dependency_check_node)  # A14: Dependency analysis
+    graph.add_node("test_pass_gate", test_pass_gate_node)  # Final test verification gate
     graph.add_node("human_escalation", human_escalation_node)
     graph.add_node("completion", completion_node)
 
@@ -481,13 +485,25 @@ def create_workflow_graph(
         },
     )
 
-    # Dependency check → completion (with conditional routing)
+    # Dependency check → test_pass_gate (with conditional routing)
     graph.add_conditional_edges(
         "dependency_check",
         dependency_check_router,
         {
-            "completion": "completion",
+            "completion": "test_pass_gate",  # Changed: go to test_pass_gate first
             "implementation": "implementation",
+            "human_escalation": "error_dispatch",  # Route through error_dispatch
+            "__end__": END,
+        },
+    )
+
+    # Test pass gate → completion (final verification before marking complete)
+    graph.add_conditional_edges(
+        "test_pass_gate",
+        test_pass_gate_router,
+        {
+            "completion": "completion",
+            "task_subgraph": "task_subgraph",  # Retry implementation if tests fail
             "human_escalation": "error_dispatch",  # Route through error_dispatch
             "__end__": END,
         },
@@ -823,7 +839,7 @@ class WorkflowRunner:
                                     # PhaseState dataclass - access status attribute directly
                                     status_val = getattr(prev_phase_status, "status", None)
                                     # Status might be a PhaseStatus enum
-                                    if hasattr(status_val, "value"):
+                                    if status_val is not None and hasattr(status_val, "value"):
                                         status_val = status_val.value
                                     prev_phase_status = {"status": status_val}
                                 prev_success = prev_phase_status.get("status") != "failed"
@@ -855,7 +871,7 @@ class WorkflowRunner:
                             except Exception as e:
                                 logger.warning(f"Callback error on phase change: {e}")
 
-        return result or initial_state
+        return dict(result or initial_state or {})
 
     async def resume(
         self,
@@ -981,6 +997,9 @@ class WorkflowRunner:
         Returns:
             Final workflow state
         """
+        if self.graph is None:
+            raise RuntimeError("WorkflowRunner must be used as async context manager")
+
         result = None
 
         # Get current state to track phase changes
@@ -1033,7 +1052,7 @@ class WorkflowRunner:
                                     # PhaseState dataclass - access status attribute directly
                                     status_val = getattr(prev_phase_status, "status", None)
                                     # Status might be a PhaseStatus enum
-                                    if hasattr(status_val, "value"):
+                                    if status_val is not None and hasattr(status_val, "value"):
                                         status_val = status_val.value
                                     prev_phase_status = {"status": status_val}
                                 prev_success = prev_phase_status.get("status") != "failed"
@@ -1091,7 +1110,7 @@ class WorkflowRunner:
     # Maximum checkpoints to return in history
     MAX_HISTORY_CHECKPOINTS = 50
 
-    async def get_history(self, limit: int = None) -> list[dict]:
+    async def get_history(self, limit: Optional[int] = None) -> list[dict]:
         """Get the workflow execution history with pagination.
 
         Args:
@@ -1100,7 +1119,10 @@ class WorkflowRunner:
         Returns:
             List of state snapshots (limited to prevent memory issues)
         """
-        limit = limit or self.MAX_HISTORY_CHECKPOINTS
+        if self.graph is None:
+            raise RuntimeError("WorkflowRunner must be used as async context manager")
+
+        effective_limit = limit or self.MAX_HISTORY_CHECKPOINTS
         run_config = {
             "configurable": {
                 "thread_id": self.thread_id,
@@ -1117,7 +1139,7 @@ class WorkflowRunner:
                 }
             )
             # Stop collecting after limit to prevent unbounded memory
-            if len(history) >= limit:
+            if len(history) >= effective_limit:
                 break
 
         return history
@@ -1160,11 +1182,12 @@ class WorkflowRunner:
         """
         import asyncio
 
-        async def _get():
+        async def _get() -> Optional[dict]:
             async with WorkflowRunner(self.project_dir) as runner:
                 return await runner.get_pending_interrupt_async()
 
-        return asyncio.run(_get())
+        result = asyncio.run(_get())
+        return result
 
 
 def get_workflow_runner(
