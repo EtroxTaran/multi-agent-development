@@ -1,8 +1,8 @@
 # CLI Reference (All Agents)
 
 <!-- SHARED: This file applies to ALL agents -->
-<!-- Version: 3.0 -->
-<!-- Last Updated: 2026-01-27 -->
+<!-- Version: 3.2 -->
+<!-- Last Updated: 2026-01-28 -->
 
 ## Quick Reference Table
 
@@ -45,9 +45,66 @@
 
 **Command**: `cursor-agent --print --output-format json "prompt"`
 
-- `--print` or `-p`: Non-interactive mode
+### Key Flags
+| Flag | Purpose |
+|------|---------|
+| `--print` or `-p` | Non-interactive mode |
+| `--output-format` | Output format (json, text) |
+| `--mode` | Agent mode (agent, plan, ask) |
+| `--resume <thread-id>` | Continue previous session |
+| `--model` | Model selection |
+| `--force` | Force execution without confirmation |
+
+### Agent Modes (New - Jan 2026)
+| Mode | Flag | In-Session | Purpose |
+|------|------|------------|---------|
+| Agent | `--mode=agent` | (default) | Execute changes directly |
+| Plan | `--mode=plan` | `/plan` | Research, ask questions, create plan before coding |
+| Ask | `--mode=ask` | `/ask` | Explore code without making changes |
+
+**IMPORTANT: Headless vs Interactive Mode Selection**
+
+| Context | Allowed Modes | Recommended |
+|---------|---------------|-------------|
+| Orchestrator (headless automation) | `agent`, `ask` | `ask` for analysis |
+| Interactive development | All modes | `plan` for complex work |
+
+**Plan mode is INTERACTIVE ONLY** - it requires user input for:
+- Clarifying questions
+- Plan approval before execution
+
+For headless automation (orchestrator workflow), use:
+- `ask` mode for read-only analysis (validation, code review)
+- `agent` mode for executing changes
+
+### Plan Mode Workflow (Interactive Only)
+1. Agent asks clarifying questions
+2. Researches codebase for context
+3. Creates implementation plan (markdown file)
+4. You review/edit the plan
+5. Click "Build" to execute
+
+Plans can be saved to `.cursor/plans/` for team sharing.
+
+### Decision Matrix (Cursor)
+
+| Scenario | Mode | When to Use |
+|----------|------|-------------|
+| **Orchestrator (Headless)** | | |
+| Phase 2 plan validation | ask | Read-only analysis of plan |
+| Phase 4 code verification | ask | Read-only code review |
+| Routine security scan | agent | Direct execution |
+| **Interactive Development** | | |
+| Simple code review | agent | Direct validation/verification |
+| Complex validation | plan | Multi-file reviews needing context |
+| Architecture review | plan | Requires deep codebase research |
+| Quick Q&A | ask | Explore without changes |
+
+### Notes
 - Prompt is POSITIONAL (at the END)
 - Common mistake: `-p "prompt"` is wrong (means `--print`)
+- Use `Shift+Tab` to cycle modes in interactive sessions
+- `/compress` reduces context window usage
 
 ---
 
@@ -102,13 +159,26 @@ export PARALLEL_WORKERS=3               # Parallel workers
 ## Autonomous Decision Guidelines
 
 **DO automatically:**
-- Use plan mode for ≥3 files or high complexity
+- Use Claude plan mode for ≥3 files or high complexity
+- Use Cursor plan mode for complex validations requiring deep research
 - Resume sessions for Ralph iterations 2+
 - Set budget limits on all invocations
 
 **DO NOT without asking:**
 - Skip budget limits entirely
 - Change project-wide budget limits
+
+### When to Use Cursor Modes
+
+**Headless Automation (Orchestrator):**
+- Use `--mode=ask` for analysis (plan validation, code review)
+- Use `--mode=agent` (default) for direct execution
+- **NEVER use `--mode=plan`** - it requires interactive input
+
+**Interactive Development:**
+- Use `--mode=plan` for complex multi-file work
+- Use `--mode=ask` for exploration without changes
+- Use `--mode=agent` (default) for direct execution
 
 ---
 

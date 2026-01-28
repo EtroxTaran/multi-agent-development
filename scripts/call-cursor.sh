@@ -8,6 +8,15 @@
 #
 # Default model: GPT-5.2-Codex (latest as of Jan 2026)
 # Can be overridden with CURSOR_MODEL environment variable
+#
+# Agent modes (Jan 2026 CLI update):
+# - agent: Execute changes directly (default)
+# - plan: Research, ask questions, create plan before coding (INTERACTIVE ONLY)
+# - ask: Explore code without making changes (use for headless analysis)
+# Can be set with CURSOR_MODE environment variable
+#
+# NOTE: Plan mode requires interactive input (clarifying questions, plan approval).
+# For headless/automation use cases (orchestrator), use 'ask' mode instead.
 
 set -e
 
@@ -22,6 +31,25 @@ PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
 # Options: gpt-5.2-codex, composer-v2, gpt-4o
 CURSOR_MODEL="${CURSOR_MODEL:-gpt-5.2-codex}"
 
+# Mode selection (Jan 2026 CLI feature)
+# Options: agent (default), ask
+# NOTE: 'plan' mode is interactive-only - not supported for headless automation
+CURSOR_MODE="${CURSOR_MODE:-agent}"
+
+# Validate mode - only allow agent/ask for headless automation
+VALID_MODES="agent ask"
+if [[ ! " $VALID_MODES " =~ " $CURSOR_MODE " ]]; then
+    if [ "$CURSOR_MODE" = "plan" ]; then
+        echo "Warning: Plan mode requires interactive input and cannot be used in headless automation."
+        echo "Switching to 'ask' mode for read-only analysis instead."
+        CURSOR_MODE="ask"
+    else
+        echo "Warning: Invalid CURSOR_MODE '$CURSOR_MODE'. Valid modes: agent, ask"
+        echo "Using default 'agent' mode."
+        CURSOR_MODE="agent"
+    fi
+fi
+
 # Validate arguments
 if [ -z "$PROMPT_FILE" ] || [ -z "$OUTPUT_FILE" ]; then
     echo "Usage: call-cursor.sh <prompt-file> <output-file> [project-dir]"
@@ -29,6 +57,11 @@ if [ -z "$PROMPT_FILE" ] || [ -z "$OUTPUT_FILE" ]; then
     echo "Environment variables:"
     echo "  CURSOR_MODEL - Model to use (default: gpt-5.2-codex)"
     echo "                 Options: gpt-5.2-codex, composer-v2, gpt-4o"
+    echo "  CURSOR_MODE  - Agent mode (default: agent)"
+    echo "                 Options: agent, ask (plan is interactive-only)"
+    echo "                 - agent: Execute changes directly"
+    echo "                 - ask: Explore code without changes (for analysis)"
+    echo "                 NOTE: plan mode requires interactive input"
     exit 1
 fi
 
@@ -88,18 +121,26 @@ echo "Calling Cursor CLI..."
 # Function to execute Cursor agent
 run_cursor() {
     local model="$1"
-    echo "Calling Cursor CLI with model: $model..."
+    local mode="$2"
+    echo "Calling Cursor CLI with model: $model, mode: $mode..."
     cursor-agent --print \
         --output-format json \
         --force \
         --model "$model" \
+        --mode "$mode" \
         "${CONTEXT_ARGS[@]}" \
         "$PROMPT" \
         > "$OUTPUT_FILE" 2>&1
 }
 
 # Initial execution
-run_cursor "$CURSOR_MODEL"
+run_cursor "$CURSOR_MODEL" "$CURSOR_MODE"
+CURSOR_EXIT_CODE=$?
+
+# Check exit code
+if [ $CURSOR_EXIT_CODE -ne 0 ]; then
+    echo "Warning: cursor-agent exited with code $CURSOR_EXIT_CODE"
+fi
 
 # Check for quota/rate limit errors in output
 # Grep for common error terms: quota, rate limit, 429, too many requests
@@ -108,7 +149,7 @@ if grep -i -qE "quota|rate limit|429|too many requests|exhausted" "$OUTPUT_FILE"
 
     if [ "$CURSOR_MODEL" != "auto" ]; then
         echo "Switching to 'auto' model and retrying..."
-        run_cursor "auto"
+        run_cursor "auto" "$CURSOR_MODE"
     else
         echo "Error: Quota exhausted even on auto model"
     fi

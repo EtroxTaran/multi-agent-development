@@ -2,8 +2,8 @@
 
 <!-- SHARED: This file applies to ALL agents -->
 <!-- Add new lessons at the TOP of this file -->
-<!-- Version: 2.0 -->
-<!-- Last Updated: 2026-01-27 -->
+<!-- Version: 2.1 -->
+<!-- Last Updated: 2026-01-28 -->
 
 ## How to Add a Lesson
 
@@ -18,6 +18,14 @@ When you discover a bug, mistake, or pattern that should be remembered:
 ---
 
 ## Recent Lessons (Last 5)
+
+### 2026-01-28 - Cursor CLI Plan Mode is Interactive-Only
+
+- **Issue**: Plan mode was added to CursorAgent but can't work in headless automation (orchestrator)
+- **Root Cause**: Plan mode requires interactive input (clarifying questions, plan approval) - unsuitable for automation
+- **Fix**: Use `--mode=ask` for headless analysis; validate mode in call-cursor.sh (reject plan mode); add `run_analysis()` method; rename `use_plan_mode` to `use_ask_mode` in validation/review methods
+- **Prevention**: Distinguish between interactive and headless modes when adding CLI features; use `ask` mode for orchestrator analysis, reserve `plan` for interactive development only
+- **Applies To**: cursor
 
 ### 2026-01-23 - Global Bugfixer and Optimizer Agents
 

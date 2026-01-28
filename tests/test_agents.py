@@ -125,6 +125,16 @@ class TestCursorAgent:
         assert agent.name == "cursor"
         assert agent.project_dir == temp_project_dir
 
+    def test_initialization_with_mode(self, temp_project_dir):
+        """Test agent initialization with mode parameter."""
+        agent = CursorAgent(temp_project_dir, mode="ask")
+        assert agent.mode == "ask"
+
+    def test_initialization_invalid_mode_fallback(self, temp_project_dir):
+        """Test that invalid mode falls back to default."""
+        agent = CursorAgent(temp_project_dir, mode="invalid_mode")
+        assert agent.mode == "agent"  # Default mode
+
     def test_get_cli_command(self, temp_project_dir):
         """Test CLI command name."""
         agent = CursorAgent(temp_project_dir)
@@ -144,6 +154,24 @@ class TestCursorAgent:
         assert "--print" in cmd  # Non-interactive mode flag
         assert "test prompt" in cmd
         assert "--force" in cmd
+
+    def test_build_command_with_mode(self, temp_project_dir):
+        """Test command building includes mode flag."""
+        agent = CursorAgent(temp_project_dir, mode="ask")
+        cmd = agent.build_command("test prompt")
+
+        assert "--mode" in cmd
+        mode_idx = cmd.index("--mode")
+        assert cmd[mode_idx + 1] == "ask"
+
+    def test_build_command_mode_override(self, temp_project_dir):
+        """Test that mode can be overridden in build_command."""
+        agent = CursorAgent(temp_project_dir, mode="agent")
+        cmd = agent.build_command("test prompt", mode="ask")
+
+        assert "--mode" in cmd
+        mode_idx = cmd.index("--mode")
+        assert cmd[mode_idx + 1] == "ask"  # Override takes precedence
 
 
 class TestGeminiAgent:
@@ -291,6 +319,100 @@ class TestBaseAgentAuditIntegration:
         assert result.success is True
         assert result.cost_usd == 0.05
         assert result.model == "claude-3-opus"
+
+
+class TestCursorAgentModes:
+    """Tests for Cursor agent mode selection (Jan 2026 CLI feature)."""
+
+    @patch("subprocess.run")
+    def test_run_analysis_uses_ask_mode(self, mock_run, temp_project_dir):
+        """Test that run_analysis() uses ask mode."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"analysis": "complete"}',
+            stderr="",
+        )
+
+        agent = CursorAgent(temp_project_dir)
+        result = agent.run_analysis("Analyze this code")
+
+        assert result.success is True
+        # Check that the command included --mode ask
+        call_args = mock_run.call_args[0][0]
+        assert "--mode" in call_args
+        mode_idx = call_args.index("--mode")
+        assert call_args[mode_idx + 1] == "ask"
+
+    @patch("subprocess.run")
+    def test_plan_mode_logs_warning(self, mock_run, temp_project_dir, caplog):
+        """Test that plan mode logs a warning about interactive requirement."""
+        import logging
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"result": "ok"}',
+            stderr="",
+        )
+
+        with caplog.at_level(logging.WARNING, logger="orchestrator.agents.cursor_agent"):
+            agent = CursorAgent(temp_project_dir)
+            agent.build_command("test prompt", mode="plan")
+
+        assert any("interactive" in record.message.lower() for record in caplog.records)
+
+    @patch("subprocess.run")
+    def test_run_with_plan_mode_logs_warning(self, mock_run, temp_project_dir, caplog):
+        """Test that run_with_plan_mode() logs a warning."""
+        import logging
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"result": "ok"}',
+            stderr="",
+        )
+
+        with caplog.at_level(logging.WARNING, logger="orchestrator.agents.cursor_agent"):
+            agent = CursorAgent(temp_project_dir)
+            agent.run_with_plan_mode("test prompt")
+
+        assert any(
+            "run_analysis" in record.message or "headless" in record.message.lower()
+            for record in caplog.records
+        )
+
+    def test_run_validation_uses_ask_mode_when_enabled(self, temp_project_dir):
+        """Test that run_validation uses ask mode when use_ask_mode=True."""
+        agent = CursorAgent(temp_project_dir)
+
+        # Mock the run method to capture mode
+        captured_mode = None
+
+        def mock_run(prompt, output_file=None, mode=None, **kwargs):
+            nonlocal captured_mode
+            captured_mode = mode
+            return MagicMock(success=True, parsed_output={})
+
+        agent.run = mock_run
+        agent.run_validation({"test": "plan"}, use_ask_mode=True)
+
+        assert captured_mode == "ask"
+
+    def test_run_code_review_uses_ask_mode_when_enabled(self, temp_project_dir):
+        """Test that run_code_review uses ask mode when use_ask_mode=True."""
+        agent = CursorAgent(temp_project_dir)
+
+        # Mock the run method to capture mode
+        captured_mode = None
+
+        def mock_run(prompt, output_file=None, mode=None, **kwargs):
+            nonlocal captured_mode
+            captured_mode = mode
+            return MagicMock(success=True, parsed_output={})
+
+        agent.run = mock_run
+        agent.run_code_review(["file1.py"], {"passed": True}, use_ask_mode=True)
+
+        assert captured_mode == "ask"
 
 
 class TestCursorAgentValidation:

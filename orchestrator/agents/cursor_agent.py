@@ -1,15 +1,25 @@
 """Cursor CLI agent wrapper."""
 
 import json
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from ..config.models import CURSOR_MODELS, DEFAULT_CURSOR_MODEL
-from .base import BaseAgent
+from .base import AgentResult, BaseAgent
 from .prompts import format_prompt, load_prompt
+
+logger = logging.getLogger(__name__)
 
 # Available Cursor models
 # Managed in orchestrator.config.models
+
+# Available agent modes (Jan 2026 CLI update)
+# NOTE: 'plan' mode is interactive-only and should NOT be used for headless automation.
+# For headless analysis, use 'ask' mode instead.
+CURSOR_MODES = {"agent", "plan", "ask"}
+HEADLESS_SAFE_MODES = {"agent", "ask"}  # Modes safe for non-interactive use
+DEFAULT_CURSOR_MODE = "agent"
 
 
 class CursorAgent(BaseAgent):
@@ -21,6 +31,15 @@ class CursorAgent(BaseAgent):
     Supports model selection:
     - codex-5.2: High capability model (default)
     - composer: Cheaper, faster model for simpler tasks
+
+    Supports agent modes (Jan 2026 CLI update):
+    - agent: Execute changes directly (default)
+    - plan: Research, ask questions, create plan before coding (INTERACTIVE ONLY)
+    - ask: Explore code without making changes (use for headless analysis)
+
+    NOTE: Plan mode requires interactive input (clarifying questions, plan approval).
+    For headless/automation use cases (orchestrator), use 'ask' mode or
+    the run_analysis() method instead.
     """
 
     name = "cursor"
@@ -30,6 +49,7 @@ class CursorAgent(BaseAgent):
         project_dir: str | Path,
         timeout: int = 300,
         model: Optional[str] = None,
+        mode: Optional[Literal["agent", "plan", "ask"]] = None,
     ):
         """Initialize Cursor agent.
 
@@ -37,9 +57,11 @@ class CursorAgent(BaseAgent):
             project_dir: Root directory of the project
             timeout: Timeout in seconds
             model: Optional model override (codex-5.2, composer)
+            mode: Optional agent mode (agent, plan, ask). Default is agent.
         """
         super().__init__(project_dir, timeout)
         self.model = model if model in CURSOR_MODELS else DEFAULT_CURSOR_MODEL
+        self.mode = mode if mode in CURSOR_MODES else DEFAULT_CURSOR_MODE
 
     def get_cli_command(self) -> str:
         """Get the CLI command."""
@@ -48,11 +70,11 @@ class CursorAgent(BaseAgent):
     def get_context_file(self) -> Optional[Path]:
         """Get Cursor's context file."""
         # Cursor reads multiple files, return the primary one
-        return self.project_dir / "AGENTS.md"
+        return Path(self.project_dir) / "AGENTS.md"
 
     def get_rules_file(self) -> Optional[Path]:
         """Get Cursor's rules file."""
-        return self.project_dir / ".cursor" / "rules"
+        return Path(self.project_dir) / ".cursor" / "rules"
 
     def build_command(
         self,
@@ -60,6 +82,8 @@ class CursorAgent(BaseAgent):
         output_format: str = "json",
         force: bool = True,
         model: Optional[str] = None,
+        mode: Optional[Literal["agent", "plan", "ask"]] = None,
+        resume: Optional[str] = None,
         **kwargs,
     ) -> list[str]:
         """Build the Cursor CLI command.
@@ -69,6 +93,8 @@ class CursorAgent(BaseAgent):
             output_format: Output format
             force: Force non-interactive mode
             model: Model override (codex-5.2, composer)
+            mode: Agent mode (agent, plan, ask). Jan 2026 CLI feature.
+            resume: Thread ID to resume previous session
             **kwargs: Additional arguments (ignored)
 
         Returns:
@@ -80,6 +106,8 @@ class CursorAgent(BaseAgent):
             - --output-format json: Output as JSON
             - --force: Force execution without confirmation
             - --model: Model selection (codex-5.2, composer)
+            - --mode: Agent mode (agent, plan, ask) - Jan 2026 CLI feature
+            - --resume: Resume previous thread by ID
             - Prompt is a positional argument at the end
         """
         command = [
@@ -93,6 +121,21 @@ class CursorAgent(BaseAgent):
         selected_model = model or self.model
         if selected_model and selected_model in CURSOR_MODELS:
             command.extend(["--model", selected_model])
+
+        # Mode selection (Jan 2026 CLI feature)
+        selected_mode = mode or self.mode
+        if selected_mode and selected_mode in CURSOR_MODES:
+            # Warn if plan mode is used - it requires interactive input
+            if selected_mode == "plan":
+                logger.warning(
+                    "Plan mode requires interactive input (clarifying questions, plan approval). "
+                    "For headless/automation, consider using 'ask' mode instead via run_analysis()."
+                )
+            command.extend(["--mode", selected_mode])
+
+        # Resume previous session
+        if resume:
+            command.extend(["--resume", resume])
 
         if force:
             command.append("--force")
@@ -110,7 +153,7 @@ class CursorAgent(BaseAgent):
         task_id: Optional[str] = None,
         session_id: Optional[str] = None,
         **kwargs,
-    ) -> "AgentResult":
+    ) -> AgentResult:
         """Execute the agent with auto-fallback for quota limits."""
         # Initial run
         result = super().run(prompt, output_file, phase, task_id, session_id, **kwargs)
@@ -144,16 +187,80 @@ class CursorAgent(BaseAgent):
 
         return result
 
+    def run_analysis(
+        self,
+        prompt: str,
+        output_file: Optional[Path] = None,
+        **kwargs,
+    ) -> AgentResult:
+        """Run Cursor in ask mode for headless read-only analysis.
+
+        Ask mode (Jan 2026 CLI feature) enables Cursor to explore code
+        without making changes - ideal for headless automation like
+        the orchestrator workflow.
+
+        Use this for:
+        - Code reviews in Phase 4 verification
+        - Plan validation in Phase 2
+        - Any automated analysis that shouldn't modify code
+
+        Args:
+            prompt: The prompt to send
+            output_file: File to write output to
+            **kwargs: Additional arguments passed to run()
+
+        Returns:
+            AgentResult with analysis output
+        """
+        return self.run(prompt, output_file=output_file, mode="ask", **kwargs)
+
+    def run_with_plan_mode(
+        self,
+        prompt: str,
+        output_file: Optional[Path] = None,
+        **kwargs,
+    ) -> AgentResult:
+        """Run Cursor in plan mode for complex validations.
+
+        WARNING: Plan mode requires interactive input (clarifying questions,
+        plan approval). It should NOT be used for headless automation.
+        For headless analysis, use run_analysis() instead.
+
+        Plan mode (Jan 2026 CLI feature) enables Cursor to:
+        1. Ask clarifying questions
+        2. Research the codebase for context
+        3. Create a comprehensive implementation plan
+        4. Execute only after plan is approved
+
+        Use this ONLY for interactive development scenarios.
+
+        Args:
+            prompt: The prompt to send
+            output_file: File to write output to
+            **kwargs: Additional arguments passed to run()
+
+        Returns:
+            AgentResult with plan mode output
+        """
+        logger.warning(
+            "run_with_plan_mode() uses interactive plan mode. "
+            "For headless automation, use run_analysis() instead."
+        )
+        return self.run(prompt, output_file=output_file, mode="plan", **kwargs)
+
     def run_validation(
         self,
         plan: dict,
         output_file: Optional[Path] = None,
+        use_ask_mode: bool = False,
     ):
         """Run Cursor for plan validation.
 
         Args:
             plan: The plan to validate
             output_file: File to write feedback to
+            use_ask_mode: If True, use ask mode for deep analysis without changes.
+                         (Previously use_plan_mode, but plan mode is interactive-only)
 
         Returns:
             AgentResult with validation feedback
@@ -206,13 +313,15 @@ Focus on:
 4. Test coverage adequacy
 5. Error handling completeness"""
 
-        return self.run(prompt, output_file=output_file)
+        mode = "ask" if use_ask_mode else None
+        return self.run(prompt, output_file=output_file, mode=mode)
 
     def run_code_review(
         self,
         files_changed: list[str],
         test_results: dict,
         output_file: Optional[Path] = None,
+        use_ask_mode: bool = False,
     ):
         """Run Cursor for code review (verification phase).
 
@@ -220,6 +329,8 @@ Focus on:
             files_changed: List of files that were created/modified
             test_results: Results from test execution
             output_file: File to write review to
+            use_ask_mode: If True, use ask mode for deep analysis without changes.
+                         (Previously use_plan_mode, but plan mode is interactive-only)
 
         Returns:
             AgentResult with code review
@@ -285,4 +396,5 @@ Focus on:
 4. Code style and consistency
 5. Test quality and coverage"""
 
-        return self.run(prompt, output_file=output_file)
+        mode = "ask" if use_ask_mode else None
+        return self.run(prompt, output_file=output_file, mode=mode)
