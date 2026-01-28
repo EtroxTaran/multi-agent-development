@@ -1,23 +1,6 @@
 """Tests for fixer research node."""
 
 import asyncio
-import sys
-from unittest.mock import MagicMock
-
-# Create a mock package for langgraph
-mock_langgraph = MagicMock()
-mock_checkpoint = MagicMock()
-mock_graph = MagicMock()
-mock_types = MagicMock()
-
-# Setup the module structure
-sys.modules["langgraph"] = mock_langgraph
-sys.modules["langgraph.checkpoint"] = mock_checkpoint
-sys.modules["langgraph.checkpoint.base"] = mock_checkpoint
-sys.modules["langgraph.checkpoint.memory"] = mock_checkpoint
-sys.modules["langgraph.graph"] = mock_graph
-sys.modules["langgraph.types"] = mock_types
-
 from unittest.mock import AsyncMock, patch
 
 import pytest

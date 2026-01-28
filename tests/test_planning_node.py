@@ -30,6 +30,7 @@ class MockAgentResult:
     output: str = ""
     error: str = ""
     exit_code: int = 0
+    parsed_output: dict | None = None
 
 
 class TestPlanningNode:
@@ -143,6 +144,7 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_agent.run.return_value = MockAgentResult(
             success=True,
             output=json.dumps(mock_plan),
+            parsed_output=mock_plan,  # Specialist runner returns parsed plan directly
         )
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
@@ -255,6 +257,7 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_agent.run.return_value = MockAgentResult(
             success=True,
             output=json.dumps(mock_plan),
+            parsed_output=mock_plan,  # Specialist runner returns parsed plan directly
         )
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
@@ -278,6 +281,7 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_agent.run.return_value = MockAgentResult(
             success=True,
             output=json.dumps(mock_plan),
+            parsed_output=mock_plan,  # Specialist runner returns parsed plan directly
         )
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
@@ -298,6 +302,7 @@ We need comprehensive test coverage to ensure reliable operation.
         mock_agent.run.return_value = MockAgentResult(
             success=True,
             output=json.dumps(mock_plan),
+            parsed_output=mock_plan,  # Specialist runner returns parsed plan directly
         )
         mock_runner = MagicMock()
         mock_runner.create_agent.return_value = mock_agent
@@ -347,7 +352,7 @@ We need comprehensive test coverage to ensure reliable operation.
 
         # Should fail gracefully and request retry
         assert result["next_decision"] == "retry"
-        assert "Could not parse plan" in result["phase_status"]["1"].error
+        assert "Could not find JSON" in result["phase_status"]["1"].error
 
     @pytest.mark.asyncio
     async def test_planning_node_timeout_handling(self, initial_state):
