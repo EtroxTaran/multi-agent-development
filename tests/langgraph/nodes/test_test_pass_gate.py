@@ -14,9 +14,13 @@ from orchestrator.langgraph.nodes.test_pass_gate import (
     _get_test_command,
     _parse_test_output,
     _run_tests,
-    test_pass_gate_node,
 )
-from orchestrator.langgraph.routers.general import test_pass_gate_router
+from orchestrator.langgraph.nodes.test_pass_gate import (
+    test_pass_gate_node as pass_gate_node,  # Alias to avoid pytest collection
+)
+from orchestrator.langgraph.routers.general import (
+    test_pass_gate_router as pass_gate_router,  # Alias to avoid pytest collection
+)
 from orchestrator.langgraph.state import WorkflowDecision, WorkflowState
 
 
@@ -60,7 +64,7 @@ class TestTestPassGateNode:
                 "total": 10,
             }
 
-            result = await test_pass_gate_node(base_state)
+            result = await pass_gate_node(base_state)
 
             assert result["next_decision"] == "continue"
             assert result["test_gate_attempts"] == 1
@@ -86,7 +90,7 @@ class TestTestPassGateNode:
                 "failed_tests": ["test_foo", "test_bar", "test_baz"],
             }
 
-            result = await test_pass_gate_node(base_state)
+            result = await pass_gate_node(base_state)
 
             assert result["next_decision"] == "retry"
             assert result["test_gate_attempts"] == 1
@@ -114,7 +118,7 @@ class TestTestPassGateNode:
                 "total": 8,
             }
 
-            result = await test_pass_gate_node(base_state)
+            result = await pass_gate_node(base_state)
 
             assert result["next_decision"] == "escalate"
             assert result["test_gate_attempts"] == MAX_TEST_GATE_ATTEMPTS
@@ -142,7 +146,7 @@ class TestTestPassGateNode:
             mock_checker_instance.check.return_value = MagicMock(test_command=None)
             mock_checker.return_value = mock_checker_instance
 
-            result = await test_pass_gate_node(state)
+            result = await pass_gate_node(state)
 
             assert result["next_decision"] == "continue"
             assert result["test_gate_results"]["status"] == "skipped"
@@ -169,7 +173,7 @@ class TestTestPassGateNode:
                 "total": 10,
             }
 
-            result = await test_pass_gate_node(base_state)
+            result = await pass_gate_node(base_state)
 
             assert result["test_gate_attempts"] == 2
 
@@ -184,7 +188,7 @@ class TestTestPassGateRouter:
             test_gate_results={"status": "passed"},
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "completion"
 
@@ -195,7 +199,7 @@ class TestTestPassGateRouter:
             test_gate_results={"status": "passed"},
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "completion"
 
@@ -206,7 +210,7 @@ class TestTestPassGateRouter:
             test_gate_results={"status": "failed"},
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "task_subgraph"
 
@@ -218,7 +222,7 @@ class TestTestPassGateRouter:
             test_gate_attempts=3,
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "human_escalation"
 
@@ -228,7 +232,7 @@ class TestTestPassGateRouter:
             next_decision=WorkflowDecision.ABORT,
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "__end__"
 
@@ -239,7 +243,7 @@ class TestTestPassGateRouter:
             test_gate_attempts=1,
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "completion"
 
@@ -250,7 +254,7 @@ class TestTestPassGateRouter:
             test_gate_attempts=1,
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "completion"
 
@@ -261,7 +265,7 @@ class TestTestPassGateRouter:
             test_gate_attempts=1,
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "task_subgraph"
 
@@ -272,7 +276,7 @@ class TestTestPassGateRouter:
             test_gate_attempts=3,
         )
 
-        result = test_pass_gate_router(state)
+        result = pass_gate_router(state)
 
         assert result == "human_escalation"
 
