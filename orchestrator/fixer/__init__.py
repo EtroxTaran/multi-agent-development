@@ -24,7 +24,13 @@ Usage:
 
 from .agent import FixerAgent, create_fixer_agent
 from .circuit_breaker import CircuitBreaker, CircuitState
-from .diagnosis import DiagnosisConfidence, DiagnosisEngine, DiagnosisResult, RootCause
+from .diagnosis import (
+    AffectedFile,
+    DiagnosisConfidence,
+    DiagnosisEngine,
+    DiagnosisResult,
+    RootCause,
+)
 from .known_fixes import FixPattern, KnownFix, KnownFixDatabase
 from .strategies import (
     ConfigurationFixStrategy,
@@ -60,6 +66,7 @@ __all__ = [
     "DiagnosisResult",
     "RootCause",
     "DiagnosisConfidence",
+    "AffectedFile",
     # Strategies
     "FixStrategy",
     "FixPlan",

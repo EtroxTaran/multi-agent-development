@@ -1,6 +1,7 @@
 """Write tests node.
 
 Uses A03-test-writer to create failing tests before implementation (TDD).
+Falls back to direct ClaudeAgent invocation when agents/ directory doesn't exist.
 """
 
 import asyncio
@@ -10,11 +11,46 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ...agents.claude_agent import ClaudeAgent
 from ...specialists.runner import SpecialistRunner
 from ..integrations.board_sync import sync_board
 from ..state import WorkflowState, get_task_by_id
 
 logger = logging.getLogger(__name__)
+
+
+# Fallback prompt for test writing when agents/ directory doesn't exist
+TEST_WRITER_PROMPT = """You are a TDD Test Writer. Write failing tests for this task BEFORE implementation.
+
+{task_context}
+
+## Instructions
+
+1. Analyze the task requirements and acceptance criteria
+2. Create test files that will FAIL initially (TDD red phase)
+3. Tests should cover:
+   - Happy path scenarios
+   - Edge cases
+   - Error conditions
+   - Each acceptance criterion
+
+4. Use the appropriate test framework for the project:
+   - Python: pytest
+   - TypeScript/JavaScript: jest, vitest, or playwright
+   - Go: testing package
+
+5. Output JSON with:
+```json
+{{
+  "tests_written": ["path/to/test1.ts", "path/to/test2.ts"],
+  "test_count": 5,
+  "coverage_targets": ["function1", "function2"],
+  "notes": "Brief notes about tests"
+}}
+```
+
+Write the tests now.
+"""
 
 
 async def write_tests_node(state: WorkflowState) -> dict[str, Any]:
@@ -84,8 +120,30 @@ EXISTING TEST FILES:
     try:
         runner = SpecialistRunner(project_dir)
 
-        # Run A03-test-writer
-        result = await asyncio.to_thread(runner.create_agent("A03-test-writer").run, prompt)
+        # Check if agents/ directory exists for specialist agents
+        if runner.has_agents_dir():
+            # Use specialist agent A03-test-writer
+            result = await asyncio.to_thread(runner.create_agent("A03-test-writer").run, prompt)
+        else:
+            # Fall back to direct ClaudeAgent invocation
+            logger.info("Agents directory not found, using direct ClaudeAgent for test writing")
+            task_context = prompt  # The prompt we built above serves as context
+            full_prompt = TEST_WRITER_PROMPT.format(task_context=task_context)
+
+            agent = ClaudeAgent(
+                project_dir,
+                allowed_tools=[
+                    "Read",
+                    "Write",
+                    "Edit",
+                    "Glob",
+                    "Grep",
+                    "Bash(npm*)",
+                    "Bash(pytest*)",
+                    "Bash(npx*)",
+                ],
+            )
+            result = await asyncio.to_thread(agent.run, full_prompt)
 
         if not result.success:
             raise Exception(result.error or "Test writing failed")
@@ -138,7 +196,7 @@ def _format_list(items: list[str]) -> str:
     return "\n".join(f"- {i}" for i in items)
 
 
-def _parse_output(stdout: str) -> dict:
+def _parse_output(stdout: str) -> dict[str, Any]:
     """Parse JSON output from agent."""
     try:
         if not stdout:
@@ -148,7 +206,8 @@ def _parse_output(stdout: str) -> dict:
 
         json_match = re.search(r"{[\s\S]*}", stdout)
         if json_match:
-            return json.loads(json_match.group(0))
+            result = json.loads(json_match.group(0))
+            return result if isinstance(result, dict) else {}
         return {}
     except Exception:
         return {}

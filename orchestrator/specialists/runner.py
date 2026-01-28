@@ -8,18 +8,22 @@ and iterative (loop) execution modes.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from ..langgraph.integrations.unified_loop import (
+        LoopContext,
+        UnifiedLoopConfig,
+        UnifiedLoopResult,
+    )
 
 from ..agents.base import BaseAgent
 from ..agents.claude_agent import ClaudeAgent
 from ..agents.cursor_agent import CursorAgent
 from ..agents.gemini_agent import GeminiAgent
-from ..langgraph.integrations.unified_loop import (
-    LoopContext,
-    UnifiedLoopConfig,
-    UnifiedLoopResult,
-    UnifiedLoopRunner,
-)
+
+# Note: unified_loop imports are deferred to avoid circular imports
+# These are imported inside run_iterative() method
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,22 @@ class SpecialistRunner:
         self.project_dir = project_dir
         self.agents_dir = project_dir / "agents"
 
+    def has_agents_dir(self) -> bool:
+        """Check if the agents directory exists and has content.
+
+        Returns:
+            True if agents/ directory exists and contains subdirectories
+        """
+        if not self.agents_dir.exists():
+            return False
+        if not self.agents_dir.is_dir():
+            return False
+        # Check if there are any subdirectories
+        try:
+            return any(p.is_dir() for p in self.agents_dir.iterdir())
+        except OSError:
+            return False
+
     def get_agent_config(self, agent_id: str) -> dict[str, Any]:
         """Load configuration for a specialist agent.
 
@@ -39,13 +59,28 @@ class SpecialistRunner:
 
         Returns:
             Dictionary with context path, tools, and agent type
+
+        Raises:
+            ValueError: If agents directory doesn't exist or agent not found
         """
+        # Check if agents directory exists
+        if not self.agents_dir.exists():
+            raise ValueError(
+                f"Agents directory not found: {self.agents_dir}\n"
+                f"Projects using specialist agents must have an 'agents/' directory.\n"
+                f"If this project doesn't use specialists, the workflow should use "
+                f"direct agent invocation instead."
+            )
+
         # Find agent directory matching the ID prefix
         agent_dir = None
-        for path in self.agents_dir.iterdir():
-            if path.is_dir() and path.name.startswith(agent_id):
-                agent_dir = path
-                break
+        try:
+            for path in self.agents_dir.iterdir():
+                if path.is_dir() and path.name.startswith(agent_id):
+                    agent_dir = path
+                    break
+        except OSError as e:
+            raise ValueError(f"Cannot read agents directory: {e}") from e
 
         if not agent_dir:
             raise ValueError(f"Agent directory not found for ID: {agent_id}")
@@ -144,17 +179,19 @@ class SpecialistRunner:
 
         result = agent.run(final_prompt, **kwargs)
 
-        return result
+        # agent.run returns AgentResult which has a to_dict() method
+        # but we return it directly as the callers expect the result object
+        return result  # type: ignore[no-any-return]
 
     async def run_iterative(
         self,
         agent_id: str,
         prompt: str,
         task_id: str,
-        context: Optional[LoopContext] = None,
-        config: Optional[UnifiedLoopConfig] = None,
+        context: Optional["LoopContext"] = None,
+        config: Optional["UnifiedLoopConfig"] = None,
         **kwargs,
-    ) -> UnifiedLoopResult:
+    ) -> "UnifiedLoopResult":
         """Run a specialist agent in iterative loop mode.
 
         Uses the unified loop runner to iterate until verification passes.
@@ -171,6 +208,13 @@ class SpecialistRunner:
         Returns:
             UnifiedLoopResult with execution details
         """
+        # Lazy imports to avoid circular dependency
+        from ..langgraph.integrations.unified_loop import (
+            LoopContext,
+            UnifiedLoopConfig,
+            UnifiedLoopRunner,
+        )
+
         logger.info(f"Running specialist {agent_id} in iterative mode for task {task_id}")
 
         # Get agent configuration
@@ -209,7 +253,7 @@ class SpecialistRunner:
             Agent type string (claude, cursor, gemini)
         """
         config = self.get_agent_config(agent_id)
-        return config["type"]
+        return str(config["type"])
 
     def get_available_models(self, agent_id: str) -> list[str]:
         """Get available models for a specialist agent.

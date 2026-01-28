@@ -136,9 +136,8 @@ def get_unified_loop_config(
         model = fallback_model
         logger.info(f"Using fallback model '{model}' for unified loop due to budget constraints")
     else:
-        model = LOOP_MODEL
-        if task.get("model"):
-            model = task.get("model")
+        task_model = task.get("model")
+        model = str(task_model) if task_model else (LOOP_MODEL or "opus")
 
     # Determine verification type
     verification = "tests"
@@ -267,20 +266,20 @@ async def implement_with_ralph_loop(
         else:
             # Ralph loop failed
             logger.warning(f"Ralph loop failed for task {task_id}: {result.error}")
-            return handle_task_error(
+            return handle_task_error(  # type: ignore[no-any-return]
                 updated_task,
                 f"Ralph loop failed after {result.iterations} iterations: {result.error}",
             )
 
     except asyncio.TimeoutError:
         logger.error(f"Ralph loop for task {task_id} timed out")
-        return handle_task_error(
+        return handle_task_error(  # type: ignore[no-any-return]
             updated_task,
             f"Ralph loop timed out after {RALPH_TIMEOUT // 60} minutes",
         )
     except Exception as e:
         logger.error(f"Ralph loop for task {task_id} failed: {e}")
-        return handle_task_error(updated_task, str(e))
+        return handle_task_error(updated_task, str(e))  # type: ignore[no-any-return]
 
 
 async def implement_with_unified_loop(
@@ -382,7 +381,7 @@ async def implement_with_unified_loop(
         else:
             # Unified loop failed
             logger.warning(f"Unified loop failed for task {task_id}: {result.error}")
-            return handle_task_error(
+            return handle_task_error(  # type: ignore[no-any-return]
                 updated_task,
                 f"Unified loop failed after {result.iterations} iterations "
                 f"({result.agent_type}): {result.error}",
@@ -390,13 +389,13 @@ async def implement_with_unified_loop(
 
     except asyncio.TimeoutError:
         logger.error(f"Unified loop for task {task_id} timed out")
-        return handle_task_error(
+        return handle_task_error(  # type: ignore[no-any-return]
             updated_task,
             f"Unified loop timed out after {RALPH_TIMEOUT // 60} minutes",
         )
     except Exception as e:
         logger.error(f"Unified loop for task {task_id} failed: {e}")
-        return handle_task_error(updated_task, str(e))
+        return handle_task_error(updated_task, str(e))  # type: ignore[no-any-return]
 
 
 async def implement_standard(
@@ -432,12 +431,37 @@ async def implement_standard(
         # Running in thread to avoid blocking event loop
         runner = SpecialistRunner(project_dir)
 
-        # Configure model override if using fallback
-        agent = runner.create_agent("A04-implementer")
-        if use_fallback_model and fallback_model:
-            logger.info(f"Using fallback model '{fallback_model}' for standard implementation")
-            agent.model = fallback_model
-            model_used = fallback_model
+        # Check if agents/ directory exists for specialist agents
+        if runner.has_agents_dir():
+            # Use specialist agent A04-implementer
+            agent = runner.create_agent("A04-implementer")
+            if use_fallback_model and fallback_model:
+                logger.info(f"Using fallback model '{fallback_model}' for standard implementation")
+                agent.model = fallback_model
+                model_used = fallback_model
+        else:
+            # Fall back to direct ClaudeAgent invocation
+            logger.info("Agents directory not found, using direct ClaudeAgent for implementation")
+            from ....agents.claude_agent import ClaudeAgent
+
+            agent = ClaudeAgent(
+                project_dir,
+                allowed_tools=[
+                    "Read",
+                    "Write",
+                    "Edit",
+                    "Glob",
+                    "Grep",
+                    "Bash(npm*)",
+                    "Bash(pytest*)",
+                    "Bash(npx*)",
+                    "Bash(git*)",
+                ],
+            )
+            if use_fallback_model and fallback_model:
+                logger.info(f"Using fallback model '{fallback_model}' for standard implementation")
+                # ClaudeAgent doesn't have a model attribute, but we track it for logging
+                model_used = fallback_model
 
         result = await asyncio.to_thread(agent.run, prompt)
 
@@ -551,7 +575,7 @@ async def implement_standard(
             error_context=error_context,
         )
 
-        error_result = handle_task_error(
+        error_result: dict[str, Any] = handle_task_error(
             updated_task,
             f"Task timed out after {TASK_TIMEOUT // 60} minutes",
         )
@@ -590,4 +614,4 @@ async def implement_standard(
         error_result["error_context"] = error_context
         error_result["last_agent_execution"] = failed_execution
         error_result["execution_history"] = [failed_execution]
-        return error_result
+        return error_result  # type: ignore[no-any-return]

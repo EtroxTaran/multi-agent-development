@@ -40,6 +40,11 @@ from .claude_agent import ClaudeAgent
 from .cursor_agent import CursorAgent
 from .error_context import ErrorContext, ErrorContextManager, ErrorType
 from .gemini_agent import GeminiAgent
+from .security_specialist import (
+    SecurityAnalysisResult,
+    SecuritySpecialistAgent,
+    get_security_specialist,
+)
 from .session_manager import SessionInfo, SessionManager
 
 __all__ = [
@@ -50,6 +55,9 @@ __all__ = [
     "ClaudeAgent",
     "CursorAgent",
     "GeminiAgent",
+    "SecuritySpecialistAgent",
+    "SecurityAnalysisResult",
+    "get_security_specialist",
     # Session management
     "SessionManager",
     "SessionInfo",

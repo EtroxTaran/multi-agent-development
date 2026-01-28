@@ -128,7 +128,7 @@ class GapAnalysisEngine:
         description = ""
 
         # Files to scan for requirements
-        doc_files = []
+        doc_files: list[Path] = []
 
         # Check for docs folder (case-insensitive)
         for doc_dir_name in ["docs", "Docs", "DOCS", "Documents", "documentation"]:
@@ -213,7 +213,7 @@ class GapAnalysisEngine:
             List of matching CollectionItem objects
         """
         matching_items = []
-        seen_ids = set()
+        seen_ids: set[str] = set()
 
         # Get items matching technologies
         if requirements.technologies:
@@ -221,9 +221,11 @@ class GapAnalysisEngine:
                 technologies=requirements.technologies,
             )
             for item in tech_items:
-                if item.id not in seen_ids:
+                # Convert RecordID to string for hashable set membership
+                item_id_str = str(item.id)
+                if item_id_str not in seen_ids:
                     matching_items.append(item)
-                    seen_ids.add(item.id)
+                    seen_ids.add(item_id_str)
 
         # Get items matching features
         if requirements.features:
@@ -231,16 +233,18 @@ class GapAnalysisEngine:
                 features=requirements.features,
             )
             for item in feature_items:
-                if item.id not in seen_ids:
+                item_id_str = str(item.id)
+                if item_id_str not in seen_ids:
                     matching_items.append(item)
-                    seen_ids.add(item.id)
+                    seen_ids.add(item_id_str)
 
         # Always include critical items
         critical_items = await self.collection_service.list_items(priority="critical")
         for item in critical_items:
-            if item.id not in seen_ids:
+            item_id_str = str(item.id)
+            if item_id_str not in seen_ids:
                 matching_items.append(item)
-                seen_ids.add(item.id)
+                seen_ids.add(item_id_str)
 
         # Sort by priority (critical > high > medium > low)
         priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}

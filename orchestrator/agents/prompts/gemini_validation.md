@@ -108,6 +108,27 @@ Provide your review as JSON:
 
 ---
 
+## Assessment Guide
+
+**CRITICAL: Choose `overall_assessment` based on these rules:**
+
+| Assessment | Score Range | Conditions |
+|------------|------------|------------|
+| `approve` | 6.0+ | Score >= 6.0 AND no critical architectural flaws |
+| `needs_changes` | 4.0-5.9 | Score 4-6 OR has critical architectural issues |
+| `reject` | < 4.0 | Fundamentally broken architecture |
+
+**IMPORTANT:**
+- If your score is **6.0 or higher**, you SHOULD set `overall_assessment: "approve"`
+- Minor concerns and suggestions do NOT block approval
+- Only use `needs_changes` for CRITICAL architectural issues like:
+  - Circular dependencies that break the design
+  - Fundamentally broken scalability (won't work at any scale)
+  - Missing core architectural components (no error handling strategy, no data persistence plan)
+- Having improvement suggestions is NORMAL - that's what the concerns list is for
+
+**Rule of Thumb:** If the architecture is sound and can be implemented successfully, APPROVE it.
+
 ## Scoring Guide
 
 | Score | Meaning | Scalability | Maintainability |
@@ -149,29 +170,30 @@ Provide your review as JSON:
 }
 ```
 
-### Example Output
+### Example Output (Score 7.5 = APPROVE)
 ```json
 {
     "reviewer": "gemini",
-    "overall_assessment": "needs_changes",
-    "score": 6.5,
+    "overall_assessment": "approve",
+    "score": 7.5,
     "architecture_review": {
         "patterns_identified": [
             "Service layer pattern",
-            "Domain model"
+            "Domain model",
+            "Repository pattern"
         ],
-        "scalability_assessment": "adequate",
-        "maintainability_assessment": "adequate",
+        "scalability_assessment": "good",
+        "maintainability_assessment": "good",
         "concerns": [
             {
                 "area": "Payment integration",
-                "description": "Synchronous payment processing will block request",
-                "recommendation": "Use async processing with callback/webhook pattern"
+                "description": "Synchronous payment processing could be optimized",
+                "recommendation": "Consider async processing with callback/webhook pattern for high load"
             },
             {
                 "area": "Order model",
-                "description": "Missing state machine for order status",
-                "recommendation": "Add explicit state transitions to prevent invalid states"
+                "description": "State transitions could be more explicit",
+                "recommendation": "Add explicit state machine in future iteration"
             }
         ]
     },
@@ -188,7 +210,7 @@ Provide your review as JSON:
     },
     "integration_considerations": [
         "Payment webhook needs public endpoint",
-        "Order status updates need to notify inventory system"
+        "Order status updates should notify inventory system"
     ],
     "alternative_approaches": [
         {
@@ -201,12 +223,14 @@ Provide your review as JSON:
                 "More complex to implement",
                 "Requires compensation logic"
             ],
-            "recommendation": "Adopt if payment failures become common"
+            "recommendation": "Consider adopting if payment failures become common"
         }
     ],
-    "summary": "Good basic design but payment processing needs async handling. Add state machine for order lifecycle."
+    "summary": "Solid architecture that can be implemented successfully. Minor optimizations suggested for future iterations."
 }
 ```
+
+**Note:** The example above has concerns but APPROVES because score >= 6.0 and concerns are suggestions, not critical blockers.
 
 ---
 
