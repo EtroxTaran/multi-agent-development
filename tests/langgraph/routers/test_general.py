@@ -56,7 +56,7 @@ class TestPrerequisitesRouter:
         """Test blocking error routes to human_escalation."""
         state = {
             "next_decision": None,
-            "errors": [{"type": "missing_product_md"}],
+            "errors": [{"type": "missing_product_md", "blocking": True}],
         }
         assert prerequisites_router(state) == "human_escalation"
 

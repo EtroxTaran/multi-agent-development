@@ -159,8 +159,9 @@ class TestCursorReviewNode:
         ):
             result = await cursor_review_node(workflow_state_phase_4)
 
-        assert "last_agent_execution" in result
-        execution = result["last_agent_execution"]
+        assert "execution_history" in result
+        assert len(result["execution_history"]) > 0
+        execution = result["execution_history"][0]
         assert execution["agent"] == "cursor"
         assert execution["template_name"] == "code_review"
 
@@ -268,8 +269,9 @@ class TestGeminiReviewNode:
         ):
             result = await gemini_review_node(workflow_state_phase_4)
 
-        assert "last_agent_execution" in result
-        assert result["last_agent_execution"]["template_name"] == "architecture_review"
+        assert "execution_history" in result
+        assert len(result["execution_history"]) > 0
+        assert result["execution_history"][0]["template_name"] == "architecture_review"
 
 
 class TestReviewGateNode:
