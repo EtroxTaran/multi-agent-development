@@ -1515,8 +1515,8 @@ Examples:
             if result.rotated_files and not args.quiet:
                 print(f"Auto-rotated {len(result.rotated_files)} log file(s)")
 
-    # Check if using LangGraph mode
-    use_langgraph = is_langgraph_enabled()
+    # Check if using LangGraph mode (CLI flag or env var)
+    use_langgraph = args.use_langgraph or is_langgraph_enabled()
 
     # Execute command
     if args.status:

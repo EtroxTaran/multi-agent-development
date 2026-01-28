@@ -156,12 +156,11 @@ async def evaluate_agent_node(state: WorkflowState) -> dict[str, Any]:
     template_name = last_execution.get("template_name", "default")
     criteria = get_template_criteria(template_name)
 
-    # Initialize evaluator with template-specific criteria
+    # Initialize evaluator (criteria passed via metadata in evaluate() call)
     evaluator = AgentEvaluator(
         project_dir=project_dir,
         evaluator_model="haiku",  # Fast/cheap for high volume
         enable_storage=True,
-        criteria=criteria,
     )
 
     try:

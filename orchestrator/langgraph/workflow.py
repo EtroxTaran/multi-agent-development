@@ -46,6 +46,7 @@ from .nodes import (  # New risk mitigation nodes; Quality infrastructure nodes;
     research_phase_node,
     review_gate_node,
     security_scan_node,
+    security_specialist_node,
     validation_fan_in_node,
     verification_fan_in_node,
 )
@@ -249,6 +250,9 @@ def create_workflow_graph(
     graph.add_node("cursor_validate", cursor_validate_node, retry_policy=agent_retry_policy)
     graph.add_node("gemini_validate", gemini_validate_node, retry_policy=agent_retry_policy)
     graph.add_node("validation_fan_in", validation_fan_in_node)
+    graph.add_node(
+        "security_specialist", security_specialist_node
+    )  # Reviews HIGH severity concerns
     graph.add_node("approval_gate", approval_gate_node)
     graph.add_node("pre_implementation", pre_implementation_node)
 
@@ -350,9 +354,13 @@ def create_workflow_graph(
     graph.add_edge("cursor_validate", "validation_fan_in")
     graph.add_edge("gemini_validate", "validation_fan_in")
 
-    # Validation fan-in → approval_gate (with conditional routing)
+    # Validation fan-in → security_specialist (reviews HIGH severity concerns)
+    graph.add_edge("validation_fan_in", "security_specialist")
+
+    # Security specialist → approval_gate (with conditional routing)
+    # Security specialist reclassifies spec gaps as MEDIUM, keeps real vulnerabilities as HIGH
     graph.add_conditional_edges(
-        "validation_fan_in",
+        "security_specialist",
         validation_router,
         {
             "implementation": "approval_gate",  # Changed: go to approval_gate first
@@ -672,6 +680,8 @@ class WorkflowRunner:
             "configurable": {
                 "thread_id": self.thread_id,
             },
+            # Increase recursion limit from default 25 to handle complex workflows
+            "recursion_limit": 100,
         }
         if progress_callback:
             # Store callback in configurable for task nodes to emit events
@@ -806,6 +816,16 @@ class WorkflowRunner:
                                     if previous_phase
                                     else {}
                                 )
+                                # Handle both dict and PhaseState dataclass
+                                if hasattr(prev_phase_status, "to_dict"):
+                                    prev_phase_status = prev_phase_status.to_dict()
+                                elif hasattr(prev_phase_status, "status"):
+                                    # PhaseState dataclass - access status attribute directly
+                                    status_val = getattr(prev_phase_status, "status", None)
+                                    # Status might be a PhaseStatus enum
+                                    if hasattr(status_val, "value"):
+                                        status_val = status_val.value
+                                    prev_phase_status = {"status": status_val}
                                 prev_success = prev_phase_status.get("status") != "failed"
 
                                 # Emit phase_end for the previous phase
@@ -865,6 +885,8 @@ class WorkflowRunner:
             "configurable": {
                 "thread_id": self.thread_id,
             },
+            # Increase recursion limit from default 25 to handle complex workflows
+            "recursion_limit": 100,
         }
         if progress_callback:
             # Store callback in configurable for task nodes to emit events
@@ -1004,6 +1026,16 @@ class WorkflowRunner:
                                     if previous_phase
                                     else {}
                                 )
+                                # Handle both dict and PhaseState dataclass
+                                if hasattr(prev_phase_status, "to_dict"):
+                                    prev_phase_status = prev_phase_status.to_dict()
+                                elif hasattr(prev_phase_status, "status"):
+                                    # PhaseState dataclass - access status attribute directly
+                                    status_val = getattr(prev_phase_status, "status", None)
+                                    # Status might be a PhaseStatus enum
+                                    if hasattr(status_val, "value"):
+                                        status_val = status_val.value
+                                    prev_phase_status = {"status": status_val}
                                 prev_success = prev_phase_status.get("status") != "failed"
 
                                 if previous_phase is not None and hasattr(callback, "on_phase_end"):

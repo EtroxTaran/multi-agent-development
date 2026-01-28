@@ -268,17 +268,35 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
                 except json.JSONDecodeError:
                     pass
 
+        # Extract blocking issues - only HIGH severity implementation_flaws block
+        # Specification gaps are feedback only (non-blocking)
+        blocking_issues = []
+        for c in feedback_data.get("concerns", []):
+            if c.get("severity") == "high":
+                concern_type = c.get("concern_type", "implementation_flaw")
+                # Only implementation flaws block; specification gaps are feedback
+                if concern_type == "implementation_flaw":
+                    blocking_issues.append(c["description"])
+                else:
+                    logger.debug(
+                        f"Skipping spec gap from blocking: {c.get('description', '')[:50]}"
+                    )
+
+        # Also check security_review.implementation_flaws
+        security_review = feedback_data.get("security_review", {})
+        for flaw in security_review.get("implementation_flaws", []):
+            if flaw.get("severity") == "high":
+                desc = flaw.get("description", "")
+                if desc and desc not in blocking_issues:
+                    blocking_issues.append(desc)
+
         feedback = AgentFeedback(
             agent="cursor",
             approved=feedback_data.get("overall_assessment") == "approve",
             score=float(feedback_data.get("score", 0)),
             assessment=feedback_data.get("overall_assessment", "unknown"),
             concerns=feedback_data.get("concerns", []),
-            blocking_issues=[
-                c["description"]
-                for c in feedback_data.get("concerns", [])
-                if c.get("severity") == "high"
-            ],
+            blocking_issues=blocking_issues,
             summary=feedback_data.get("summary", ""),
             raw_output=feedback_data,
         )
@@ -325,7 +343,8 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
         return {
             "validation_feedback": {"cursor": feedback},
             "updated_at": datetime.now().isoformat(),
-            "last_agent_execution": execution,
+            # Note: Don't set last_agent_execution in parallel nodes to avoid concurrent update error
+            # Only set execution_history (has list reducer for parallel safety)
             "execution_history": [execution],
         }
 
@@ -373,7 +392,7 @@ async def cursor_validate_node(state: WorkflowState) -> dict[str, Any]:
                 }
             ],
             "error_context": error_context,
-            "last_agent_execution": failed_execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [failed_execution],
         }
 
@@ -510,7 +529,7 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
         return {
             "validation_feedback": {"gemini": feedback},
             "updated_at": datetime.now().isoformat(),
-            "last_agent_execution": execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [execution],
         }
 
@@ -558,7 +577,7 @@ async def gemini_validate_node(state: WorkflowState) -> dict[str, Any]:
                 }
             ],
             "error_context": error_context,
-            "last_agent_execution": failed_execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [failed_execution],
         }
 

@@ -260,7 +260,7 @@ TEST RESULTS:
         return {
             "verification_feedback": {"cursor": feedback},
             "updated_at": datetime.now().isoformat(),
-            "last_agent_execution": execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [execution],
         }
 
@@ -307,7 +307,7 @@ TEST RESULTS:
                 }
             ],
             "error_context": error_context,
-            "last_agent_execution": failed_execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [failed_execution],
         }
 
@@ -438,7 +438,7 @@ FILES IMPLEMENTED:
         return {
             "verification_feedback": {"gemini": feedback},
             "updated_at": datetime.now().isoformat(),
-            "last_agent_execution": execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [execution],
         }
 
@@ -485,7 +485,7 @@ FILES IMPLEMENTED:
                 }
             ],
             "error_context": error_context,
-            "last_agent_execution": failed_execution,
+            # Note: Don't set last_agent_execution in parallel nodes
             "execution_history": [failed_execution],
         }
 
