@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 # Available agent modes (Jan 2026 CLI update)
 # NOTE: 'plan' mode is interactive-only and should NOT be used for headless automation.
 # For headless analysis, use 'ask' mode instead.
-CURSOR_MODES = {"agent", "plan", "ask"}
-HEADLESS_SAFE_MODES = {"agent", "ask"}  # Modes safe for non-interactive use
-DEFAULT_CURSOR_MODE = "agent"
+# The CLI only supports 'plan' and 'ask' modes - 'agent' is not a valid mode.
+CURSOR_MODES = {"plan", "ask"}
+HEADLESS_SAFE_MODES = {"ask"}  # Modes safe for non-interactive use
+DEFAULT_CURSOR_MODE = "ask"  # Use 'ask' for headless automation
 
 
 class CursorAgent(BaseAgent):
