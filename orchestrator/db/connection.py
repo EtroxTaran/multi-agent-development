@@ -28,7 +28,7 @@ class InsecureAsyncWsSurrealConnection(AsyncWsSurrealConnection):
 
     async def connect(self, url: Optional[str] = None) -> None:
         """Connect with optional SSL verification skip."""
-        if self.socket:
+        if self.socket:  # type: ignore[has-type]
             return
 
         # overwrite params if passed in
@@ -112,7 +112,7 @@ class Connection:
 
     def _get_http_url(self) -> str:
         """Convert WebSocket URL to HTTP URL for token auth."""
-        url = self.config.url
+        url: str = self.config.url
         if url.startswith("wss://"):
             return url.replace("wss://", "https://")
         elif url.startswith("ws://"):
@@ -137,13 +137,13 @@ class Connection:
             if data.get("code") != 200:
                 raise ConnectionError(f"HTTP signin failed: {data}")
 
-            token = data.get("token")
+            token: str | None = data.get("token")
             if not token:
                 raise ConnectionError("No token in signin response")
 
             return token
         except requests.RequestException as e:
-            raise ConnectionError(f"HTTP signin request failed: {e}")
+            raise ConnectionError(f"HTTP signin request failed: {e}") from e
 
     async def connect(self) -> None:
         """Establish connection to SurrealDB.
@@ -191,12 +191,14 @@ class Connection:
                 self._connected = True
                 logger.debug(f"Connected to SurrealDB: {self.config.namespace}/{self.database}")
 
-            except asyncio.TimeoutError:
-                raise ConnectionError(f"Connection timeout after {self.config.connect_timeout}s")
+            except asyncio.TimeoutError as e:
+                raise ConnectionError(
+                    f"Connection timeout after {self.config.connect_timeout}s"
+                ) from e
             except ConnectionError:
                 raise
             except Exception as e:
-                raise ConnectionError(f"Failed to connect: {e}")
+                raise ConnectionError(f"Failed to connect: {e}") from e
 
     async def disconnect(self) -> None:
         """Close connection."""
@@ -226,6 +228,7 @@ class Connection:
         """
         if not self.is_connected:
             await self.connect()
+        assert self._client is not None
 
         try:
             result = await asyncio.wait_for(
@@ -236,7 +239,7 @@ class Connection:
             # SurrealDB returns list of results for each statement
             if isinstance(result, list):
                 # Flatten results from multiple statements
-                records = []
+                records: list[dict[str, Any]] = []
                 for stmt_result in result:
                     if isinstance(stmt_result, dict):
                         if "result" in stmt_result:
@@ -254,10 +257,10 @@ class Connection:
                 return records
             return result or []
 
-        except asyncio.TimeoutError:
-            raise QueryError(f"Query timeout after {self.config.query_timeout}s")
+        except asyncio.TimeoutError as e:
+            raise QueryError(f"Query timeout after {self.config.query_timeout}s") from e
         except Exception as e:
-            raise QueryError(f"Query failed: {e}")
+            raise QueryError(f"Query failed: {e}") from e
 
     async def create(
         self,
@@ -277,6 +280,7 @@ class Connection:
         """
         if not self.is_connected:
             await self.connect()
+        assert self._client is not None
 
         try:
             if record_id:
@@ -305,7 +309,11 @@ class Connection:
             return {}
 
         except Exception as e:
-            raise QueryError(f"Create failed: {e}")
+            # If record already exists and we have an explicit ID, fall back to update
+            if record_id and ("already exists" in str(e) or str(record_id) in str(e)):
+                logger.debug(f"Record {thing} already exists, updating instead")
+                return await self.update(thing, data)
+            raise QueryError(f"Create failed: {e}") from e
 
     async def select(
         self,
@@ -321,6 +329,7 @@ class Connection:
         """
         if not self.is_connected:
             await self.connect()
+        assert self._client is not None
 
         try:
             result = await self._client.select(thing)
@@ -332,7 +341,7 @@ class Connection:
             return []
 
         except Exception as e:
-            raise QueryError(f"Select failed: {e}")
+            raise QueryError(f"Select failed: {e}") from e
 
     async def update(
         self,
@@ -350,16 +359,17 @@ class Connection:
         """
         if not self.is_connected:
             await self.connect()
+        assert self._client is not None
 
         try:
             result = await self._client.update(thing, data)
 
             if isinstance(result, list):
-                return result[0] if result else {}
-            return result or {}
+                return result[0] if result else {}  # type: ignore[no-any-return]
+            return result or {}  # type: ignore[return-value]
 
         except Exception as e:
-            raise QueryError(f"Update failed: {e}")
+            raise QueryError(f"Update failed: {e}") from e
 
     async def delete(
         self,
@@ -375,12 +385,13 @@ class Connection:
         """
         if not self.is_connected:
             await self.connect()
+        assert self._client is not None
 
         try:
             await self._client.delete(thing)
             return True
         except Exception as e:
-            raise QueryError(f"Delete failed: {e}")
+            raise QueryError(f"Delete failed: {e}") from e
 
     async def live(
         self,
@@ -398,13 +409,14 @@ class Connection:
         """
         if not self.is_connected:
             await self.connect()
+        assert self._client is not None
 
         try:
-            live_id = await self._client.live(table, callback)
+            live_id: str = await self._client.live(table, callback)
             logger.debug(f"Live query started on {table}: {live_id}")
             return live_id
         except Exception as e:
-            raise QueryError(f"Live query failed: {e}")
+            raise QueryError(f"Live query failed: {e}") from e
 
     async def kill(self, live_id: str) -> None:
         """Stop a live query subscription.

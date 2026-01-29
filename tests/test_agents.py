@@ -133,7 +133,7 @@ class TestCursorAgent:
     def test_initialization_invalid_mode_fallback(self, temp_project_dir):
         """Test that invalid mode falls back to default."""
         agent = CursorAgent(temp_project_dir, mode="invalid_mode")
-        assert agent.mode == "agent"  # Default mode
+        assert agent.mode == "ask"  # Default mode (ask is safe for headless)
 
     def test_get_cli_command(self, temp_project_dir):
         """Test CLI command name."""
