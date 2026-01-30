@@ -896,6 +896,15 @@ class WorkflowRunner:
                             except Exception as e:
                                 logger.warning(f"Callback error on phase change: {e}")
 
+        # Retrieve the full accumulated state from the graph checkpoint,
+        # not just the last node's partial output.
+        try:
+            final_snapshot = await graph.aget_state(run_config)
+            if final_snapshot and final_snapshot.values:
+                return dict(final_snapshot.values)
+        except Exception as e:
+            logger.warning(f"Could not retrieve final state from checkpoint: {e}")
+
         return dict(result or initial_state or {})
 
     async def resume(
