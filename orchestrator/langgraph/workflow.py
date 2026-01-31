@@ -807,6 +807,7 @@ class WorkflowRunner:
             Final workflow state
         """
         result = None
+        final_graph_output = None  # Full accumulated state from LangGraph completion
         previous_phase: int | None = initial_state.get("current_phase") if initial_state else None
 
         # Emit phase_start for the initial phase
@@ -836,6 +837,12 @@ class WorkflowRunner:
                             logger.warning(f"Callback error on_node_start: {e}")
 
             elif event_type == "on_chain_end":
+                # Capture the LangGraph-level completion event (full accumulated state)
+                if event_name == "LangGraph":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict) and len(output) > 1:
+                        final_graph_output = output
+
                 # Node completed
                 if event_name and event_name != "LangGraph":
                     output = event.get("data", {}).get("output", {})
@@ -896,15 +903,30 @@ class WorkflowRunner:
                             except Exception as e:
                                 logger.warning(f"Callback error on phase change: {e}")
 
-        # Retrieve the full accumulated state from the graph checkpoint,
-        # not just the last node's partial output.
+        # Return the full accumulated state. Priority:
+        # 1. LangGraph-level on_chain_end output (full state from graph completion)
+        # 2. aget_state from checkpoint (may be stale with some checkpointers)
+        # 3. Fallback to last node's partial output merged with initial state
+        if final_graph_output and "phase_status" in final_graph_output:
+            logger.info("Returning full state from LangGraph completion event")
+            return dict(final_graph_output)
+
+        # Try checkpoint as secondary source
         try:
             state_config = {"configurable": run_config.get("configurable", {})}
             final_snapshot = await graph.aget_state(state_config)
             if final_snapshot and final_snapshot.values:
-                return dict(final_snapshot.values)
+                snapshot_dict = dict(final_snapshot.values)
+                logger.info("Returning state from checkpoint")
+                return snapshot_dict
         except Exception as e:
             logger.warning(f"Could not retrieve final state from checkpoint: {e}")
+
+        # Fallback: merge last node output with initial state
+        if initial_state and result:
+            merged = dict(initial_state)
+            merged.update(result)
+            return merged
 
         return dict(result or initial_state or {})
 
