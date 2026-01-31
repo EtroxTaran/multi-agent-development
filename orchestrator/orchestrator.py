@@ -208,6 +208,7 @@ class Orchestrator:
         start_phase: int = 1,
         end_phase: int = 5,
         skip_validation: bool = False,
+        autonomous: bool = False,
     ) -> dict:
         """Run the orchestration workflow asynchronously using LangGraph.
 
@@ -215,6 +216,7 @@ class Orchestrator:
             start_phase: Phase to start from (1-5)
             end_phase: Phase to end at (1-5)
             skip_validation: Skip the validation phase (phase 2)
+            autonomous: Run fully autonomously without human consultation
 
         Returns:
             Dictionary with workflow results
@@ -223,6 +225,7 @@ class Orchestrator:
             start_phase=start_phase,
             end_phase=end_phase,
             skip_validation=skip_validation,
+            autonomous=autonomous,
         )
 
     def run(
@@ -230,6 +233,7 @@ class Orchestrator:
         start_phase: int = 1,
         end_phase: int = 5,
         skip_validation: bool = False,
+        autonomous: bool = False,
     ) -> dict:
         """Run the orchestration workflow using LangGraph (synchronous wrapper).
 
@@ -237,11 +241,14 @@ class Orchestrator:
             start_phase: Phase to start from (1-5)
             end_phase: Phase to end at (1-5)
             skip_validation: Skip the validation phase (phase 2)
+            autonomous: Run fully autonomously without human consultation
 
         Returns:
             Dictionary with workflow results
         """
-        return asyncio.run(self.run_async(start_phase, end_phase, skip_validation))
+        return asyncio.run(
+            self.run_async(start_phase, end_phase, skip_validation, autonomous)
+        )
 
     def _auto_commit(self, phase_num: int, phase_name: str) -> None:
         """Auto-commit changes after a phase.
@@ -1626,6 +1633,7 @@ Examples:
                 start_phase=start,
                 end_phase=args.end_phase,
                 skip_validation=args.skip_validation,
+                autonomous=args.autonomous,
             )
     else:
         parser.print_help()
